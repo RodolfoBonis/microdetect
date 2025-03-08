@@ -10,18 +10,19 @@ import glob
 
 def annotate_image_manually(image_path, output_dir):
     """
-    Ferramenta simples para anotação manual de leveduras em imagens de microscopia.
-    Instruções:
-    - Clique nas leveduras para marcá-las
-    - Pressione 'r' para resetar
-    - Pressione 'q' para sair sem salvar
-    - Pressione 's' para salvar e ir para a próxima imagem
+    Tool for manually annotating yeast cells in microscopy images with custom bounding boxes.
+    Instructions:
+    - Click and drag to draw bounding boxes
+    - Select a class before drawing each box
+    - Press 'r' to reset
+    - Press 'q' to quit without saving
+    - Press 's' to save and go to next image
+    - Press 'd' to delete the last box
 
     Args:
-        image_path: Caminho para a imagem a ser anotada
-        output_dir: Diretório para salvar as anotações
+        image_path: Path to the image to be annotated
+        output_dir: Directory to save the annotations
     """
-
     import tkinter as tk
     from PIL import Image, ImageTk
 
@@ -37,39 +38,134 @@ def annotate_image_manually(image_path, output_dir):
     else:
         new_w, new_h = w, h
 
-    points = []
+    # Store bounding boxes as (class_id, x1, y1, x2, y2) in original image coordinates
+    bounding_boxes = []
+    start_x, start_y = None, None
+    current_rect = None
+
+    # Available classes for annotation
+    classes = ["0-levedura", "1-fungo", "2-micro-alga"]  # Customize classes here
+    current_class = "0-levedura"  # Default class
 
     root = tk.Tk()
-    root.title("Anotação de Leveduras")
+    root.title("Yeast Annotation Tool")
+
+    # Create main frame
+    main_frame = tk.Frame(root)
+    main_frame.pack(fill=tk.BOTH, expand=True)
+
+    # Control panel
+    control_frame = tk.Frame(main_frame)
+    control_frame.pack(side=tk.TOP, fill=tk.X)
+
+    # Class selection
+    class_label = tk.Label(control_frame, text="Select class:")
+    class_label.pack(side=tk.LEFT, padx=5)
+
+    class_var = tk.StringVar(root)
+    class_var.set(current_class)
+
+    class_menu = tk.OptionMenu(control_frame, class_var, *classes)
+    class_menu.pack(side=tk.LEFT, padx=5)
+    class_var.trace("w", lambda *args: set_current_class(class_var.get()))
 
     # Convert to PhotoImage for Tkinter
     img_tk = ImageTk.PhotoImage(Image.fromarray(img))
 
     # Create canvas
-    canvas = tk.Canvas(root, width=new_w, height=new_h)
-    canvas.pack()
+    canvas = tk.Canvas(main_frame, width=new_w, height=new_h)
+    canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
     canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
 
     # Status label
-    status_label = tk.Label(root, text="Contagem: 0")
-    status_label.pack()
+    status_label = tk.Label(main_frame, text="Count: 0 | Draw by clicking and dragging")
+    status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def on_click(event):
-        x, y = event.x, event.y
-        # Convert coordinates back to original scale
-        orig_x = int(x / scale) if scale < 1 else x
-        orig_y = int(y / scale) if scale < 1 else y
-        points.append((orig_x, orig_y))
+    def set_current_class(class_name):
+        nonlocal current_class
+        current_class = class_name
+        status_label.config(
+            text=f"Class: {current_class} | Count: {len(bounding_boxes)} | Draw by clicking and dragging")
 
-        # Draw point
-        canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill='green')
-        status_label.config(text=f"Contagem: {len(points)}")
+    def on_mouse_down(event):
+        nonlocal start_x, start_y, current_rect
+        start_x, start_y = event.x, event.y
 
-    def reset():
+    def on_mouse_move(event):
+        nonlocal current_rect
+        if start_x is not None and start_y is not None:
+            # Delete previous rectangle if exists
+            if current_rect:
+                canvas.delete(current_rect)
+            # Draw new rectangle
+            current_rect = canvas.create_rectangle(
+                start_x, start_y, event.x, event.y,
+                outline='green', width=2
+            )
+
+    def on_mouse_up(event):
+        nonlocal start_x, start_y, current_rect
+        if start_x is not None and start_y is not None:
+            # Convert coordinates back to original scale
+            x1 = min(start_x, event.x) / scale if scale < 1 else min(start_x, event.x)
+            y1 = min(start_y, event.y) / scale if scale < 1 else min(start_y, event.y)
+            x2 = max(start_x, event.x) / scale if scale < 1 else max(start_x, event.x)
+            y2 = max(start_y, event.y) / scale if scale < 1 else max(start_y, event.y)
+
+            # Get class index (format is "0-live", we need just the number)
+            class_id = current_class.split('-')[0]
+
+            # Add to bounding boxes list
+            bounding_boxes.append((class_id, int(x1), int(y1), int(x2), int(y2)))
+
+            # Add class label next to the box
+            label_text = f"{current_class} #{len(bounding_boxes)}"
+            canvas.create_text(
+                min(start_x, event.x), min(start_y, event.y) - 5,
+                text=label_text, anchor=tk.SW, fill='green', font=("Arial", 10, "bold")
+            )
+
+            # Update status
+            status_label.config(
+                text=f"Class: {current_class} | Count: {len(bounding_boxes)} | Draw by clicking and dragging")
+
+            # Reset
+            start_x, start_y = None, None
+            current_rect = None
+
+    def delete_last():
+        if bounding_boxes:
+            bounding_boxes.pop()
+            redraw_all_boxes()
+            status_label.config(text=f"Class: {current_class} | Count: {len(bounding_boxes)} | Last box deleted")
+
+    def redraw_all_boxes():
         canvas.delete("all")
         canvas.create_image(0, 0, anchor=tk.NW, image=img_tk)
-        points.clear()
-        status_label.config(text="Contagem: 0")
+
+        for i, (class_id, x1, y1, x2, y2) in enumerate(bounding_boxes):
+            # Convert back to display coordinates
+            dx1 = x1 * scale if scale < 1 else x1
+            dy1 = y1 * scale if scale < 1 else y1
+            dx2 = x2 * scale if scale < 1 else x2
+            dy2 = y2 * scale if scale < 1 else y2
+
+            # Find class name for display
+            class_name = next((c for c in classes if c.startswith(class_id)), f"{class_id}-unknown")
+
+            # Draw rectangle
+            canvas.create_rectangle(dx1, dy1, dx2, dy2, outline='green', width=2)
+
+            # Draw label
+            canvas.create_text(
+                dx1, dy1 - 5, text=f"{class_name} #{i + 1}",
+                anchor=tk.SW, fill='green', font=("Arial", 10, "bold")
+            )
+
+    def reset():
+        bounding_boxes.clear()
+        redraw_all_boxes()
+        status_label.config(text=f"Class: {current_class} | Count: 0 | All boxes cleared")
 
     def save():
         base_name = os.path.basename(image_path)
@@ -77,29 +173,48 @@ def annotate_image_manually(image_path, output_dir):
         txt_path = os.path.join(output_dir, txt_filename)
 
         with open(txt_path, "w") as f:
-            for point in points:
-                x, y = point
-                box_w, box_h = 0.03, 0.03
-                x_center = x / w
-                y_center = y / h
-                f.write(f"0 {x_center} {y_center} {box_w} {box_h}\n")
+            for box in bounding_boxes:
+                class_id, x1, y1, x2, y2 = box
 
-        print(f"Anotação salva em {txt_path}. {len(points)} leveduras marcadas.")
-        root.quit()
+                # Convert to YOLO format: class_id center_x center_y width height (normalized)
+                box_w = (x2 - x1) / w
+                box_h = (y2 - y1) / h
+                center_x = (x1 + (x2 - x1) / 2) / w
+                center_y = (y1 + (y2 - y1) / 2) / h
+
+                f.write(f"{class_id} {center_x} {center_y} {box_w} {box_h}\n")
+
+        print(f"Annotation saved to {txt_path}. {len(bounding_boxes)} boxes annotated.")
+        root.destroy()
+
+    def on_closing():
+        root.destroy()
 
     # Buttons
-    button_frame = tk.Frame(root)
+    button_frame = tk.Frame(main_frame)
     button_frame.pack(fill=tk.X)
 
     tk.Button(button_frame, text="Reset (R)", command=reset).pack(side=tk.LEFT, padx=5)
+    tk.Button(button_frame, text="Delete Last (D)", command=delete_last).pack(side=tk.LEFT, padx=5)
     tk.Button(button_frame, text="Save (S)", command=save).pack(side=tk.LEFT, padx=5)
-    tk.Button(button_frame, text="Quit (Q)", command=root.quit).pack(side=tk.LEFT, padx=5)
+    tk.Button(button_frame, text="Quit (Q)", command=on_closing).pack(side=tk.LEFT, padx=5)
+
+    # Bind events
+    canvas.bind('<ButtonPress-1>', on_mouse_down)
+    canvas.bind('<B1-Motion>', on_mouse_move)
+    canvas.bind('<ButtonRelease-1>', on_mouse_up)
 
     # Bind keyboard shortcuts
     root.bind('<r>', lambda e: reset())
+    root.bind('<d>', lambda e: delete_last())
     root.bind('<s>', lambda e: save())
-    root.bind('<q>', lambda e: root.quit())
-    canvas.bind('<Button-1>', on_click)
+    root.bind('<q>', lambda e: on_closing())
+
+    # Protocol for window closing
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+
+    # Store the image reference to prevent garbage collection
+    canvas.img_tk = img_tk
 
     root.mainloop()
 

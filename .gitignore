@@ -1,0 +1,108 @@
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.conda
+
+# Dataset and images
+dataset/
+data/images/
+data/labels/
+runs/
+
+# Model files
+*.pt
+*.pth
+*.onnx
+*.mlmodel
+*.torchscript
+*.engine
+*.tflite
+*.weights
+
+# Training output
+runs/
+*.json
+*.csv
+*_pred.*
+*_aug*.*
+
+# Images (except those in samples folder)
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
+!samples/**/*.jpg
+!samples/**/*.png
+
+# Logs
+logs/
+*.log
+events.out.tfevents.*
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Icon?
+*.swp
+
+# IDE specific
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+
+# YOLOv8 specific
+*_openvino_model
+*.torchscript
+*.onnx
+*.coreml
+*.mlmodel
+*.tflite
+*.edgetpu
+*.tfjs
+*_paddle_model
+*.ncnn
+
+# Conda environment
+.conda/
+conda-meta/
