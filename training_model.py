@@ -1,12 +1,13 @@
-import os
 import argparse
-import yaml
-import shutil
-import random
-from pathlib import Path
-import cv2
 import glob
+import os
+import random
+import shutil
+
+import cv2
 import numpy as np
+import torch
+import yaml
 from ultralytics import YOLO
 
 
@@ -139,9 +140,6 @@ def augment_data(input_image_dir, input_label_dir, output_image_dir, output_labe
         output_label_dir: Directory to save augmented annotations
         augmentation_factor: Number of variations to generate for each image
     """
-    import cv2
-    import glob
-    import numpy as np
 
     os.makedirs(output_image_dir, exist_ok=True)
     os.makedirs(output_label_dir, exist_ok=True)
@@ -244,7 +242,6 @@ def train_yolo(data_yaml, model_size='m', epochs=100, batch_size=16, image_size=
     model = YOLO(model_name)
 
     # Determine device - use MPS if available on Apple Silicon
-    import torch
     if torch.backends.mps.is_available():
         device = 'mps'
         print("Training on Apple GPU (MPS)")
@@ -282,7 +279,6 @@ def evaluate_and_report(model_path, data_yaml, output_dir='reports'):
         data_yaml: Caminho para o arquivo de configuração do dataset
         output_dir: Diretório para salvar o relatório
     """
-    import pandas as pd
     import matplotlib.pyplot as plt
     from datetime import datetime
     import json
