@@ -11,8 +11,8 @@ SOURCE_LABEL_DIR = data/labels
 OUTPUT_DIR = runs/train
 
 # Training parameters
-MODEL_SIZE = n
-EPOCHS = 20
+MODEL_SIZE = s
+EPOCHS = 50
 BATCH_SIZE = 32
 IMAGE_SIZE = 640
 AUGMENT_FACTOR = 5
