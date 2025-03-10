@@ -3,6 +3,6 @@ names:
 - 1-fungo
 - 2-micro-alga
 nc: 3
-test: /Users/rodolfodebonis/Documents/projects/yeast_training_model/dataset/test/images
-train: /Users/rodolfodebonis/Documents/projects/yeast_training_model/dataset/train/images
-val: /Users/rodolfodebonis/Documents/projects/yeast_training_model/dataset/val/images
+test: /home/rodol/projects/yeast_model_training/dataset/test/images
+train: /home/rodol/projects/yeast_model_training/dataset/train/images
+val: /home/rodol/projects/yeast_model_training/dataset/val/images

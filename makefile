@@ -15,7 +15,7 @@ MODEL_SIZE = s
 EPOCHS = 50
 BATCH_SIZE = 32
 IMAGE_SIZE = 640
-AUGMENT_FACTOR = 5
+AUGMENT_FACTOR = 20
 
 # Default target
 all: help
@@ -49,17 +49,25 @@ augment:
 	@echo "Augmenting training data..."
 	python training_model.py --dataset_dir $(DATASET_DIR) --augment --augment_factor $(AUGMENT_FACTOR)
 
+# Fix PyTorch/torchvision compatibility
 fix-torch:
 	@echo "Fixing PyTorch/torchvision compatibility..."
 	pip install torchvision==0.21.0
 
+# Update PyTorch and torchvision
 update-torch:
 	@echo "Updating PyTorch and torchvision..."
 	pip install -U torch torchvision
 
+# Create necessary directories
 create-dirs:
 	@echo "Creating necessary directories..."
 	mkdir -p scripts dataset data/images data/labels runs/train
+
+# Convert TIFF images to PNG
+convert-tiff:
+	@echo "Converting TIFF images to PNG..."
+	python convert_tiff.py --input_dir $(SOURCE_IMG_DIR) --output_dir $(SOURCE_IMG_DIR) --use_opencv --delete_original
 
 # Annotation tool
 annotate:
@@ -121,6 +129,7 @@ help:
 	@echo "  make fix-torch      - Fix PyTorch/torchvision compatibility"
 	@echo "  make update-torch   - Update PyTorch and torchvision"
 	@echo "  make create-dirs    - Create necessary directories"
+	@echo "  make convert-tiff   - Convert TIFF images to PNG format"
 	@echo "  make clean          - Clean up generated files"
 	@echo ""
 	@echo "Configuration (override with make VAR=value):"
@@ -131,4 +140,4 @@ help:
 	@echo "  BATCH_SIZE = $(BATCH_SIZE)"
 	@echo "  AUGMENT_FACTOR = $(AUGMENT_FACTOR)"
 
-.PHONY: all setup install setup-win prepare-data augment annotate visualize train train-augmented train-simple evaluate fix-torch update-torch create-dirs clean help
+.PHONY: all setup install setup-win prepare-data augment annotate visualize train train-augmented train-simple evaluate fix-torch update-torch create-dirs convert-tiff clean help
