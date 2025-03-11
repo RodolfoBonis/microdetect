@@ -253,13 +253,31 @@ jobs:
           # Decode the JSON-encoded message from outputs
           echo '${{ needs.get_commit_messages.outputs.commit_messages }}' | jq -r > processed_message.txt
 
-          # Escape Markdown special characters in the message
-          escaped_message=$(cat processed_message.txt | sed -E 's/([_*\[\]()~`>#+\-=|{}.!])/\\\1/g')
+          # Escape Markdown special characters one by one
+          cat processed_message.txt | \
+          sed 's/\*/\\*/g' | \
+          sed 's/_/\\_/g' | \
+          sed 's/\[/\\[/g' | \
+          sed 's/\]/\\]/g' | \
+          sed 's/(/\\(/g' | \
+          sed 's/)/\\)/g' | \
+          sed 's/~/\\~/g' | \
+          sed 's/`/\\`/g' | \
+          sed 's/>/\\>/g' | \
+          sed 's/#/\\#/g' | \
+          sed 's/+/\\+/g' | \
+          sed 's/-/\\-/g' | \
+          sed 's/=/\\=/g' | \
+          sed 's/|/\\|/g' | \
+          sed 's/{/\\{/g' | \
+          sed 's/}/\\}/g' | \
+          sed 's/\./\\./g' | \
+          sed 's/!/\\!/g' > escaped_message.txt
 
           # Read and format for GitHub Actions output
           delimiter="EOF_MESSAGE"
           echo "processed<<$delimiter" >> $GITHUB_OUTPUT
-          echo "$escaped_message" >> $GITHUB_OUTPUT
+          cat escaped_message.txt >> $GITHUB_OUTPUT
           echo "$delimiter" >> $GITHUB_OUTPUT
 
       - name: Set branch name
