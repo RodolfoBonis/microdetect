@@ -249,10 +249,10 @@ jobs:
           mkdir -p microdetect
           # Create __init__.py if it doesn't exist
           if [ ! -f "microdetect/__init__.py" ]; then
-            echo '__version__ = "${VERSION_NUM}"' > microdetect/__init__.py
+            echo "__version__ = '${VERSION_NUM}'" > microdetect/__init__.py
           else
             # Update version in __init__.py
-            sed -i 's/__version__ = .*/__version__ = "${VERSION_NUM}"/' microdetect/__init__.py
+            sed -i "s/__version__ = .*/__version__ = '${VERSION_NUM}'/" microdetect/__init__.py
           fi
           cat microdetect/__init__.py | grep "__version__"
 
@@ -299,7 +299,7 @@ jobs:
 
   notify:
     name: Send Notification
-    needs: [determine_version, create_release]
+    needs: [ determine_version, create_release ]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -307,12 +307,27 @@ jobs:
         id: branch_name
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # For PR, use the source branch name
             echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
           else
-            # For direct push, use regular branch name
             echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
+
+      - name: Format release info for Telegram
+        if: always()
+        id: format_telegram
+        run: |
+          # Get the release info and escape markdown special characters
+          release_info="${{ needs.determine_version.outputs.changelog }}"
+
+          # Remove JSON quotes and process the content
+          release_info=$(echo "$release_info" | sed 's/^"//;s/"$//')
+
+          # Escape markdown special characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+          escaped_info=$(echo "$release_info" | sed 's/\([_*\[\]()~`>#+=|{}\.!]\)/\\\1/g')
+
+          echo "telegram_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$escaped_info" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Success Message via Telegram
         if: needs.create_release.outputs.release_status == 'success'
@@ -327,7 +342,7 @@ jobs:
 
             Type: ${{ needs.determine_version.outputs.version_type }} release
 
-            ${{ needs.determine_version.outputs.changelog }}
+            ${{ steps.format_telegram.outputs.telegram_info }}
 
             ➡️ The deployment to AWS CodeArtifact will start automatically.
 
@@ -343,13 +358,13 @@ jobs:
           parse_mode: 'markdown'
           text: |
             ❌ *Release Creation Failed!*
-            
+
             *Error Details:*
             • Repository: ${{ github.repository }}
             • Branch: ${{ steps.branch_name.outputs.branch }}
             • Version: ${{ needs.determine_version.outputs.new_version }}
             • Triggered by: ${{ github.actor }}
-            
-            ${{ needs.determine_version.outputs.error_message || 'Failed to create GitHub release. Check workflow logs for details.' }}
-            
+
+            ${{ needs.determine_version.outputs.error_message || 'Failed to create GitHub release\\. Check workflow logs for details\\.' }}
+
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

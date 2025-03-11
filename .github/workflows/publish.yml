@@ -205,6 +205,23 @@ jobs:
             echo "status=failure" >> $GITHUB_OUTPUT
           fi
 
+      - name: Format release info for Telegram
+        if: always()
+        id: format_telegram
+        run: |
+          # Get the release info and escape markdown special characters
+          release_info="${{ needs.get_release_info.outputs.release_info }}"
+
+          # Remove JSON quotes and process the content
+          release_info=$(echo "$release_info" | sed 's/^"//;s/"$//')
+
+          # Escape markdown special characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
+          escaped_info=$(echo "$release_info" | sed 's/\([_*\[\]()~`>#+=|{}\.!]\)/\\\1/g')
+
+          echo "telegram_info<<EOF" >> $GITHUB_OUTPUT
+          echo "$escaped_info" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Send Success Message via Telegram
         if: steps.status.outputs.status == 'success'
         uses: akeylimepie/telegram-action@main
@@ -215,15 +232,15 @@ jobs:
           parse_mode: 'markdown'
           text: |
             ✅ *Successfully Deployed to AWS CodeArtifact!*
-            
+
             *Details:*
             • Package: MicroDetect
             • Version: ${{ needs.get_release_info.outputs.version }}
             • Repository: ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }}
             • Domain: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
-            
-            ${{ needs.get_release_info.outputs.release_info }}
-            
+
+            ${{ steps.format_telegram.outputs.telegram_info }}
+
             📦 [View GitHub Action](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: Send Error Message via Telegram
@@ -243,6 +260,6 @@ jobs:
             • Repository: ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }}
             • Domain: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
             
-            ${{ needs.get_release_info.outputs.release_info }}
+            ${{ steps.format_telegram.outputs.telegram_info }}
             
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
