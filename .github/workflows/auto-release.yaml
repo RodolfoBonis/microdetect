@@ -2,7 +2,7 @@ name: Auto Release
 
 on:
   workflow_run:
-    workflows: ["CI"]  # Use the exact name of your CI workflow here
+    workflows: ["MicroDetect CI"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -23,6 +23,12 @@ on:
         default: false
         type: boolean
 
+# Add permissions block to ensure workflow has necessary rights
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
+
 jobs:
   check_workflow_status:
     runs-on: ubuntu-latest
@@ -35,6 +41,7 @@ jobs:
             echo "Workflow name: ${{ github.event.workflow_run.name }}"
             echo "Workflow conclusion: ${{ github.event.workflow_run.conclusion }}"
             echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
+            echo "Head branch: ${{ github.event.workflow_run.head_branch }}"
           else
             echo "Running from manual workflow dispatch"
           fi
@@ -51,9 +58,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Use the SHA from the workflow_run event if available, otherwise normal checkout
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || github.token }}
 
       # Rest of the job remains unchanged
       - name: Get latest tag
@@ -212,6 +219,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          token: ${{ secrets.GH_TOKEN || github.token }}
+
+      - name: Install GitHub CLI
+        run: |
+          # Make sure GitHub CLI is installed
+          if ! command -v gh &> /dev/null; then
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt update
+            sudo apt install gh -y
+          fi
 
       - name: Update version in code
         id: update_version
@@ -233,26 +253,31 @@ jobs:
 
       - name: Commit version update
         id: commit_version
-        continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add microdetect/__init__.py
-          git commit -m "chore: bump version to ${{ needs.determine_version.outputs.new_version }}"
-          git push
+          git commit -m "chore: bump version to ${{ needs.determine_version.outputs.new_version }}" || echo "No changes to commit"
+          git push || echo "Failed to push changes, possibly already up to date"
 
-      - name: Create Release
+      - name: Create Release with GitHub CLI
         id: create_release
-        continue-on-error: true
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        with:
-          tag_name: ${{ needs.determine_version.outputs.new_version }}
-          release_name: Release ${{ needs.determine_version.outputs.new_version }}
-          body: ${{ needs.determine_version.outputs.changelog }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+        run: |
+          # Create tag
+          git tag ${{ needs.determine_version.outputs.new_version }}
+          git push --tags
+
+          # Create the release with GitHub CLI
+          RELEASE_URL=$(gh release create \
+            ${{ needs.determine_version.outputs.new_version }} \
+            --title "Release ${{ needs.determine_version.outputs.new_version }}" \
+            --notes "${{ needs.determine_version.outputs.changelog }}")
+
+          echo "::set-output name=html_url::$RELEASE_URL"
+          echo "Release created at: $RELEASE_URL"
+          echo "success=true" >> $GITHUB_OUTPUT
 
       - name: Set status
         id: status
