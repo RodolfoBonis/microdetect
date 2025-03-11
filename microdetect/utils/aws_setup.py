@@ -3,7 +3,6 @@ Módulo para configuração do AWS CodeArtifact para atualizações do MicroDete
 """
 
 import configparser
-import getpass
 import logging
 import os
 import subprocess
@@ -11,23 +10,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
-try:
-    from colorama import Fore, Style, init
-
-    # Inicializar colorama (necessário para Windows)
-    init(autoreset=True)
-    # Definir cores e estilos
-    INFO = Fore.CYAN
-    SUCCESS = Fore.GREEN
-    WARNING = Fore.YELLOW
-    ERROR = Fore.RED
-    BRIGHT = Style.BRIGHT
-    RESET = Style.RESET_ALL
-    COLORS_AVAILABLE = True
-except ImportError:
-    # Fallback se colorama não estiver disponível
-    INFO = WARNING = SUCCESS = ERROR = BRIGHT = RESET = ""
-    COLORS_AVAILABLE = False
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)
 
