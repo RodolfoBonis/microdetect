@@ -1,8 +1,0 @@
-names:
-- 0-levedura
-- 1-fungo
-- 2-micro-alga
-nc: 3
-test: /home/rodol/projects/yeast_model_training/dataset/test/images
-train: /home/rodol/projects/yeast_model_training/dataset/train/images
-val: /home/rodol/projects/yeast_model_training/dataset/val/images

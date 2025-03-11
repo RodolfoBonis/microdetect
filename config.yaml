@@ -1,0 +1,45 @@
+# Configuração para o Projeto de Detecção de Microorganismos
+
+# Diretórios
+directories:
+  dataset: dataset
+  images: data/images
+  labels: data/labels
+  output: runs/train
+  reports: reports
+
+# Classes para detecção
+classes:
+  - "0-levedura"
+  - "1-fungo"
+  - "2-micro-alga"
+
+# Mapeamento de cores para visualização
+color_map:
+  "0": [0, 255, 0]  # Verde para levedura
+  "1": [0, 0, 255]  # Vermelho para fungo
+  "2": [255, 0, 0]  # Azul para micro-alga
+
+# Parâmetros de treinamento
+training:
+  model_size: s
+  epochs: 100
+  batch_size: 32
+  image_size: 640
+  pretrained: true
+
+# Parâmetros para divisão do dataset
+dataset:
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  seed: 42
+
+# Parâmetros para augmentação de dados
+augmentation:
+  factor: 20
+  brightness_range: [0.8, 1.2]
+  contrast_range: [-30, 30]
+  flip_probability: 0.5
+  rotation_range: [-15, 15]
+  noise_probability: 0.3

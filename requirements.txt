@@ -1,0 +1,19 @@
+# Dependências principais
+ultralytics>=8.1.0
+opencv-python>=4.8.0
+numpy>=1.22.0
+pyyaml>=6.0.0
+matplotlib>=3.7.0
+pillow>=10.0.0
+tqdm>=4.65.0
+
+# Bibliotecas para interface gráfica de anotação
+tk; platform_system != "Darwin" or python_version < "3.12"
+
+# PyTorch (as versões específicas serão instaladas conforme o ambiente)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Utilidades para processamento de dados
+pandas>=2.0.0
+scikit-learn>=1.3.0

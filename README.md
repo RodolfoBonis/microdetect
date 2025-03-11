@@ -1,244 +1,229 @@
-# Microorganism Detection Project
+# MicroDetect
 
-This project provides a complete pipeline for detecting and classifying microorganisms (yeasts, fungi, and micro-algae) using YOLOv8 object detection. The tools include image annotation, data augmentation, training, and evaluation functionalities.
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![License](https://img.shields.io/badge/license-PROPRIETARY-green)
 
-**Documentation Languages:**
-- [English](README.md) (current)
-- [Portuguese](README-pt.md)
+**MicroDetect** is a comprehensive tool for detecting and classifying microorganisms in microscopy images using YOLOv8. This project provides a complete pipeline from image conversion, manual annotation, data augmentation, training to model evaluation.
 
-## Features
+## Documentation Languages
+[English](README.md)(Current) | [Portuguese](README.pt.md)
 
-- Manual annotation tool for creating bounding boxes
-- Data augmentation to expand your training dataset
-- TIFF to PNG image conversion
-- Annotation visualization and validation
-- Training pipeline with YOLOv8
-- Model evaluation with detailed metrics and reports
-- Support for multiple operating systems
+## Key Features
 
-## Requirements
+- 🔍 **Image Conversion**: Converts TIFF images to formats suitable for processing
+- 🏷️ **Manual Annotation**: Graphical interface for marking microorganisms in images
+- 👁️ **Visualization**: Visualizes existing annotations in images
+- 🔄 **Data Augmentation**: Enhances dataset with augmentation techniques
+- 📊 **Dataset Preparation**: Splits and organizes data for training/validation/testing
+- 🧠 **Model Training**: Trains custom YOLOv8 models with your images
+- 📈 **Evaluation**: Evaluates models with detailed metrics and visual reports
 
-- Python 3.8+
-- OpenCV
-- PyTorch
-- Ultralytics YOLOv8
-- NumPy
-- Pillow
-- YAML
-- TensorBoard (for training visualization)
-- CUDA-capable GPU (recommended for training)
+## Supported Microorganisms
+
+- 🦠 **Yeasts**
+- 🍄 **Fungi**
+- 🌱 **Micro-algae**
 
 ## Installation
 
-### Windows
+### Prerequisites
+
+- Python 3.12 or higher
+- Conda (recommended for environment management)
+
+### Setup with Conda (Recommended)
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/microorganism-detection.git
-cd microorganism-detection
+git clone https://github.com/your-username/microdetect.git
+cd microdetect
 
-# Create and activate conda environment
-make setup-win
+# Setup environment
+chmod +x scripts/setup.sh
+./scripts/setup.sh --create
+
+# Activate environment
 conda activate yeast_detection
 
 # Install dependencies
-make install
+./scripts/setup.sh --install
 ```
 
-### macOS/Linux
+### Windows Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/microorganism-detection.git
-cd microorganism-detection
+git clone https://github.com/your-username/microdetect.git
+cd microdetect
 
-# Create and activate conda environment
-make setup
+# Setup environment
+scripts\setup.bat --create
+
+# Activate environment
 conda activate yeast_detection
 
 # Install dependencies
-make install
+scripts\setup.bat --install
 ```
 
-### Manual Installation (Any OS)
+### Manual Installation
 
 ```bash
-# Create conda environment
-conda create -n yeast_detection python=3.12 -y
-conda activate yeast_detection
+# Clone the repository
+git clone https://github.com/your-username/microdetect.git
+cd microdetect
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 
 # Install dependencies
-pip install ultralytics opencv-python-headless numpy pillow pyyaml tqdm
-pip install torch torchvision
+pip install -r requirements.txt
+pip install -e .
+```
+
+## Quick Guide
+
+### Converting TIFF Images to PNG
+
+```bash
+microdetect convert --input_dir data/raw_images --output_dir data/images --use_opencv
+```
+
+### Manual Image Annotation
+
+```bash
+microdetect annotate --image_dir data/images --output_dir data/labels
+```
+
+### Visualizing Annotations
+
+```bash
+microdetect visualize --image_dir data/images --label_dir data/labels
+```
+
+### Data Augmentation
+
+```bash
+microdetect augment --image_dir data/images --label_dir data/labels --factor 10
+```
+
+### Dataset Preparation
+
+```bash
+microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
+```
+
+### Model Training
+
+```bash
+microdetect train --dataset_dir dataset --model_size s --epochs 100
+```
+
+### Model Evaluation
+
+```bash
+microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset --confusion_matrix
 ```
 
 ## Project Structure
 
 ```
-microorganism-detection/
-├── data/
-│   ├── images/         # Raw images for annotation
-│   └── labels/         # Annotation files in YOLO format
-├── dataset/            # Processed dataset with train/val/test splits
-├── scripts/            # Helper scripts
-├── runs/               # Training results and models
-├── reports/            # Evaluation reports and metrics
-├── bounding_boxes.py   # Visualization tool
-├── convert_tiff.py     # TIFF conversion utility
-├── main.py             # Annotation tool
-├── training_model.py   # Training and evaluation script
-└── makefile            # Automation commands
+microdetect/
+├── README.md                  # Main documentation
+├── requirements.txt           # Project dependencies
+├── setup.py                   # Installation script
+├── Makefile                   # Make commands for automation
+├── config.yaml                # Central project configuration
+├── microdetect/               # Main package
+│   ├── __init__.py            # Package initialization
+│   ├── cli.py                 # Command line interface
+│   ├── data/                  # Data processing modules
+│   │   ├── __init__.py
+│   │   ├── augmentation.py    # Image augmentation
+│   │   ├── conversion.py      # Format conversion
+│   │   └── dataset.py         # Dataset management
+│   ├── annotation/            # Annotation modules
+│   │   ├── __init__.py
+│   │   ├── annotator.py       # Annotation tool
+│   │   └── visualization.py   # Annotation visualization
+│   ├── training/              # Training modules
+│   │   ├── __init__.py
+│   │   ├── train.py           # Model training
+│   │   └── evaluate.py        # Model evaluation
+│   └── utils/                 # Utility functions and classes
+│       ├── __init__.py
+│       └── config.py          # Configuration management
+└── scripts/                   # Helper scripts
+    ├── setup.sh               # Setup on Linux/Mac
+    └── setup.bat              # Setup on Windows
 ```
 
-## Usage
+## Dataset Structure
 
-### Directory Setup
+The project follows the standard YOLOv8 structure:
 
-Create necessary directories for your project:
+```
+dataset/
+├── train/                     # Training data
+│   ├── images/                # Images for training
+│   └── labels/                # Annotations in YOLO format
+├── val/                       # Validation data
+│   ├── images/
+│   └── labels/
+├── test/                      # Test data
+│   ├── images/
+│   └── labels/
+└── data.yaml                  # Dataset configuration
+```
+
+## Annotation Format
+
+Annotations follow the YOLO format:
+
+```
+<class_id> <x_center> <y_center> <width> <height>
+```
+
+Where:
+- `class_id`: Class ID (0=yeast, 1=fungus, 2=micro-algae)
+- `x_center`, `y_center`: Normalized coordinates (0-1) of the box center
+- `width`, `height`: Normalized width and height (0-1) of the box
+
+## Using with Makefile
+
+The project includes a Makefile for convenience:
 
 ```bash
+# Create directories
 make create-dirs
-```
 
-### Convert TIFF Images to PNG
-
-If your images are in TIFF format, convert them to PNG:
-
-```bash
-make convert-tiff
-# or manually:
-python convert_tiff.py --input_dir data/images --output_dir data/images --use_opencv --delete_original
-```
-
-### Annotate Images
-
-Launch the annotation tool to create bounding boxes:
-
-```bash
+# Annotate images
 make annotate
-# or manually:
-python main.py annotate --image_dir data/images --output_dir data/labels
-```
 
-Instructions:
-- Click and drag to create bounding boxes
-- Use the class dropdown to select microorganism type
-- 'r' to reset, 'd' to delete last box, 's' to save, 'q' to quit
-
-### Visualize Annotations
-
-Check your annotations visually:
-
-```bash
-make visualize
-# or manually:
-python bounding_boxes.py --image_dir data/images --label_dir data/labels
-```
-
-Navigation:
-- 'n' for next image, 'p' for previous image
-- '0', '1', '2' to toggle class visibility
-- 'a' to show all classes, 'q' to quit
-
-### Prepare Dataset
-
-Split your annotated data into training, validation, and test sets:
-
-```bash
+# Prepare dataset
 make prepare-data
-# or manually:
-python training_model.py --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
-```
 
-### Data Augmentation
-
-Augment your training data to improve model performance:
-
-```bash
-make augment
-# or manually:
-python training_model.py --dataset_dir dataset --augment --augment_factor 20
-```
-
-### Train Model
-
-Train the YOLOv8 model on your dataset:
-
-```bash
+# Train model
 make train
-# or with augmentation:
-make train-augmented
-# or manually:
-python training_model.py --dataset_dir dataset --model_size s --epochs 50 --batch_size 32 --train
+
+# Complete pipeline
+make pipeline
 ```
 
-Model size options:
-- `n`: nano (smallest, fastest)
-- `s`: small
-- `m`: medium
-- `l`: large
-- `x`: xlarge (largest, most accurate)
+## Contributing
 
-### Evaluate Model
-
-Generate evaluation metrics and reports:
-
-```bash
-make evaluate
-# or manually:
-python training_model.py --evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset
-```
-
-## Common Issues & Troubleshooting
-
-### PyTorch/Torchvision Compatibility
-If you encounter compatibility issues:
-```bash
-make fix-torch
-# or
-make update-torch
-```
-
-### GPU Acceleration
-- The script automatically selects the best available device (CUDA GPU, Apple Metal, or CPU)
-- For optimal training performance, use a CUDA-capable NVIDIA GPU
-
-### Memory Issues
-If you encounter CUDA out-of-memory errors:
-- Reduce batch size: `--batch_size 8` or lower
-- Use a smaller model: `--model_size s` or `--model_size n`
-- Reduce image size: `--image_size 416`
-
-## Complete Workflow Example
-
-```bash
-# 1. Setup environment
-make setup
-conda activate yeast_detection
-make install
-
-# 2. Convert TIFF images (if needed)
-make convert-tiff
-
-# 3. Annotate images
-make annotate
-
-# 4. Visualize annotations
-make visualize
-
-# 5. Prepare dataset
-make prepare-data
-
-# 6. Augment training data
-make augment
-
-# 7. Train model
-make train-augmented
-
-# 8. Evaluate model
-make evaluate
-```
+Contributions are welcome! Feel free to open issues or submit pull requests.
 
 ## License
 
-This project is licensed under [Proprietary License](LICENSE) - see the LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contact
+
+For questions, suggestions, or collaborations, please contact:
+
+- Email: contact@example.com
+- GitHub Issues: [https://github.com/your-username/microdetect/issues](https://github.com/your-username/microdetect/issues)

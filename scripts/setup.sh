@@ -1,83 +1,169 @@
 #!/bin/bash
+# Script para configuração do ambiente MicroDetect
 
-echo "Setting up Yeast Detection environment..."
+set -e
 
-# Function to detect platform
+CONDA_ENV_NAME="yeast_detection"
+PYTHON_VERSION="3.12"
+
+show_help() {
+    echo "Uso: $0 [opções]"
+    echo ""
+    echo "Opções:"
+    echo "  --create         Criar novo ambiente conda"
+    echo "  --install        Instalar dependências no ambiente atual"
+    echo "  --update         Atualizar dependências no ambiente atual"
+    echo "  --env NAME       Nome do ambiente conda (padrão: yeast_detection)"
+    echo "  --python VERSION Versão do Python (padrão: 3.12)"
+    echo "  --help           Mostrar esta ajuda"
+    echo ""
+}
+
+# Função para detectar plataforma
 detect_platform() {
-    if [[ "$(uname)" == "Darwin"* ]]; then
-        # Check if M1/M2 Mac
-        if [[ "$(uname -m)" == "arm64" ]]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Verificar se é Mac M1/M2/M3
+        if [[ $(uname -m) == "arm64" ]]; then
             echo "mac_arm"
         else
             echo "mac_intel"
         fi
-    elif [[ "$(grep -i microsoft /proc/version 2>/dev/null)" ]]; then
+    elif [[ $(grep -i microsoft /proc/version 2>/dev/null) ]]; then
         echo "wsl"
     else
         echo "linux"
     fi
 }
 
-# Create and activate conda environment
 create_env() {
-    echo "Creating conda environment: yeast_detection"
-    conda create -n yeast_detection python=3.12 -y
-
-    # Source doesn't work in scripts, inform user to activate manually
-    echo "Please activate the environment manually with:"
-    echo "conda activate yeast_detection"
-    echo "Then run this script again with the --install flag"
+    echo "Criando ambiente conda $CONDA_ENV_NAME com Python $PYTHON_VERSION..."
+    conda create -y -n $CONDA_ENV_NAME python=$PYTHON_VERSION
+    echo "Ambiente criado. Ative-o com: conda activate $CONDA_ENV_NAME"
 }
 
-# Install platform-specific dependencies
-install_deps() {
-    platform=$(detect_platform)
-    echo "Detected platform: $platform"
+install_dependencies() {
+    echo "Instalando dependências..."
 
-    # Install common dependencies
-    echo "Installing common dependencies..."
-    pip install numpy opencv-python PyYAML matplotlib pillow
+    # Verificar se estamos em um ambiente conda
+    if [ -z "$CONDA_PREFIX" ]; then
+        echo "ERRO: Nenhum ambiente conda ativo. Ative um ambiente conda primeiro."
+        exit 1
+    fi
 
-    # Platform-specific installations
-    if [[ "$platform" == "mac_arm" ]]; then
-        echo "Installing PyTorch for Mac M1/M2..."
+    PLATFORM=$(detect_platform)
+    echo "Plataforma detectada: $PLATFORM"
+
+    # Instalar dependências comuns
+    echo "Instalando dependências comuns..."
+    pip install numpy opencv-python PyYAML matplotlib pillow tqdm
+
+    # Instalar PyTorch com versão apropriada para o ambiente
+    if [[ "$PLATFORM" == "mac_arm" ]]; then
+        echo "Instalando PyTorch para Mac M1/M2/M3..."
         pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
 
-        # Verify MPS is available
+        # Verificar disponibilidade de MPS
         python -c "import torch; print(f'PyTorch version: {torch.__version__}'); \
                   print(f'MPS available: {torch.backends.mps.is_available()}')"
 
-    elif [[ "$platform" == "mac_intel" ]]; then
-        echo "Installing PyTorch for Mac Intel..."
+    elif [[ "$PLATFORM" == "mac_intel" ]]; then
+        echo "Instalando PyTorch para Mac Intel..."
         conda install pytorch torchvision -c pytorch -y
 
-    elif [[ "$platform" == "wsl" || "$platform" == "linux" ]]; then
-        echo "Installing PyTorch with CUDA support for Linux/WSL..."
+    elif [[ "$PLATFORM" == "wsl" || "$PLATFORM" == "linux" ]]; then
+        echo "Instalando PyTorch com suporte a CUDA para Linux/WSL..."
         conda install pytorch torchvision pytorch-cuda=12.1 -c pytorch -c nvidia -y
 
-        # Verify CUDA is available
+        # Verificar disponibilidade de CUDA
         python -c "import torch; print(f'PyTorch version: {torch.__version__}'); \
                   print(f'CUDA available: {torch.cuda.is_available()}')"
+    else
+        echo "Plataforma não reconhecida, instalando PyTorch para CPU..."
+        pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
     fi
 
-    # Install optree Update for faster inference
-    echo "Installing optree Update for faster inference..."
+    # Instalar optree atualizado para inferência mais rápida
+    echo "Instalando optree para inferência mais rápida..."
     pip install --upgrade 'optree>=0.13.0'
 
-    # Install YOLOv8
-    echo "Installing Ultralytics YOLOv8..."
+    # Instalar Ultralytics (YOLOv8)
+    echo "Instalando Ultralytics YOLOv8..."
     pip install ultralytics
 
-    echo "Installation complete!"
+    # Instalar outras dependências do projeto
+    if [ -f "requirements.txt" ]; then
+        echo "Instalando dependências do requirements.txt..."
+        pip install -r requirements.txt
+    fi
+
+    # Instalar o próprio pacote em modo desenvolvimento
+    echo "Instalando o pacote em modo desenvolvimento..."
+    pip install -e .
+
+    echo "Instalação concluída!"
 }
 
-# Main execution
-if [[ "$1" == "--create" ]]; then
+update_dependencies() {
+    echo "Atualizando dependências..."
+    pip install -U numpy opencv-python PyYAML matplotlib pillow tqdm ultralytics
+    pip install --upgrade 'optree>=0.13.0'
+
+    if [ -f "requirements.txt" ]; then
+        pip install -U -r requirements.txt
+    fi
+
+    echo "Atualização concluída!"
+}
+
+# Processar argumentos
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --create)
+            CREATE_ENV=1
+            shift
+            ;;
+        --install)
+            INSTALL_DEPS=1
+            shift
+            ;;
+        --update)
+            UPDATE_DEPS=1
+            shift
+            ;;
+        --env)
+            CONDA_ENV_NAME="$2"
+            shift 2
+            ;;
+        --python)
+            PYTHON_VERSION="$2"
+            shift 2
+            ;;
+        --help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Opção desconhecida: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# Executar ações solicitadas
+if [ ! -z "$CREATE_ENV" ]; then
     create_env
-elif [[ "$1" == "--install" ]]; then
-    install_deps
-else
-    echo "Usage:"
-    echo "  ./setup.sh --create   # Create conda environment"
-    echo "  ./setup.sh --install  # Install dependencies (run after activating environment)"
+fi
+
+if [ ! -z "$INSTALL_DEPS" ]; then
+    install_dependencies
+fi
+
+if [ ! -z "$UPDATE_DEPS" ]; then
+    update_dependencies
+fi
+
+# Se nenhuma ação foi especificada, mostrar ajuda
+if [ -z "$CREATE_ENV" ] && [ -z "$INSTALL_DEPS" ] && [ -z "$UPDATE_DEPS" ]; then
+    show_help
 fi

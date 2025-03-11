@@ -1,143 +1,147 @@
-# Makefile for Yeast Detection Project
+# Makefile para Projeto MicroDetect
 
-# Configuration variables
-CONDA_ENV_NAME = yeast_detection
+# Variáveis de configuração
+CONDA_ENV_NAME = microdetect
 PYTHON_VERSION = 3.12
 
-# Data directories
+# Diretórios principais
 DATASET_DIR = dataset
 SOURCE_IMG_DIR = data/images
 SOURCE_LABEL_DIR = data/labels
 OUTPUT_DIR = runs/train
+REPORTS_DIR = reports
 
-# Training parameters
+# Parâmetros de treinamento (podem ser sobrescritos com make VAR=valor)
 MODEL_SIZE = s
-EPOCHS = 50
+EPOCHS = 100
 BATCH_SIZE = 32
 IMAGE_SIZE = 640
 AUGMENT_FACTOR = 20
 
-# Default target
+# Alvo padrão
 all: help
 
-# Environment setup
+# Configuração de ambiente
 setup:
-	@echo "Setting up environment..."
+	@echo "Configurando ambiente..."
 	@chmod +x scripts/setup.sh
 	./scripts/setup.sh --create
-	@echo "Now activate the environment with: conda activate $(CONDA_ENV_NAME)"
-	@echo "Then run: make install"
+	@echo "Agora ative o ambiente com: conda activate $(CONDA_ENV_NAME)"
+	@echo "Em seguida execute: make install"
 
-# Install dependencies (after conda environment activation)
+# Instalar dependências (após ativação do ambiente conda)
 install:
-	@echo "Installing dependencies..."
+	@echo "Instalando dependências..."
 	@chmod +x scripts/setup.sh
 	./scripts/setup.sh --install
 
-# Windows setup (alternative to setup target)
+# Configuração no Windows (alternativa ao alvo setup)
 setup-win:
-	@echo "Setting up environment on Windows..."
-	scripts\setup.bat
+	@echo "Configurando ambiente no Windows..."
+	scripts\setup.bat --create
 
-# Prepare dataset (split into train/val/test)
-prepare-data:
-	@echo "Preparing dataset..."
-	python training_model.py --source_img_dir $(SOURCE_IMG_DIR) --source_label_dir $(SOURCE_LABEL_DIR) --dataset_dir $(DATASET_DIR)
+install-win:
+	@echo "Instalando dependências no Windows..."
+	scripts\setup.bat --install
 
-# Data augmentation
-augment:
-	@echo "Augmenting training data..."
-	python training_model.py --dataset_dir $(DATASET_DIR) --augment --augment_factor $(AUGMENT_FACTOR)
-
-# Fix PyTorch/torchvision compatibility
-fix-torch:
-	@echo "Fixing PyTorch/torchvision compatibility..."
-	pip install torchvision==0.21.0
-
-# Update PyTorch and torchvision
-update-torch:
-	@echo "Updating PyTorch and torchvision..."
-	pip install -U torch torchvision
-
-# Create necessary directories
+# Criar diretórios necessários
 create-dirs:
-	@echo "Creating necessary directories..."
-	mkdir -p scripts dataset data/images data/labels runs/train
+	@echo "Criando diretórios necessários..."
+	mkdir -p scripts $(DATASET_DIR) data/images data/labels $(OUTPUT_DIR) $(REPORTS_DIR)
 
-# Convert TIFF images to PNG
+# Converter imagens TIFF para PNG
 convert-tiff:
-	@echo "Converting TIFF images to PNG..."
-	python convert_tiff.py --input_dir $(SOURCE_IMG_DIR) --output_dir $(SOURCE_IMG_DIR) --use_opencv --delete_original
+	@echo "Convertendo imagens TIFF para PNG..."
+	python -m microdetect convert --input_dir $(SOURCE_IMG_DIR) --output_dir $(SOURCE_IMG_DIR) --use_opencv --delete_original
 
-# Annotation tool
+# Ferramenta de anotação
 annotate:
-	@echo "Starting annotation tool..."
-	python main.py annotate --image_dir $(SOURCE_IMG_DIR) --output_dir $(SOURCE_LABEL_DIR)
+	@echo "Iniciando ferramenta de anotação..."
+	python -m microdetect annotate --image_dir $(SOURCE_IMG_DIR) --output_dir $(SOURCE_LABEL_DIR)
 
-# Visualize annotations
+# Visualizar anotações
 visualize:
-	@echo "Visualizing annotations..."
-	python bounding_boxes.py --image_dir $(SOURCE_IMG_DIR) --label_dir $(SOURCE_LABEL_DIR)
+	@echo "Visualizando anotações..."
+	python -m microdetect visualize --image_dir $(SOURCE_IMG_DIR) --label_dir $(SOURCE_LABEL_DIR)
 
-# Train YOLO model
+# Preparar dataset (dividir em train/val/test)
+prepare-data:
+	@echo "Preparando dataset..."
+	python -m microdetect dataset --source_img_dir $(SOURCE_IMG_DIR) --source_label_dir $(SOURCE_LABEL_DIR) --dataset_dir $(DATASET_DIR)
+
+# Augmentação de dados
+augment:
+	@echo "Realizando augmentação de dados..."
+	python -m microdetect augment --image_dir $(SOURCE_IMG_DIR) --label_dir $(SOURCE_LABEL_DIR) --factor $(AUGMENT_FACTOR)
+
+# Treinar modelo YOLO
 train:
-	@echo "Training YOLO model..."
-	python training_model.py --dataset_dir $(DATASET_DIR) --model_size $(MODEL_SIZE) \
+	@echo "Treinando modelo YOLO..."
+	python -m microdetect train --dataset_dir $(DATASET_DIR) --model_size $(MODEL_SIZE) \
 		--epochs $(EPOCHS) --batch_size $(BATCH_SIZE) --image_size $(IMAGE_SIZE) \
-		--output_dir $(OUTPUT_DIR) --train
+		--output_dir $(OUTPUT_DIR)
 
-# Train YOLO with augmentation
-train-augmented:
-	@echo "Training YOLO model with augmentation..."
-	python training_model.py --dataset_dir $(DATASET_DIR) --model_size $(MODEL_SIZE) \
-		--epochs $(EPOCHS) --batch_size $(BATCH_SIZE) --image_size $(IMAGE_SIZE) \
-		--output_dir $(OUTPUT_DIR) --augment --augment_factor $(AUGMENT_FACTOR) --train
+# Treinar modelo YOLO com busca de hiperparâmetros
+train-hyperparams:
+	@echo "Treinando modelo YOLO com busca de hiperparâmetros..."
+	python -m microdetect train --dataset_dir $(DATASET_DIR) --model_size $(MODEL_SIZE) \
+		--find_hyperparams --output_dir $(OUTPUT_DIR)
 
-# Train YOLO with dataset existing
-train-simple:
-	@echo "Training YOLO model with dataset existing..."
-	python training_model.py --dataset_dir $(DATASET_DIR)
-
-# Evaluate model and generate report
+# Avaliar modelo e gerar relatório
 evaluate:
-	@echo "Evaluating model and generating report..."
-	python training_model.py --evaluate --model_path $(OUTPUT_DIR)/yolov8_$(MODEL_SIZE)_custom/weights/best.pt \
-		--dataset_dir $(DATASET_DIR)
+	@echo "Avaliando modelo e gerando relatório..."
+	python -m microdetect evaluate --model_path $(OUTPUT_DIR)/yolov8_$(MODEL_SIZE)_custom/weights/best.pt \
+		--dataset_dir $(DATASET_DIR) --output_dir $(REPORTS_DIR) --confusion_matrix
 
-# Clean up generated files
+# Pipeline completa: desde a preparação até a avaliação
+pipeline: prepare-data augment train evaluate
+	@echo "Pipeline completa executada com sucesso!"
+
+# Limpar dados gerados
 clean:
-	@echo "Cleaning up augmented data..."
+	@echo "Limpando dados augmentados..."
 	rm -rf $(DATASET_DIR)/train/images/*_aug*
 	rm -rf $(DATASET_DIR)/train/labels/*_aug*
 
-# Help command
+# Limpar tudo (exceto código fonte)
+clean-all: clean
+	@echo "Limpando todos os dados gerados..."
+	rm -rf $(DATASET_DIR)/* $(OUTPUT_DIR)/* $(REPORTS_DIR)/*
+
+# Atualizar dependências
+update:
+	@echo "Atualizando dependências..."
+	./scripts/setup.sh --update
+
+# Comando de ajuda
 help:
-	@echo "Yeast Detection Project Makefile"
+	@echo "MicroDetect - Detecção de Microorganismos"
 	@echo ""
-	@echo "Commands:"
-	@echo "  make setup          - Create conda environment (Mac/Linux)"
-	@echo "  make setup-win      - Create conda environment (Windows)"
-	@echo "  make install        - Install dependencies (after activating env)"
-	@echo "  make prepare-data   - Prepare dataset (train/val/test split)"
-	@echo "  make annotate       - Start annotation tool"
-	@echo "  make augment        - Augment training data"
-	@echo "  make visualize      - Visualize annotations"
-	@echo "  make train          - Train YOLO model"
-	@echo "  make train-augmented - Train with augmentation"
-	@echo "  make train-simple   - Train YOLO with dataset existing"
-	@echo "  make evaluate       - Evaluate model and generate report"
-	@echo "  make fix-torch      - Fix PyTorch/torchvision compatibility"
-	@echo "  make update-torch   - Update PyTorch and torchvision"
-	@echo "  make create-dirs    - Create necessary directories"
-	@echo "  make convert-tiff   - Convert TIFF images to PNG format"
-	@echo "  make clean          - Clean up generated files"
+	@echo "Comandos disponíveis:"
+	@echo "  make setup          - Criar ambiente conda (Linux/Mac)"
+	@echo "  make setup-win      - Criar ambiente conda (Windows)"
+	@echo "  make install        - Instalar dependências (após ativar ambiente)"
+	@echo "  make install-win    - Instalar dependências (Windows)"
+	@echo "  make create-dirs    - Criar diretórios necessários"
+	@echo "  make convert-tiff   - Converter imagens TIFF para PNG"
+	@echo "  make annotate       - Iniciar ferramenta de anotação"
+	@echo "  make visualize      - Visualizar anotações"
+	@echo "  make prepare-data   - Preparar dataset (dividir em train/val/test)"
+	@echo "  make augment        - Realizar augmentação de dados"
+	@echo "  make train          - Treinar modelo YOLO"
+	@echo "  make train-hyperparams - Treinar com busca de hiperparâmetros"
+	@echo "  make evaluate       - Avaliar modelo e gerar relatório"
+	@echo "  make pipeline       - Executar pipeline completa"
+	@echo "  make clean          - Limpar dados augmentados"
+	@echo "  make clean-all      - Limpar todos os dados gerados"
+	@echo "  make update         - Atualizar dependências"
 	@echo ""
-	@echo "Configuration (override with make VAR=value):"
+	@echo "Configuração (sobrescreva com make VAR=valor):"
 	@echo "  SOURCE_IMG_DIR = $(SOURCE_IMG_DIR)"
 	@echo "  SOURCE_LABEL_DIR = $(SOURCE_LABEL_DIR)"
-	@echo "  MODEL_SIZE = $(MODEL_SIZE) (options: n, s, m, l, x)"
+	@echo "  MODEL_SIZE = $(MODEL_SIZE) (opções: n, s, m, l, x)"
 	@echo "  EPOCHS = $(EPOCHS)"
 	@echo "  BATCH_SIZE = $(BATCH_SIZE)"
 	@echo "  AUGMENT_FACTOR = $(AUGMENT_FACTOR)"
 
-.PHONY: all setup install setup-win prepare-data augment annotate visualize train train-augmented train-simple evaluate fix-torch update-torch create-dirs convert-tiff clean help
+.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate pipeline clean clean-all update help
