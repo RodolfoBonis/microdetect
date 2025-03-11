@@ -38,9 +38,9 @@ jobs:
           ci_status=$(gh api repos/${{ github.repository }}/actions/runs \
             --jq '.workflow_runs[] | select(.name=="MicroDetect CI" and .head_sha=="${{ github.sha }}") | .conclusion' \
             | head -n 1)
-          
+
           echo "Latest CI status: $ci_status"
-          
+
           if [ "$ci_status" == "success" ]; then
             echo "success=true" >> $GITHUB_OUTPUT
           else
@@ -54,8 +54,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.set_version.outputs.new_version }}
-      version_type: ${{ steps.determine_type.outputs.version_type }}
+      version_type: ${{ steps.determine_type.outputs.version_type || steps.analyze_pr.outputs.version_type }}
       changelog: ${{ steps.generate_changelog.outputs.changelog }}
+      error_message: ${{ steps.generate_changelog.outputs.error_message || steps.set_version.outputs.error_message || steps.determine_type.outputs.error_message || steps.analyze_pr.outputs.error_message }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -68,19 +69,19 @@ jobs:
           # Get latest tag or set to v0.0.0 if none exists
           latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
-          
+
           # Parse version
           if [[ $latest_tag == v* ]]; then
             version=${latest_tag#v}
           else
             version=$latest_tag
           fi
-          
+
           IFS='.' read -r major minor patch <<< "$version"
           echo "current_major=$major" >> $GITHUB_ENV
           echo "current_minor=$minor" >> $GITHUB_ENV
           echo "current_patch=$patch" >> $GITHUB_ENV
-          
+
           echo "Current version: $latest_tag (Major: $major, Minor: $minor, Patch: $patch)"
 
       - name: Determine version type
@@ -89,13 +90,13 @@ jobs:
         run: |
           # For manual trigger, use the specified version type
           version_type="${{ github.event.inputs.version_type }}"
-          
+
           if [ "$version_type" == "auto" ]; then
             # Auto-detect based on PR labels or commit messages
             # For now, just use patch as default
             version_type="patch"
           fi
-          
+
           echo "version_type=$version_type" >> $GITHUB_OUTPUT
           echo "Version type: $version_type"
 
@@ -107,18 +108,18 @@ jobs:
         run: |
           # Get the PR that was just merged
           pr_number=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
-          
+
           if [ -z "$pr_number" ]; then
             echo "No recent merged PR found. Using patch increment as default."
             echo "version_type=patch" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "Analyzing PR #$pr_number..."
-          
+
           # Get PR labels and title
           pr_data=$(gh pr view $pr_number --json labels,title)
-          
+
           # Check for version labels
           if echo "$pr_data" | grep -q '"name": "major"'; then
             echo "Found major version label"
@@ -146,7 +147,7 @@ jobs:
         run: |
           # Combine the version type from either source
           version_type="${{ steps.determine_type.outputs.version_type || steps.analyze_pr.outputs.version_type }}"
-          
+
           # Calculate new version
           case "$version_type" in
             major)
@@ -159,7 +160,7 @@ jobs:
               new_version="v${current_major}.${current_minor}.$(($current_patch + 1))"
               ;;
           esac
-          
+
           echo "new_version=$new_version" >> $GITHUB_OUTPUT
           echo "New version will be: $new_version"
 
@@ -170,12 +171,12 @@ jobs:
         run: |
           echo "## What's Changed" > changelog.md
           echo "" >> changelog.md
-          
+
           # If we have previous tag, get commits since then
           if [ "$latest_tag" != "v0.0.0" ]; then
             # Get PR numbers from commits
             pr_list=$(git log $latest_tag..HEAD --pretty=format:"%s" | grep -o "#[0-9]*" | tr -d '#' | sort -u)
-            
+
             # If we found PRs, list them with details
             if [ ! -z "$pr_list" ]; then
               for pr in $pr_list; do
@@ -195,37 +196,51 @@ jobs:
             # No previous tag, include all commits
             git log --pretty=format:"* %s (%h)" >> changelog.md
           fi
-          
+
           echo "" >> changelog.md
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$latest_tag...${{ steps.set_version.outputs.new_version }}" >> changelog.md
-          
+
           # Save changelog to output (escape newlines for GitHub Actions)
           changelog=$(cat changelog.md)
           delimiter="EOF_CHANGELOG"
           echo "changelog<<$delimiter" >> $GITHUB_OUTPUT
           echo "$changelog" >> $GITHUB_OUTPUT
           echo "$delimiter" >> $GITHUB_OUTPUT
-          
+
           cat changelog.md
 
   create_release:
     needs: [determine_version]
     runs-on: ubuntu-latest
+    outputs:
+      release_status: ${{ steps.status.outputs.status }}
+      release_url: ${{ steps.create_release.outputs.html_url || '' }}
+      version: ${{ needs.determine_version.outputs.new_version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Update version in code
+        id: update_version
         run: |
           # Extract version number (remove 'v' prefix)
           VERSION="${{ needs.determine_version.outputs.new_version }}"
           VERSION_NUM="${VERSION#v}"
-          
-          # Update version in __init__.py
-          sed -i "s/__version__ = .*/__version__ = '$VERSION_NUM'/" microdetect/__init__.py
+
+          # Make sure the directory exists
+          mkdir -p microdetect
+          # Create __init__.py if it doesn't exist
+          if [ ! -f "microdetect/__init__.py" ]; then
+            echo "__version__ = '${VERSION_NUM}'" > microdetect/__init__.py
+          else
+            # Update version in __init__.py
+            sed -i "s/__version__ = .*/__version__ = '${VERSION_NUM}'/" microdetect/__init__.py
+          fi
           cat microdetect/__init__.py | grep "__version__"
 
       - name: Commit version update
+        id: commit_version
+        continue-on-error: true
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -235,6 +250,7 @@ jobs:
 
       - name: Create Release
         id: create_release
+        continue-on-error: true
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -245,7 +261,34 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Send Notification via Telegram
+      - name: Set status
+        id: status
+        run: |
+          if [[ "${{ steps.create_release.outcome }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+  notify:
+    name: Send Notification
+    needs: [determine_version, create_release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Set branch name
+        id: branch_name
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR, use the source branch name
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          else
+            # For direct push, use regular branch name
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Success Message via Telegram
+        if: needs.create_release.outputs.release_status == 'success'
         uses: akeylimepie/telegram-action@main
         with:
           token: ${{ secrets.BOTTOKEN }}
@@ -253,12 +296,33 @@ jobs:
           message_thread_id: ${{ secrets.THREAD_ID }}
           parse_mode: 'markdown'
           text: |
-            🚀 *New Release Created: ${{ needs.determine_version.outputs.new_version }}*
-            
+            ✅ *New Release Created Successfully: ${{ needs.create_release.outputs.version }}*
+
             Type: ${{ needs.determine_version.outputs.version_type }} release
-            
+
             ${{ needs.determine_version.outputs.changelog }}
-            
+
             ➡️ The deployment to AWS CodeArtifact will start automatically.
+
+            [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.create_release.outputs.version }})
+
+      - name: Send Error Message via Telegram
+        if: needs.create_release.outputs.release_status == 'failure' || needs.create_release.result == 'failure'
+        uses: akeylimepie/telegram-action@main
+        with:
+          token: ${{ secrets.BOTTOKEN }}
+          chat_id: ${{ secrets.CHAT_ID }}
+          message_thread_id: ${{ secrets.THREAD_ID }}
+          parse_mode: 'markdown'
+          text: |
+            ❌ *Release Creation Failed!*
             
-            [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.determine_version.outputs.new_version }})
+            *Error Details:*
+            • Repository: ${{ github.repository }}
+            • Branch: ${{ steps.branch_name.outputs.branch }}
+            • Version: ${{ needs.determine_version.outputs.new_version }}
+            • Triggered by: ${{ github.actor }}
+            
+            ${{ needs.determine_version.outputs.error_message || 'Failed to create GitHub release. Check workflow logs for details.' }}
+            
+            ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

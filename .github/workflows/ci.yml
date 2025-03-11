@@ -226,7 +226,6 @@ jobs:
 
       - name: Process commit messages
         id: process_messages
-        if: steps.status.outputs.status == 'success'
         run: |
           # Decode the JSON-encoded message from outputs
           echo '${{ needs.get_commit_messages.outputs.commit_messages }}' | jq -r > processed_message.txt
@@ -237,6 +236,17 @@ jobs:
           echo "processed<<$delimiter" >> $GITHUB_OUTPUT
           echo "$processed" >> $GITHUB_OUTPUT
           echo "$delimiter" >> $GITHUB_OUTPUT
+
+      - name: Set branch name
+        id: branch_name
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR, use the source branch name
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          else
+            # For direct push, use regular branch name
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Send Success Message via Telegram
         if: steps.status.outputs.status == 'success'
@@ -251,7 +261,7 @@ jobs:
               
               *Build Details:*
               • Repository: ${{ github.repository }}
-              • Branch: ${{ github.ref_name }}
+              • Branch: ${{ steps.branch_name.outputs.branch }}
               • Triggered by: ${{ github.actor }}
               
               ${{ steps.process_messages.outputs.processed }}
@@ -271,7 +281,7 @@ jobs:
             
             *Error Details:*
             • Repository: ${{ github.repository }}
-            • Branch: ${{ github.ref_name }}
+            • Branch: ${{ steps.branch_name.outputs.branch }}
             • Triggered by: ${{ github.actor }}
             
             *Job Status:*
