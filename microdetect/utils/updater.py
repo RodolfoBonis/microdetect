@@ -12,24 +12,7 @@ import tempfile
 import time
 from typing import Dict, Tuple
 
-try:
-    from colorama import Fore, Style, init
-
-    # Inicializar colorama (necessário para Windows)
-    init(autoreset=True)
-    # Definir cores e estilos
-    INFO = Fore.CYAN
-    SUCCESS = Fore.GREEN
-    WARNING = Fore.YELLOW
-    ERROR = Fore.RED
-    BRIGHT = Style.BRIGHT
-    RESET = Style.RESET_ALL
-    COLORS_AVAILABLE = True
-except ImportError:
-    # Fallback se colorama não estiver disponível
-    INFO = WARNING = SUCCESS = ERROR = BRIGHT = RESET = ""
-    COLORS_AVAILABLE = False
-    print("Dica: Instale 'colorama' para saídas coloridas: pip install colorama")
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)
 

@@ -17,25 +17,12 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import AWSSetupManager, UpdateManager
-
-try:
-    from colorama import Fore, Style, init
-
-    # Inicializar colorama (necessário para Windows)
-    init(autoreset=True)
-    # Definir cores e estilos
-    INFO = Fore.CYAN
-    SUCCESS = Fore.GREEN
-    WARNING = Fore.YELLOW
-    ERROR = Fore.RED
-    BRIGHT = Style.BRIGHT
-    RESET = Style.RESET_ALL
-    COLORS_AVAILABLE = True
-except ImportError:
-    # Fallback se colorama não estiver disponível
-    INFO = WARNING = SUCCESS = ERROR = BRIGHT = RESET = ""
-    COLORS_AVAILABLE = False
+from microdetect.utils import (
+    AWSSetupManager,
+    ColoredHelpFormatter,
+    ColoredVersionAction,
+)
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 # Configuração de logging
 logging.basicConfig(
@@ -190,7 +177,7 @@ def handle_setup_aws(args):
         print(f"{BRIGHT}AWS Access Key ID: {RESET}", end="")
         aws_access_key = input()
         print(f"{BRIGHT}AWS Secret Access Key: {RESET}", end="")
-        aws_secret_key = getpass.getpass("")
+        aws_secret_key = getpass("")
         if not args.region:
             print(f"{BRIGHT}AWS Region [{region}]: {RESET}", end="")
             region = input() or region
@@ -528,7 +515,10 @@ def main(args: Optional[List[str]] = None):
         args: Lista de argumentos da linha de comando (opcional)
     """
     # Criar parser principal
-    parser = argparse.ArgumentParser(description="MicroDetect: Detecção de Microorganismos com YOLOv8")
+    parser = argparse.ArgumentParser(
+        description=f"{BRIGHT}{INFO}MicroDetect{RESET}: Detecção de Microorganismos com YOLOv8",
+        formatter_class=ColoredHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command", help="Comandos disponíveis")
 
     # Registrar parsers para cada comando
@@ -544,7 +534,9 @@ def main(args: Optional[List[str]] = None):
     setup_aws_parser(subparsers)  # Comando de configuração AWS
 
     # Adicionar versão e ajuda
-    parser.add_argument("--version", action="version", version=f"MicroDetect {__version__}")
+    parser.add_argument(
+        "--version", action=ColoredVersionAction, version=__version__, help="mostrar versão do programa e sair"
+    )
 
     # Analisar argumentos
     parsed_args = parser.parse_args(args)
