@@ -175,8 +175,8 @@ jobs:
           # If we have previous tag, get commits since then
           if [ "$latest_tag" != "v0.0.0" ]; then
             # Try to get PRs via GitHub API first
-            pr_list=$(gh pr list --state merged --base main --limit 20 --json number,title,author,mergeCommit --jq '.[] | select(.mergeCommit.oid != null)' | jq -s '')
-
+            pr_count=$(gh pr list --state merged --base main --json number --jq 'length')
+            pr_list=$(gh pr list --state merged --base main --limit $pr_count --json number,title,author,mergeCommit --jq '.[] | select(.mergeCommit.oid != null)' | jq -s '')
             if [ ! -z "$pr_list" ] && [ "$pr_list" != "[]" ]; then
               # Filter PRs that were merged between the latest tag and HEAD
               echo "$pr_list" | jq -c '.[]' | while read -r pr; do
