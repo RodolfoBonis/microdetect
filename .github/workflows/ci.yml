@@ -259,8 +259,6 @@ jobs:
           sed 's/_/\\_/g' | \
           sed 's/\[/\\[/g' | \
           sed 's/\]/\\]/g' | \
-          sed 's/(/\\(/g' | \
-          sed 's/)/\\)/g' | \
           sed 's/~/\\~/g' | \
           sed 's/`/\\`/g' | \
           sed 's/>/\\>/g' | \
@@ -271,7 +269,6 @@ jobs:
           sed 's/|/\\|/g' | \
           sed 's/{/\\{/g' | \
           sed 's/}/\\}/g' | \
-          sed 's/\./\\./g' | \
           sed 's/!/\\!/g' > escaped_message.txt
 
           # Read and format for GitHub Actions output
