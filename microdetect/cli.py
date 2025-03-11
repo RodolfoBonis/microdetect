@@ -17,12 +17,10 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import (
-    AWSSetupManager,
-    ColoredHelpFormatter,
-    ColoredVersionAction,
-)
-from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
+from microdetect.utils import (AWSSetupManager, ColoredHelpFormatter,
+                               ColoredVersionAction)
+from microdetect.utils.colors import (BRIGHT, ERROR, INFO, RESET, SUCCESS,
+                                      WARNING)
 
 # Configuração de logging
 logging.basicConfig(
@@ -172,12 +170,10 @@ def setup_docs_parser(subparsers):
 def handle_docs(args):
     """Manipular comando de documentação."""
     try:
-        from microdetect.utils.docs_server import (
-            start_docs_server,
-            start_server_in_background,
-            stop_background_server,
-            check_server_status
-        )
+        from microdetect.utils.docs_server import (check_server_status,
+                                                   start_docs_server,
+                                                   start_server_in_background,
+                                                   stop_background_server)
 
         # Verificar se queremos parar o servidor
         if args.stop:
@@ -197,15 +193,18 @@ def handle_docs(args):
         # Configurar opções globais (se necessário)
         if args.port != 8080:
             import microdetect.utils.docs_server as docs_server
+
             docs_server.PORT = args.port
 
         if args.no_browser:
+
             def do_nothing(url):
                 print(f"Servidor de documentação iniciado em {url}")
                 print("Acesse o URL acima no seu navegador para ver a documentação.")
                 print("Pressione Ctrl+C para parar o servidor.")
 
             import microdetect.utils.docs_server as docs_server
+
             docs_server.open_browser = do_nothing
 
         # Iniciar servidor em background ou foreground
@@ -219,6 +218,7 @@ def handle_docs(args):
         logger.info("Tente instalar as dependências necessárias: pip install markdown pygments")
     except Exception as e:
         logger.error(f"Erro ao iniciar o servidor de documentação: {str(e)}")
+
 
 def handle_setup_aws(args):
     """Manipular comando de configuração AWS."""

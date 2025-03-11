@@ -14,9 +14,8 @@ from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 # Importar as constantes de cores do módulo existente
-from microdetect.utils.colors import (
-    INFO, SUCCESS, WARNING, ERROR, BRIGHT, RESET, COLORS_AVAILABLE
-)
+from microdetect.utils.colors import (BRIGHT, COLORS_AVAILABLE, ERROR, INFO,
+                                      RESET, SUCCESS, WARNING)
 
 # Declaração inicial das variáveis globais
 MARKDOWN_AVAILABLE = False
@@ -26,6 +25,7 @@ try:
     from pygments import highlight
     from pygments.formatters import HtmlFormatter
     from pygments.lexers import get_lexer_by_name
+
     MARKDOWN_AVAILABLE = True
 except ImportError:
     pass
@@ -59,6 +59,7 @@ def find_docs_dir() -> Path:
 
     # Se não encontrar, criar um diretório temporário
     import tempfile
+
     temp_dir = Path(tempfile.mkdtemp(prefix="microdetect_docs_"))
     temp_docs = temp_dir / "docs"
     temp_docs.mkdir(exist_ok=True)
@@ -82,11 +83,11 @@ def get_doc_files(docs_dir: Path) -> Dict[str, List[Path]]:
     """
     # Categorias e ordem de exibição
     categories = {
-        'Getting Started': ['installation_guide.md', 'troubleshooting.md'],
-        'Features': [],
-        'Updates': ['update_system.md', 'aws_codeartifact_setup.md', 'update_and_release_model.md'],
-        'Configuration': ['advanced_configuration.md'],
-        'Development': ['development_guide.md'],
+        "Getting Started": ["installation_guide.md", "troubleshooting.md"],
+        "Features": [],
+        "Updates": ["update_system.md", "aws_codeartifact_setup.md", "update_and_release_model.md"],
+        "Configuration": ["advanced_configuration.md"],
+        "Development": ["development_guide.md"],
     }
 
     # Arquivos não categorizados
@@ -108,15 +109,15 @@ def get_doc_files(docs_dir: Path) -> Dict[str, List[Path]]:
         if not found:
             # Tenta categorizar com base no nome
             if "install" in file_name or "setup" in file_name:
-                categories['Getting Started'].append(file_name)
+                categories["Getting Started"].append(file_name)
             elif "config" in file_name:
-                categories['Configuration'].append(file_name)
+                categories["Configuration"].append(file_name)
             elif "develop" in file_name or "contrib" in file_name:
-                categories['Development'].append(file_name)
+                categories["Development"].append(file_name)
             elif "update" in file_name or "release" in file_name:
-                categories['Updates'].append(file_name)
+                categories["Updates"].append(file_name)
             else:
-                categories['Features'].append(file_name)
+                categories["Features"].append(file_name)
 
     # Remover categorias vazias
     result = {k: [] for k in categories.keys()}
@@ -172,20 +173,14 @@ def start_server_in_background(port=None):
         cmd.extend(["--port", str(port)])
 
     # Iniciar processo em background
-    if os.name == 'nt':  # Windows
+    if os.name == "nt":  # Windows
         # No Windows, usamos subprocess com DETACHED_PROCESS
         flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        process = subprocess.Popen(cmd,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   creationflags=flags)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=flags)
         pid = process.pid
     else:  # Unix/Linux/Mac
         # No Unix, usamos o fork do processo
-        process = subprocess.Popen(cmd,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   start_new_session=True)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
         pid = process.pid
 
     # Aguardar um momento para o servidor iniciar
@@ -200,7 +195,7 @@ def start_server_in_background(port=None):
 
     # Salvar PID em arquivo
     if running:
-        with open(get_pid_file_path(), 'w') as f:
+        with open(get_pid_file_path(), "w") as f:
             f.write(str(pid))
 
         # Abrir navegador se o servidor estiver rodando
@@ -208,8 +203,7 @@ def start_server_in_background(port=None):
         open_browser(server_url)
 
         if COLORS_AVAILABLE:
-            print(
-                f"{SUCCESS}Documentation server started in background at {BRIGHT}{server_url}{RESET}")
+            print(f"{SUCCESS}Documentation server started in background at {BRIGHT}{server_url}{RESET}")
             print(f"{INFO}To stop the server, run: microdetect docs --stop{RESET}")
         else:
             print(f"Documentation server started in background at {server_url}")
@@ -243,7 +237,7 @@ def stop_background_server():
 
     # Ler PID do arquivo
     try:
-        with open(pid_file, 'r') as f:
+        with open(pid_file, "r") as f:
             pid = int(f.read().strip())
     except (ValueError, IOError) as e:
         if COLORS_AVAILABLE:
@@ -254,8 +248,8 @@ def stop_background_server():
 
     # Tentar parar o processo
     try:
-        if os.name == 'nt':  # Windows
-            subprocess.call(['taskkill', '/F', '/PID', str(pid)])
+        if os.name == "nt":  # Windows
+            subprocess.call(["taskkill", "/F", "/PID", str(pid)])
         else:  # Unix/Linux/Mac
             os.kill(pid, signal.SIGTERM)
 
@@ -290,7 +284,7 @@ def check_server_status():
 
     # Ler PID do arquivo
     try:
-        with open(pid_file, 'r') as f:
+        with open(pid_file, "r") as f:
             pid = int(f.read().strip())
     except (ValueError, IOError):
         return {"status": "unknown"}
@@ -317,7 +311,7 @@ def run_as_daemon(port=None):
         PORT = port
 
     # Redirecionar saída para /dev/null ou NUL
-    with open(os.devnull, 'w') as devnull:
+    with open(os.devnull, "w") as devnull:
         # Substituir stdout e stderr
         sys.stdout = devnull
         sys.stderr = devnull
@@ -339,6 +333,7 @@ def run_as_daemon(port=None):
             # Ignorar exceções em modo daemon
             pass
 
+
 def get_markdown_title(file_path: Path) -> str:
     """
     Extrai o título de um arquivo Markdown (primeiro cabeçalho H1).
@@ -350,19 +345,20 @@ def get_markdown_title(file_path: Path) -> str:
         Título do documento ou nome do arquivo se não encontrar
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Procurar pelo primeiro cabeçalho H1
         import re
-        match = re.search(r'^# (.*?)$', content, re.MULTILINE)
+
+        match = re.search(r"^# (.*?)$", content, re.MULTILINE)
         if match:
             return match.group(1)
     except Exception:
         pass
 
     # Fallback: usar nome do arquivo
-    return file_path.stem.replace('_', ' ').title()
+    return file_path.stem.replace("_", " ").title()
 
 
 def markdown_to_html(content: str) -> str:
@@ -380,11 +376,11 @@ def markdown_to_html(content: str) -> str:
 
     # Configurar extensões
     extensions = [
-        'markdown.extensions.tables',
-        'markdown.extensions.fenced_code',
-        'markdown.extensions.codehilite',
-        'markdown.extensions.toc',
-        'markdown.extensions.nl2br',
+        "markdown.extensions.tables",
+        "markdown.extensions.fenced_code",
+        "markdown.extensions.codehilite",
+        "markdown.extensions.toc",
+        "markdown.extensions.nl2br",
     ]
 
     # Converter com extensões
@@ -649,7 +645,7 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
     sidebar_html.append('<div id="sidebar">')
     sidebar_html.append('  <div class="sidebar-header">')
     sidebar_html.append('    <h1 class="sidebar-title"><a href="/?file=index.md">MicroDetect Docs</a></h1>')
-    sidebar_html.append('  </div>')
+    sidebar_html.append("  </div>")
 
     # Adicionar categorias e links
     for category, doc_files in docs_by_category.items():
@@ -660,36 +656,36 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
         for doc_file in doc_files:
             title = get_markdown_title(doc_file)
             file_name = doc_file.name
-            active_class = 'active' if active_file and doc_file.samefile(active_file) else ''
+            active_class = "active" if active_file and doc_file.samefile(active_file) else ""
 
             sidebar_html.append(f'      <li><a class="sidebar-link {active_class}" href="/?file={file_name}">{title}</a></li>')
 
-        sidebar_html.append(f'    </ul>')
-        sidebar_html.append(f'  </div>')
+        sidebar_html.append(f"    </ul>")
+        sidebar_html.append(f"  </div>")
 
-    sidebar_html.append('</div>')
+    sidebar_html.append("</div>")
 
     # Construir HTML completo
     html = [
-        '<!DOCTYPE html>',
+        "<!DOCTYPE html>",
         '<html lang="en">',
-        '<head>',
+        "<head>",
         '  <meta charset="UTF-8">',
         '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
-        '  <title>MicroDetect Documentation</title>',
-        f'  <style>{css}</style>',
-        '</head>',
-        '<body>',
-        '\n'.join(sidebar_html),
+        "  <title>MicroDetect Documentation</title>",
+        f"  <style>{css}</style>",
+        "</head>",
+        "<body>",
+        "\n".join(sidebar_html),
         '  <div id="content">',
         content_html,
-        '  </div>',
-        f'  <script>{js}</script>',
-        '</body>',
-        '</html>'
+        "  </div>",
+        f"  <script>{js}</script>",
+        "</body>",
+        "</html>",
     ]
 
-    return '\n'.join(html)
+    return "\n".join(html)
 
 
 class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -705,7 +701,7 @@ class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
         query_params = parse_qs(url_parts.query)
 
         # Determinar qual arquivo exibir
-        file_name = query_params.get('file', [None])[0]
+        file_name = query_params.get("file", [None])[0]
         file_path = None
 
         # Se não há arquivo especificado, procurar por index.md ou usar o primeiro arquivo
@@ -734,7 +730,7 @@ class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         # Ler conteúdo do arquivo
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 markdown_content = f.read()
 
             # Converter para HTML
@@ -780,14 +776,20 @@ def _check_dependencies():
         if install == "y" or install == "yes":
             try:
                 import subprocess
+
                 subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing_deps)
-                print(f"{SUCCESS}Dependencies installed successfully!{RESET}" if COLORS_AVAILABLE else "Dependencies installed successfully!")
+                print(
+                    f"{SUCCESS}Dependencies installed successfully!{RESET}"
+                    if COLORS_AVAILABLE
+                    else "Dependencies installed successfully!"
+                )
 
                 # Reimport
                 import markdown
                 from pygments import highlight
                 from pygments.formatters import HtmlFormatter
                 from pygments.lexers import get_lexer_by_name
+
                 MARKDOWN_AVAILABLE = True
 
                 return True
@@ -879,8 +881,8 @@ def open_browser(url: str):
     # Detectar WSL
     is_wsl = False
     try:
-        with open('/proc/version', 'r') as f:
-            if 'microsoft' in f.read().lower():
+        with open("/proc/version", "r") as f:
+            if "microsoft" in f.read().lower():
                 is_wsl = True
     except:
         pass
@@ -889,12 +891,13 @@ def open_browser(url: str):
         # Estamos no WSL, use o explorer.exe do Windows
         try:
             import subprocess
-            subprocess.run(['cmd.exe', '/c', 'start', url], check=False)
+
+            subprocess.run(["cmd.exe", "/c", "start", url], check=False)
             return True
         except Exception as e:
             # Se falhar, tente uma alternativa
             try:
-                subprocess.run(['explorer.exe', url], check=False)
+                subprocess.run(["explorer.exe", url], check=False)
                 return True
             except Exception:
                 pass
@@ -926,7 +929,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, help="Port for the server")
 
     args = parser.parse_args()
-
 
     if args.daemon:
         run_as_daemon(args.port)

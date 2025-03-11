@@ -1,6 +1,7 @@
 """
 Módulo para gerenciamento de atualizações do pacote MicroDetect.
 """
+
 import configparser
 import json
 import logging
@@ -13,7 +14,8 @@ import time
 from pathlib import Path
 from typing import Dict, Tuple
 
-from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
+from microdetect.utils.colors import (BRIGHT, ERROR, INFO, RESET, SUCCESS,
+                                      WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +54,8 @@ class UpdateManager:
                 if env_file.exists():
                     with env_file.open() as f:
                         for line in f:
-                            if line.strip() and not line.startswith('#'):
-                                key, value = line.strip().split('=', 1)
+                            if line.strip() and not line.startswith("#"):
+                                key, value = line.strip().split("=", 1)
                                 if key == "AWS_CODEARTIFACT_DOMAIN" and not domain:
                                     domain = value
                                 elif key == "AWS_CODEARTIFACT_REPOSITORY" and not repository:
