@@ -552,7 +552,10 @@ def main(args: Optional[List[str]] = None):
     if parsed_args.command not in ["update", "setup-aws"]:
         from microdetect.utils.updater import UpdateManager
 
-        UpdateManager.check_for_updates_after_command()
+        update_result = UpdateManager.check_for_updates_before_command()
+
+        if update_result:
+            return
 
     try:
         if parsed_args.command == "init":

@@ -292,14 +292,14 @@ class UpdateManager:
         return {"current": current_version, "latest": latest_version, "needs_update": needs_update}
 
     @staticmethod
-    def check_for_updates_after_command():
+    def check_for_updates_before_command() -> bool:
         """
         Verificar se há atualizações disponíveis e notificar o usuário.
-        Esta função deve ser chamada após a execução de qualquer comando.
+        Esta função deve ser chamada antes da execução de qualquer comando.
         """
         # Verificar se deve pular esta verificação (variável de ambiente)
         if os.environ.get("MICRODETECT_SKIP_UPDATE_CHECK") == "1":
-            return
+            return False
 
         # Verificar se o arquivo de cache existe e se a verificação já foi feita hoje
         cache_dir = os.path.join(tempfile.gettempdir(), "microdetect")
@@ -333,6 +333,9 @@ class UpdateManager:
                         f"\n{INFO}🔄 {BRIGHT}Nova versão do MicroDetect disponível: {SUCCESS}{update_info['latest']} "
                         f"{INFO}(atual: {WARNING}{update_info['current']}{INFO}){RESET}"
                     )
-                    print(f"{INFO}   Para atualizar, execute: {BRIGHT}microdetect update{RESET}\n")
+                    return UpdateManager.update_package()
             except Exception as e:
                 logger.debug(f"Erro ao verificar atualizações: {str(e)}")
+                return False
+
+        return False
