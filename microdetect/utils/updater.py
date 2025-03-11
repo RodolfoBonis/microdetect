@@ -90,6 +90,8 @@ class UpdateManager:
 
         try:
             # Usar pip para listar versões
+            auth_endpoint = endpoint.replace("https://", f"https://aws:{token}@")
+
             cmd = [
                 sys.executable,
                 "-m",
@@ -98,17 +100,16 @@ class UpdateManager:
                 "versions",
                 "microdetect",
                 "--index-url",
-                f"{endpoint}simple/",
+                f"{auth_endpoint}simple/",
                 "--extra-index-url",
                 "https://pypi.org/simple",
                 "--no-cache-dir",
             ]
 
             env = os.environ.copy()
-            env["PIP_INDEX_URL"] = f"{endpoint}simple/"
+            # Também ajuste as variáveis de ambiente
+            env["PIP_INDEX_URL"] = f"{auth_endpoint}simple/"
             env["PIP_EXTRA_INDEX_URL"] = "https://pypi.org/simple"
-            env["TWINE_USERNAME"] = "aws"
-            env["TWINE_PASSWORD"] = token
 
             output = subprocess.check_output(cmd, env=env).decode("utf-8")
 
