@@ -2,12 +2,13 @@
 Módulo para avaliação de modelos treinados.
 """
 
-import os
-import json
 import csv
+import json
 import logging
+import os
 from datetime import datetime
-from typing import Dict, Any, Optional, Union, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 from ultralytics import YOLO
@@ -29,7 +30,7 @@ class ModelEvaluator:
         Args:
             output_dir: Diretório para salvar relatórios de avaliação
         """
-        self.output_dir = output_dir or config.get('directories.reports', 'reports')
+        self.output_dir = output_dir or config.get("directories.reports", "reports")
         os.makedirs(self.output_dir, exist_ok=True)
 
     def evaluate_model(self, model_path: str, data_yaml: str) -> Dict[str, Any]:
@@ -86,32 +87,36 @@ class ModelEvaluator:
             "Recall": float(results.box.recall),
             "Precisão": float(results.box.precision),
             "F1-Score": self._calculate_f1(
-                float(results.box.precision),
-                float(results.box.recall)
+                float(results.box.precision), float(results.box.recall)
             ),
-            "Taxa de Erro": 1.0 - float(results.box.map50)
+            "Taxa de Erro": 1.0 - float(results.box.map50),
         }
 
         # Métricas por classe
         class_metrics = []
         for i, class_name in enumerate(results.names.values()):
             if i < len(results.box.ap_class_index):
-                idx = results.box.ap_class_index.tolist().index(i) if i in results.box.ap_class_index else -1
+                idx = (
+                    results.box.ap_class_index.tolist().index(i)
+                    if i in results.box.ap_class_index
+                    else -1
+                )
                 if idx >= 0:
-                    class_metrics.append({
-                        "Classe": class_name,
-                        "Precisão (AP50)": float(results.box.ap50[idx]),
-                        "Recall": float(results.box.r[idx]),
-                        "Precisão": float(results.box.p[idx]),
-                        "F1-Score": self._calculate_f1(
-                            float(results.box.p[idx]),
-                            float(results.box.r[idx])
-                        ),
-                    })
+                    class_metrics.append(
+                        {
+                            "Classe": class_name,
+                            "Precisão (AP50)": float(results.box.ap50[idx]),
+                            "Recall": float(results.box.r[idx]),
+                            "Precisão": float(results.box.p[idx]),
+                            "F1-Score": self._calculate_f1(
+                                float(results.box.p[idx]), float(results.box.r[idx])
+                            ),
+                        }
+                    )
 
         return {
             "metricas_gerais": general_metrics,
-            "metricas_por_classe": class_metrics
+            "metricas_por_classe": class_metrics,
         }
 
     @staticmethod
@@ -128,7 +133,9 @@ class ModelEvaluator:
         """
         return 2 * (precision * recall) / (precision + recall + 1e-10)
 
-    def generate_report(self, metrics: Dict[str, Any], model_path: str) -> Dict[str, str]:
+    def generate_report(
+        self, metrics: Dict[str, Any], model_path: str
+    ) -> Dict[str, str]:
         """
         Gera relatórios detalhados de avaliação do modelo.
 
@@ -144,7 +151,9 @@ class ModelEvaluator:
 
         # Caminho para os arquivos de saída
         csv_path = os.path.join(self.output_dir, f"relatorio_metricas_{timestamp}.csv")
-        json_path = os.path.join(self.output_dir, f"relatorio_metricas_{timestamp}.json")
+        json_path = os.path.join(
+            self.output_dir, f"relatorio_metricas_{timestamp}.json"
+        )
         graph_path = os.path.join(self.output_dir, f"metricas_grafico_{timestamp}.png")
 
         # 1. Salvar resultados em CSV
@@ -161,11 +170,7 @@ class ModelEvaluator:
         logger.info(f"- JSON: {os.path.basename(json_path)}")
         logger.info(f"- Gráficos: {os.path.basename(graph_path)}")
 
-        return {
-            "csv": csv_path,
-            "json": json_path,
-            "graphs": graph_path
-        }
+        return {"csv": csv_path, "json": json_path, "graphs": graph_path}
 
     def _save_csv_report(self, csv_path: str, metrics: Dict[str, Any]) -> None:
         """
@@ -176,7 +181,7 @@ class ModelEvaluator:
             metrics: Métricas de desempenho do modelo
         """
         try:
-            with open(csv_path, 'w', newline='') as csvfile:
+            with open(csv_path, "w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(["Métrica", "Valor"])
 
@@ -185,23 +190,29 @@ class ModelEvaluator:
                     writer.writerow([key, f"{value:.4f}"])
 
                 writer.writerow([])
-                writer.writerow(["Classe", "Precisão (AP50)", "Recall", "Precisão", "F1-Score"])
+                writer.writerow(
+                    ["Classe", "Precisão (AP50)", "Recall", "Precisão", "F1-Score"]
+                )
 
                 # Métricas por classe
                 for item in metrics["metricas_por_classe"]:
-                    writer.writerow([
-                        item["Classe"],
-                        f"{item['Precisão (AP50)']:.4f}",
-                        f"{item['Recall']:.4f}",
-                        f"{item['Precisão']:.4f}",
-                        f"{item['F1-Score']:.4f}"
-                    ])
+                    writer.writerow(
+                        [
+                            item["Classe"],
+                            f"{item['Precisão (AP50)']:.4f}",
+                            f"{item['Recall']:.4f}",
+                            f"{item['Precisão']:.4f}",
+                            f"{item['F1-Score']:.4f}",
+                        ]
+                    )
 
             logger.info(f"Relatório CSV salvo em: {csv_path}")
         except Exception as e:
             logger.error(f"Erro ao salvar relatório CSV: {str(e)}")
 
-    def _save_json_report(self, json_path: str, metrics: Dict[str, Any], model_path: str) -> None:
+    def _save_json_report(
+        self, json_path: str, metrics: Dict[str, Any], model_path: str
+    ) -> None:
         """
         Salva as métricas em formato JSON com informações adicionais.
 
@@ -215,14 +226,14 @@ class ModelEvaluator:
             "modelo": {
                 "caminho": model_path,
                 "nome": os.path.basename(model_path),
-                "data_avaliacao": datetime.now().isoformat()
+                "data_avaliacao": datetime.now().isoformat(),
             },
             "metricas_gerais": metrics["metricas_gerais"],
-            "metricas_por_classe": metrics["metricas_por_classe"]
+            "metricas_por_classe": metrics["metricas_por_classe"],
         }
 
         try:
-            with open(json_path, 'w', encoding='utf-8') as f:
+            with open(json_path, "w", encoding="utf-8") as f:
                 json.dump(report_data, f, indent=4, ensure_ascii=False)
             logger.info(f"Relatório JSON salvo em: {json_path}")
         except Exception as e:
@@ -241,7 +252,11 @@ class ModelEvaluator:
 
             # Gráfico de barras para métricas gerais
             plt.subplot(2, 1, 1)
-            metrics_to_plot = {k: v for k, v in metrics["metricas_gerais"].items() if k != "Taxa de Erro"}
+            metrics_to_plot = {
+                k: v
+                for k, v in metrics["metricas_gerais"].items()
+                if k != "Taxa de Erro"
+            }
             bars = plt.bar(metrics_to_plot.keys(), metrics_to_plot.values())
             plt.title("Métricas Gerais do Modelo")
             plt.xticks(rotation=45)
@@ -249,14 +264,21 @@ class ModelEvaluator:
 
             for bar in bars:
                 height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width() / 2., height + 0.01,
-                         f'{height:.4f}', ha='center', va='bottom')
+                plt.text(
+                    bar.get_x() + bar.get_width() / 2.0,
+                    height + 0.01,
+                    f"{height:.4f}",
+                    ha="center",
+                    va="bottom",
+                )
 
             # Gráfico de barras para precisão por classe
             if metrics["metricas_por_classe"]:
                 plt.subplot(2, 1, 2)
                 classes = [m["Classe"] for m in metrics["metricas_por_classe"]]
-                ap_values = [m["Precisão (AP50)"] for m in metrics["metricas_por_classe"]]
+                ap_values = [
+                    m["Precisão (AP50)"] for m in metrics["metricas_por_classe"]
+                ]
 
                 bars = plt.bar(classes, ap_values)
                 plt.title("Precisão (AP50) por Classe")
@@ -264,8 +286,13 @@ class ModelEvaluator:
 
                 for bar in bars:
                     height = bar.get_height()
-                    plt.text(bar.get_x() + bar.get_width() / 2., height + 0.01,
-                             f'{height:.4f}', ha='center', va='bottom')
+                    plt.text(
+                        bar.get_x() + bar.get_width() / 2.0,
+                        height + 0.01,
+                        f"{height:.4f}",
+                        ha="center",
+                        va="bottom",
+                    )
 
             plt.tight_layout()
             plt.savefig(graph_path)
@@ -286,7 +313,9 @@ class ModelEvaluator:
             Caminho para a imagem da matriz de confusão
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        conf_matrix_path = os.path.join(self.output_dir, f"confusion_matrix_{timestamp}.png")
+        conf_matrix_path = os.path.join(
+            self.output_dir, f"confusion_matrix_{timestamp}.png"
+        )
 
         try:
             # Carregar modelo
@@ -295,20 +324,24 @@ class ModelEvaluator:
             # Rodar validação para gerar matriz de confusão
             results = model.val(data=data_yaml, conf_matrix=True)
 
-            if hasattr(results, 'confusion_matrix') and hasattr(results.confusion_matrix, 'plot'):
+            if hasattr(results, "confusion_matrix") and hasattr(
+                results.confusion_matrix, "plot"
+            ):
                 try:
                     # Usar método integrado para plotar matriz de confusão
-                    results.confusion_matrix.plot(save_dir=self.output_dir, names=results.names)
+                    results.confusion_matrix.plot(
+                        save_dir=self.output_dir, names=results.names
+                    )
                     logger.info(f"Matriz de confusão salva em: {self.output_dir}")
                     return conf_matrix_path
                 except Exception as plot_error:
-                    logger.error(f"Erro ao plotar matriz de confusão: {str(plot_error)}")
+                    logger.error(
+                        f"Erro ao plotar matriz de confusão: {str(plot_error)}"
+                    )
 
                     # Fallback manual
                     self._plot_confusion_matrix_manually(
-                        results.confusion_matrix.matrix,
-                        results.names,
-                        conf_matrix_path
+                        results.confusion_matrix.matrix, results.names, conf_matrix_path
                     )
                     return conf_matrix_path
             else:
@@ -320,10 +353,7 @@ class ModelEvaluator:
             return ""
 
     def _plot_confusion_matrix_manually(
-            self,
-            matrix: np.ndarray,
-            class_names: Dict[int, str],
-            save_path: str
+        self, matrix: np.ndarray, class_names: Dict[int, str], save_path: str
     ) -> None:
         """
         Plota a matriz de confusão manualmente.
@@ -337,9 +367,11 @@ class ModelEvaluator:
             plt.figure(figsize=(10, 8))
 
             # Normalizar a matriz por linha (previsões verdadeiras)
-            matrix_normalized = matrix.astype('float') / (matrix.sum(axis=1, keepdims=True) + 1e-6)
+            matrix_normalized = matrix.astype("float") / (
+                matrix.sum(axis=1, keepdims=True) + 1e-6
+            )
 
-            plt.imshow(matrix_normalized, interpolation='nearest', cmap=plt.cm.Blues)
+            plt.imshow(matrix_normalized, interpolation="nearest", cmap=plt.cm.Blues)
             plt.title("Matriz de Confusão Normalizada")
             plt.colorbar()
 
@@ -350,14 +382,19 @@ class ModelEvaluator:
             plt.yticks(tick_marks, classes)
 
             # Adicionar valores na matriz
-            thresh = matrix_normalized.max() / 2.
+            thresh = matrix_normalized.max() / 2.0
             for i, j in np.ndindex(matrix_normalized.shape):
-                plt.text(j, i, f"{matrix[i, j]}\n({matrix_normalized[i, j]:.2f})",
-                         ha="center", va="center",
-                         color="white" if matrix_normalized[i, j] > thresh else "black")
+                plt.text(
+                    j,
+                    i,
+                    f"{matrix[i, j]}\n({matrix_normalized[i, j]:.2f})",
+                    ha="center",
+                    va="center",
+                    color="white" if matrix_normalized[i, j] > thresh else "black",
+                )
 
-            plt.ylabel('Real')
-            plt.xlabel('Previsto')
+            plt.ylabel("Real")
+            plt.xlabel("Previsto")
             plt.tight_layout()
 
             plt.savefig(save_path)

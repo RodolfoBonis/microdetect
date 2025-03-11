@@ -224,6 +224,20 @@ jobs:
             echo "status=failure" >> $GITHUB_OUTPUT
           fi
 
+      - name: Process commit messages
+        id: process_messages
+        if: steps.status.outputs.status == 'success'
+        run: |
+          # Decode the JSON-encoded message from outputs
+          echo '${{ needs.get_commit_messages.outputs.commit_messages }}' | jq -r > processed_message.txt
+          
+          # Read and format for GitHub Actions output
+          processed=$(cat processed_message.txt)
+          delimiter="EOF_MESSAGE"
+          echo "processed<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$processed" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+
       - name: Send Success Message via Telegram
         if: steps.status.outputs.status == 'success'
         uses: akeylimepie/telegram-action@main
@@ -240,7 +254,7 @@ jobs:
               • Branch: ${{ github.ref_name }}
               • Triggered by: ${{ github.actor }}
               
-              ${{ needs.get_commit_messages.outputs.commit_messages }}
+              ${{ steps.process_messages.outputs.processed }}
               
               🔍 [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
@@ -266,6 +280,6 @@ jobs:
             • Build: ${{ needs.build.result }}
             • Security: ${{ needs.security.result }}
             
-            ${{ needs.get_commit_messages.outputs.commit_messages }}
+            ${{ steps.process_messages.outputs.processed }}
             
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

@@ -2,12 +2,13 @@
 Módulo para preparação e gerenciamento de datasets.
 """
 
-import os
 import glob
+import logging
+import os
 import random
 import shutil
-import logging
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
+
 import yaml
 
 from microdetect.utils.config import config
@@ -20,12 +21,14 @@ class DatasetManager:
     Classe para gerenciar a preparação, divisão e configuração de datasets.
     """
 
-    def __init__(self,
-                 dataset_dir: str = None,
-                 train_ratio: float = None,
-                 val_ratio: float = None,
-                 test_ratio: float = None,
-                 seed: int = None):
+    def __init__(
+        self,
+        dataset_dir: str = None,
+        train_ratio: float = None,
+        val_ratio: float = None,
+        test_ratio: float = None,
+        seed: int = None,
+    ):
         """
         Inicializa o gerenciador de dataset.
 
@@ -36,17 +39,19 @@ class DatasetManager:
             test_ratio: Proporção dos dados para teste
             seed: Semente para reprodutibilidade
         """
-        self.dataset_dir = dataset_dir or config.get('directories.dataset', 'dataset')
-        self.train_ratio = train_ratio or config.get('dataset.train_ratio', 0.7)
-        self.val_ratio = val_ratio or config.get('dataset.val_ratio', 0.15)
-        self.test_ratio = test_ratio or config.get('dataset.test_ratio', 0.15)
-        self.seed = seed or config.get('dataset.seed', 42)
-        self.classes = config.get('classes', ["0-levedura", "1-fungo", "2-micro-alga"])
+        self.dataset_dir = dataset_dir or config.get("directories.dataset", "dataset")
+        self.train_ratio = train_ratio or config.get("dataset.train_ratio", 0.7)
+        self.val_ratio = val_ratio or config.get("dataset.val_ratio", 0.15)
+        self.test_ratio = test_ratio or config.get("dataset.test_ratio", 0.15)
+        self.seed = seed or config.get("dataset.seed", 42)
+        self.classes = config.get("classes", ["0-levedura", "1-fungo", "2-micro-alga"])
 
         # Verificar se as proporções somam 1
         total_ratio = self.train_ratio + self.val_ratio + self.test_ratio
         if abs(total_ratio - 1.0) > 1e-5:
-            logger.warning(f"As proporções do dataset não somam 1.0 (soma: {total_ratio}). Normalizando...")
+            logger.warning(
+                f"As proporções do dataset não somam 1.0 (soma: {total_ratio}). Normalizando..."
+            )
             # Normalizar as proporções
             self.train_ratio /= total_ratio
             self.val_ratio /= total_ratio
@@ -57,15 +62,17 @@ class DatasetManager:
         Cria a estrutura de diretórios padrão para treinamento YOLO.
         """
         # Criar diretórios para as divisões train/val/test
-        for split in ['train', 'val', 'test']:
-            for subdir in ['images', 'labels']:
-                os.makedirs(os.path.join(self.dataset_dir, split, subdir), exist_ok=True)
+        for split in ["train", "val", "test"]:
+            for subdir in ["images", "labels"]:
+                os.makedirs(
+                    os.path.join(self.dataset_dir, split, subdir), exist_ok=True
+                )
 
         logger.info(f"Estrutura de diretórios criada em {self.dataset_dir}")
 
-    def split_dataset(self,
-                      source_img_dir: str,
-                      source_label_dir: str) -> Dict[str, int]:
+    def split_dataset(
+        self, source_img_dir: str, source_label_dir: str
+    ) -> Dict[str, int]:
         """
         Divide o dataset em conjuntos de treino/validação/teste e copia os arquivos.
 
@@ -81,7 +88,7 @@ class DatasetManager:
 
         # Obter todos os arquivos de imagem
         image_files = []
-        for ext in ['*.jpg', '*.jpeg', '*.png']:
+        for ext in ["*.jpg", "*.jpeg", "*.png"]:
             image_files.extend(glob.glob(os.path.join(source_img_dir, ext)))
 
         if not image_files:
@@ -99,36 +106,31 @@ class DatasetManager:
 
         # Dividir dados
         train_files = image_files[:num_train]
-        val_files = image_files[num_train:num_train + num_val]
-        test_files = image_files[num_train + num_val:]
+        val_files = image_files[num_train : num_train + num_val]
+        test_files = image_files[num_train + num_val :]
 
         # Copiar arquivos para diretórios apropriados
-        splits = {
-            'train': train_files,
-            'val': val_files,
-            'test': test_files
-        }
+        splits = {"train": train_files, "val": val_files, "test": test_files}
 
         split_counts = {}
 
         for split_name, files in splits.items():
-            count = self._copy_files_to_split(
-                files, split_name, source_label_dir
-            )
+            count = self._copy_files_to_split(files, split_name, source_label_dir)
             split_counts[split_name] = count
 
         total = sum(split_counts.values())
-        logger.info(f"Divisão do dataset concluída: "
-                    f"{split_counts.get('train', 0)} treino, "
-                    f"{split_counts.get('val', 0)} validação, "
-                    f"{split_counts.get('test', 0)} teste")
+        logger.info(
+            f"Divisão do dataset concluída: "
+            f"{split_counts.get('train', 0)} treino, "
+            f"{split_counts.get('val', 0)} validação, "
+            f"{split_counts.get('test', 0)} teste"
+        )
 
         return split_counts
 
-    def _copy_files_to_split(self,
-                             files: List[str],
-                             target_split: str,
-                             source_label_dir: str) -> int:
+    def _copy_files_to_split(
+        self, files: List[str], target_split: str, source_label_dir: str
+    ) -> int:
         """
         Copia arquivos de imagem e anotação para um diretório de divisão específico.
 
@@ -147,11 +149,13 @@ class DatasetManager:
             base_name = os.path.splitext(os.path.basename(img_path))[0]
 
             # Definir caminhos de origem e destino
-            img_dest = os.path.join(self.dataset_dir, target_split, 'images',
-                                    os.path.basename(img_path))
+            img_dest = os.path.join(
+                self.dataset_dir, target_split, "images", os.path.basename(img_path)
+            )
             label_path = os.path.join(source_label_dir, f"{base_name}.txt")
-            label_dest = os.path.join(self.dataset_dir, target_split, 'labels',
-                                      f"{base_name}.txt")
+            label_dest = os.path.join(
+                self.dataset_dir, target_split, "labels", f"{base_name}.txt"
+            )
 
             try:
                 # Copiar arquivo de imagem
@@ -179,15 +183,15 @@ class DatasetManager:
             Caminho para o arquivo YAML criado
         """
         if output_path is None:
-            output_path = os.path.join(self.dataset_dir, 'data.yaml')
+            output_path = os.path.join(self.dataset_dir, "data.yaml")
 
         # Converter para caminho absoluto
         dataset_path = os.path.abspath(self.dataset_dir)
 
         # Definir caminhos
-        train_path = os.path.join(dataset_path, 'train/images')
-        val_path = os.path.join(dataset_path, 'val/images')
-        test_path = os.path.join(dataset_path, 'test/images')
+        train_path = os.path.join(dataset_path, "train/images")
+        val_path = os.path.join(dataset_path, "val/images")
+        test_path = os.path.join(dataset_path, "test/images")
 
         # Verificar se diretórios existem
         for path in [train_path, val_path, test_path]:
@@ -195,15 +199,15 @@ class DatasetManager:
                 logger.warning(f"Diretório não encontrado: {path}")
 
         data = {
-            'train': train_path,
-            'val': val_path,
-            'test': test_path,
-            'nc': len(self.classes),
-            'names': self.classes
+            "train": train_path,
+            "val": val_path,
+            "test": test_path,
+            "nc": len(self.classes),
+            "names": self.classes,
         }
 
         try:
-            with open(output_path, 'w') as f:
+            with open(output_path, "w") as f:
                 yaml.dump(data, f, default_flow_style=False)
             logger.info(f"Configuração do dataset salva em {output_path}")
         except Exception as e:

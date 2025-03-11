@@ -7,7 +7,7 @@ import logging
 import os
 import tkinter as tk
 from datetime import datetime
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 import cv2
 from PIL import Image, ImageTk
@@ -29,7 +29,9 @@ class ImageAnnotator:
         Args:
             classes: Lista de classes para anotação
         """
-        self.classes = classes or config.get('classes', ["0-levedura", "1-fungo", "2-micro-alga"])
+        self.classes = classes or config.get(
+            "classes", ["0-levedura", "1-fungo", "2-micro-alga"]
+        )
         self.progress_file = ".annotation_progress.json"
 
     def annotate_image(self, image_path: str, output_dir: str) -> Optional[str]:
@@ -79,13 +81,17 @@ class ImageAnnotator:
         existing_annotation_path = os.path.join(output_dir, f"{base_name}.txt")
 
         if os.path.exists(existing_annotation_path):
-            logger.info(f"Carregando anotações existentes de {existing_annotation_path}")
+            logger.info(
+                f"Carregando anotações existentes de {existing_annotation_path}"
+            )
 
             # Carregar anotações existentes
-            with open(existing_annotation_path, 'r') as f:
+            with open(existing_annotation_path, "r") as f:
                 for line in f:
                     parts = line.strip().split()
-                    if len(parts) == 5:  # formato YOLO: class x_center y_center width height
+                    if (
+                        len(parts) == 5
+                    ):  # formato YOLO: class x_center y_center width height
                         class_id, x_center, y_center, box_w, box_h = parts
 
                         # Converter de YOLO para pixel
@@ -132,11 +138,17 @@ class ImageAnnotator:
         class_menu.pack(side=tk.LEFT, padx=5)
 
         # Status label
-        status_label = tk.Label(main_frame, text=f"Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando")
+        status_label = tk.Label(
+            main_frame,
+            text=f"Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando",
+        )
         status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Informações da imagem
-        info_label = tk.Label(main_frame, text=f"Imagem: {os.path.basename(image_path)} | Dimensões: {w}x{h}")
+        info_label = tk.Label(
+            main_frame,
+            text=f"Imagem: {os.path.basename(image_path)} | Dimensões: {w}x{h}",
+        )
         info_label.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Converter para PhotoImage para o Tkinter
@@ -155,7 +167,8 @@ class ImageAnnotator:
             nonlocal current_class
             current_class = class_var.get()
             status_label.config(
-                text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando")
+                text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando"
+            )
 
         def on_mouse_down(event):
             nonlocal start_x, start_y, current_rect
@@ -169,21 +182,36 @@ class ImageAnnotator:
                     canvas.delete(current_rect)
                 # Desenhar novo retângulo
                 current_rect = canvas.create_rectangle(
-                    start_x, start_y, event.x, event.y,
-                    outline='green', width=2
+                    start_x, start_y, event.x, event.y, outline="green", width=2
                 )
 
         def on_mouse_up(event):
             nonlocal start_x, start_y, current_rect
             if start_x is not None and start_y is not None:
                 # Converter coordenadas de volta para escala original
-                x1 = min(start_x, event.x) / scale if scale < 1 else min(start_x, event.x)
-                y1 = min(start_y, event.y) / scale if scale < 1 else min(start_y, event.y)
-                x2 = max(start_x, event.x) / scale if scale < 1 else max(start_x, event.x)
-                y2 = max(start_y, event.y) / scale if scale < 1 else max(start_y, event.y)
+                x1 = (
+                    min(start_x, event.x) / scale
+                    if scale < 1
+                    else min(start_x, event.x)
+                )
+                y1 = (
+                    min(start_y, event.y) / scale
+                    if scale < 1
+                    else min(start_y, event.y)
+                )
+                x2 = (
+                    max(start_x, event.x) / scale
+                    if scale < 1
+                    else max(start_x, event.x)
+                )
+                y2 = (
+                    max(start_y, event.y) / scale
+                    if scale < 1
+                    else max(start_y, event.y)
+                )
 
                 # Obter índice da classe (formato é "0-levedura", precisamos apenas do número)
-                class_id = current_class.split('-')[0]
+                class_id = current_class.split("-")[0]
 
                 # Adicionar à lista de bounding boxes
                 bounding_boxes.append((class_id, int(x1), int(y1), int(x2), int(y2)))
@@ -191,13 +219,18 @@ class ImageAnnotator:
                 # Adicionar rótulo de classe ao lado da caixa
                 label_text = f"{current_class} #{len(bounding_boxes)}"
                 canvas.create_text(
-                    min(start_x, event.x), min(start_y, event.y) - 5,
-                    text=label_text, anchor=tk.SW, fill='green', font=("Arial", 10, "bold")
+                    min(start_x, event.x),
+                    min(start_y, event.y) - 5,
+                    text=label_text,
+                    anchor=tk.SW,
+                    fill="green",
+                    font=("Arial", 10, "bold"),
                 )
 
                 # Atualizar status
                 status_label.config(
-                    text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando")
+                    text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Desenhe clicando e arrastando"
+                )
 
                 # Reiniciar
                 start_x, start_y = None, None
@@ -208,7 +241,8 @@ class ImageAnnotator:
                 bounding_boxes.pop()
                 redraw_all_boxes()
                 status_label.config(
-                    text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Última caixa excluída")
+                    text=f"Classe: {current_class} | Contagem: {len(bounding_boxes)} | Última caixa excluída"
+                )
 
         def redraw_all_boxes():
             canvas.delete("all")
@@ -222,21 +256,30 @@ class ImageAnnotator:
                 dy2 = y2 * scale if scale < 1 else y2
 
                 # Encontrar nome da classe para exibição
-                class_name = next((c for c in self.classes if c.startswith(class_id)), f"{class_id}-desconhecido")
+                class_name = next(
+                    (c for c in self.classes if c.startswith(class_id)),
+                    f"{class_id}-desconhecido",
+                )
 
                 # Desenhar retângulo
-                canvas.create_rectangle(dx1, dy1, dx2, dy2, outline='green', width=2)
+                canvas.create_rectangle(dx1, dy1, dx2, dy2, outline="green", width=2)
 
                 # Desenhar rótulo
                 canvas.create_text(
-                    dx1, dy1 - 5, text=f"{class_name} #{i + 1}",
-                    anchor=tk.SW, fill='green', font=("Arial", 10, "bold")
+                    dx1,
+                    dy1 - 5,
+                    text=f"{class_name} #{i + 1}",
+                    anchor=tk.SW,
+                    fill="green",
+                    font=("Arial", 10, "bold"),
                 )
 
         def reset():
             bounding_boxes.clear()
             redraw_all_boxes()
-            status_label.config(text=f"Classe: {current_class} | Contagem: 0 | Todas as caixas limpas")
+            status_label.config(
+                text=f"Classe: {current_class} | Contagem: 0 | Todas as caixas limpas"
+            )
 
         def save():
             nonlocal annotation_path
@@ -256,7 +299,9 @@ class ImageAnnotator:
 
                     f.write(f"{class_id} {center_x} {center_y} {box_w} {box_h}\n")
 
-            logger.info(f"Anotação salva em {txt_path}. {len(bounding_boxes)} caixas anotadas.")
+            logger.info(
+                f"Anotação salva em {txt_path}. {len(bounding_boxes)} caixas anotadas."
+            )
             annotation_path = txt_path
             root.destroy()
 
@@ -279,23 +324,33 @@ class ImageAnnotator:
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X)
 
-        tk.Button(button_frame, text="Reiniciar (R)", command=reset).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Excluir Última (D)", command=delete_last).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Salvar (S)", command=save).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Sair (Q)", command=on_closing).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Salvar e Sair (E)", command=exit_and_save).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Reiniciar (R)", command=reset).pack(
+            side=tk.LEFT, padx=5
+        )
+        tk.Button(button_frame, text="Excluir Última (D)", command=delete_last).pack(
+            side=tk.LEFT, padx=5
+        )
+        tk.Button(button_frame, text="Salvar (S)", command=save).pack(
+            side=tk.LEFT, padx=5
+        )
+        tk.Button(button_frame, text="Sair (Q)", command=on_closing).pack(
+            side=tk.LEFT, padx=5
+        )
+        tk.Button(button_frame, text="Salvar e Sair (E)", command=exit_and_save).pack(
+            side=tk.LEFT, padx=5
+        )
 
         # Vincular eventos
-        canvas.bind('<ButtonPress-1>', on_mouse_down)
-        canvas.bind('<B1-Motion>', on_mouse_move)
-        canvas.bind('<ButtonRelease-1>', on_mouse_up)
+        canvas.bind("<ButtonPress-1>", on_mouse_down)
+        canvas.bind("<B1-Motion>", on_mouse_move)
+        canvas.bind("<ButtonRelease-1>", on_mouse_up)
 
         # Vincular atalhos de teclado
-        root.bind('<r>', lambda e: reset())
-        root.bind('<d>', lambda e: delete_last())
-        root.bind('<s>', lambda e: save())
-        root.bind('<q>', lambda e: on_closing())
-        root.bind('<e>', lambda e: exit_and_save())
+        root.bind("<r>", lambda e: reset())
+        root.bind("<d>", lambda e: delete_last())
+        root.bind("<s>", lambda e: save())
+        root.bind("<q>", lambda e: on_closing())
+        root.bind("<e>", lambda e: exit_and_save())
 
         # Protocolo para fechar janela
         root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -309,7 +364,7 @@ class ImageAnnotator:
         height = root.winfo_height()
         x = (root.winfo_screenwidth() // 2) - (width // 2)
         y = (root.winfo_screenheight() // 2) - (height // 2)
-        root.geometry('{}x{}+{}+{}'.format(width, height, x, y))
+        root.geometry("{}x{}+{}+{}".format(width, height, x, y))
 
         # Desenhar as bounding boxes existentes
         if bounding_boxes:
@@ -342,7 +397,7 @@ class ImageAnnotator:
 
         # Obter todos os arquivos de imagem
         image_files = []
-        for ext in ['*.jpg', '*.jpeg', '*.png']:
+        for ext in ["*.jpg", "*.jpeg", "*.png"]:
             image_files.extend(glob.glob(os.path.join(image_dir, ext)))
 
         if not image_files:
@@ -358,17 +413,21 @@ class ImageAnnotator:
 
         if os.path.exists(progress_path):
             try:
-                with open(progress_path, 'r') as f:
+                with open(progress_path, "r") as f:
                     progress_data = json.load(f)
 
-                last_annotated = progress_data.get('last_annotated', '')
+                last_annotated = progress_data.get("last_annotated", "")
                 if last_annotated in image_files:
                     start_index = image_files.index(last_annotated) + 1
                     if start_index < len(image_files):
-                        logger.info(f"Retomando anotação a partir de: {os.path.basename(image_files[start_index])}")
-                        retomar = input(f"Última imagem anotada: {os.path.basename(last_annotated)}. "
-                                        f"Retomar da próxima imagem? (s/n): ").lower()
-                        if retomar != 's':
+                        logger.info(
+                            f"Retomando anotação a partir de: {os.path.basename(image_files[start_index])}"
+                        )
+                        retomar = input(
+                            f"Última imagem anotada: {os.path.basename(last_annotated)}. "
+                            f"Retomar da próxima imagem? (s/n): "
+                        ).lower()
+                        if retomar != "s":
                             start_index = 0
                     else:
                         logger.info("Todas as imagens já foram anotadas.")
@@ -389,23 +448,27 @@ class ImageAnnotator:
         # Processar imagens a partir do ponto de retomada
         for i in range(start_index, len(image_files)):
             img_path = image_files[i]
-            logger.info(f"Anotando: {os.path.basename(img_path)} ({i + 1}/{len(image_files)})")
+            logger.info(
+                f"Anotando: {os.path.basename(img_path)} ({i + 1}/{len(image_files)})"
+            )
 
             # Verificar se já existe anotação
             base_name = os.path.splitext(os.path.basename(img_path))[0]
             existing_annotation = os.path.join(output_dir, f"{base_name}.txt")
 
             if os.path.exists(existing_annotation):
-                should_skip = input(f"A anotação para {base_name} já existe. O que deseja fazer? "
-                                    f"(p)ular, (e)ditar, (s)obrescrever: ").lower()
-                if should_skip == 'p':
+                should_skip = input(
+                    f"A anotação para {base_name} já existe. O que deseja fazer? "
+                    f"(p)ular, (e)ditar, (s)obrescrever: "
+                ).lower()
+                if should_skip == "p":
                     logger.info(f"Pulando {base_name}")
                     imagens_existentes += 1
 
                     # Salvar progresso após cada imagem
                     self._save_progress(progress_path, img_path)
                     continue
-                elif should_skip != 'e':
+                elif should_skip != "e":
                     # Para 's' ou qualquer outra entrada, continuamos normalmente (sobrescrever)
                     logger.info(f"Sobrescrevendo anotação existente para {base_name}")
 
@@ -414,7 +477,9 @@ class ImageAnnotator:
 
             if annotation_path:
                 total_annotated += 1
-                logger.info(f"Concluído {total_annotated}/{len(image_files) - start_index} imagens nesta sessão")
+                logger.info(
+                    f"Concluído {total_annotated}/{len(image_files) - start_index} imagens nesta sessão"
+                )
 
                 # Salvar progresso após cada imagem
                 self._save_progress(progress_path, img_path)
@@ -423,7 +488,8 @@ class ImageAnnotator:
                 break
 
         logger.info(
-            f"Anotação em lote concluída: {total_annotated + imagens_existentes}/{len(image_files)} imagens anotadas no total")
+            f"Anotação em lote concluída: {total_annotated + imagens_existentes}/{len(image_files)} imagens anotadas no total"
+        )
         return len(image_files), total_annotated + imagens_existentes
 
     def _save_progress(self, progress_path: str, current_image: str) -> None:
@@ -438,11 +504,11 @@ class ImageAnnotator:
 
         try:
             progress_data = {
-                'last_annotated': current_image,
-                'timestamp': datetime.now().isoformat()
+                "last_annotated": current_image,
+                "timestamp": datetime.now().isoformat(),
             }
 
-            with open(progress_path, 'w') as f:
+            with open(progress_path, "w") as f:
                 json.dump(progress_data, f)
 
         except Exception as e:

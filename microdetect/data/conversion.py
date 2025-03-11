@@ -23,10 +23,10 @@ class ImageConverter:
 
     @staticmethod
     def convert_tiff_to_png(
-            input_dir: str,
-            output_dir: str,
-            use_opencv: bool = False,
-            delete_original: bool = False
+        input_dir: str,
+        output_dir: str,
+        use_opencv: bool = False,
+        delete_original: bool = False,
     ) -> Tuple[int, int, List[str]]:
         """
         Converte todas as imagens TIFF em um diretório para o formato PNG.
@@ -45,7 +45,7 @@ class ImageConverter:
 
         # Obter todos os arquivos TIFF
         tiff_files = []
-        for ext in ['*.tif', '*.tiff']:
+        for ext in ["*.tif", "*.tiff"]:
             tiff_files.extend(glob.glob(os.path.join(input_dir, ext)))
 
         if not tiff_files:
@@ -81,7 +81,9 @@ class ImageConverter:
 
                     # Normalizar se necessário (para imagens de 16 bits)
                     if img.dtype == np.uint16:
-                        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(
+                            np.uint8
+                        )
 
                     cv2.imwrite(png_path, img)
                 else:
@@ -109,17 +111,19 @@ class ImageConverter:
         # Fechar barra de progresso
         progress_bar.close()
 
-        logger.info(f"Conversão concluída: {success} arquivos convertidos com sucesso, {errors} erros")
+        logger.info(
+            f"Conversão concluída: {success} arquivos convertidos com sucesso, {errors} erros"
+        )
         return success, errors, error_messages
 
     @staticmethod
     def batch_convert(
-            input_dir: str,
-            output_dir: str,
-            source_format: str,
-            target_format: str,
-            use_opencv: bool = False,
-            delete_original: bool = False
+        input_dir: str,
+        output_dir: str,
+        source_format: str,
+        target_format: str,
+        use_opencv: bool = False,
+        delete_original: bool = False,
     ) -> Tuple[int, int, List[str]]:
         """
         Converte imagens de um formato para outro.
@@ -136,7 +140,7 @@ class ImageConverter:
             Tupla com (número de sucessos, número de falhas, lista de erros)
         """
         # Atualmente, só implementamos conversão de TIFF para PNG
-        if source_format.lower() in ['tif', 'tiff'] and target_format.lower() == 'png':
+        if source_format.lower() in ["tif", "tiff"] and target_format.lower() == "png":
             return ImageConverter.convert_tiff_to_png(
                 input_dir, output_dir, use_opencv, delete_original
             )

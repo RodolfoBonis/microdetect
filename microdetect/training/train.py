@@ -2,9 +2,10 @@
 Módulo para treinamento de modelos YOLOv8.
 """
 
-import os
 import logging
-from typing import Dict, Any, Optional, Union, Tuple
+import os
+from typing import Any, Dict, Optional, Tuple, Union
+
 import torch
 from ultralytics import YOLO
 
@@ -18,13 +19,15 @@ class YOLOTrainer:
     Classe para treinar modelos YOLOv8 para detecção de microorganismos.
     """
 
-    def __init__(self,
-                 model_size: str = None,
-                 epochs: int = None,
-                 batch_size: int = None,
-                 image_size: int = None,
-                 pretrained: bool = None,
-                 output_dir: str = None):
+    def __init__(
+        self,
+        model_size: str = None,
+        epochs: int = None,
+        batch_size: int = None,
+        image_size: int = None,
+        pretrained: bool = None,
+        output_dir: str = None,
+    ):
         """
         Inicializa o treinador com parâmetros configuráveis.
 
@@ -36,12 +39,16 @@ class YOLOTrainer:
             pretrained: Se deve usar pesos pré-treinados
             output_dir: Diretório para salvar resultados de treinamento
         """
-        self.model_size = model_size or config.get('training.model_size', 's')
-        self.epochs = epochs or config.get('training.epochs', 100)
-        self.batch_size = batch_size or config.get('training.batch_size', 16)
-        self.image_size = image_size or config.get('training.image_size', 640)
-        self.pretrained = pretrained if pretrained is not None else config.get('training.pretrained', True)
-        self.output_dir = output_dir or config.get('directories.output', 'runs/train')
+        self.model_size = model_size or config.get("training.model_size", "s")
+        self.epochs = epochs or config.get("training.epochs", 100)
+        self.batch_size = batch_size or config.get("training.batch_size", 16)
+        self.image_size = image_size or config.get("training.image_size", 640)
+        self.pretrained = (
+            pretrained
+            if pretrained is not None
+            else config.get("training.pretrained", True)
+        )
+        self.output_dir = output_dir or config.get("directories.output", "runs/train")
 
     def train(self, data_yaml: str) -> Dict[str, Any]:
         """
@@ -54,7 +61,11 @@ class YOLOTrainer:
             Resultados do treinamento
         """
         # Selecionar modelo com base no tamanho
-        model_name = f"yolov8{self.model_size}.pt" if self.pretrained else f"yolov8{self.model_size}.yaml"
+        model_name = (
+            f"yolov8{self.model_size}.pt"
+            if self.pretrained
+            else f"yolov8{self.model_size}.yaml"
+        )
 
         # Inicializar modelo
         try:
@@ -66,19 +77,21 @@ class YOLOTrainer:
 
         # Determinar dispositivo - usar MPS se disponível no Apple Silicon
         if torch.backends.mps.is_available():
-            device = 'mps'
+            device = "mps"
             logger.info("Treinando na GPU Apple (MPS)")
         elif torch.cuda.is_available():
-            device = '0'  # Primeiro dispositivo CUDA
+            device = "0"  # Primeiro dispositivo CUDA
             logger.info("Treinando na GPU NVIDIA (CUDA)")
             logger.info(f"GPU disponível: {torch.cuda.get_device_name(0)}")
         else:
-            device = 'cpu'
+            device = "cpu"
             logger.info("Treinando na CPU (sem aceleração GPU disponível)")
 
         # Iniciar treinamento
-        logger.info(f"Iniciando treinamento com configuração: "
-                    f"epochs={self.epochs}, batch={self.batch_size}, img_size={self.image_size}")
+        logger.info(
+            f"Iniciando treinamento com configuração: "
+            f"epochs={self.epochs}, batch={self.batch_size}, img_size={self.image_size}"
+        )
 
         try:
             results = model.train(
@@ -90,14 +103,14 @@ class YOLOTrainer:
                 name=f"yolov8_{self.model_size}_custom",
                 patience=20,
                 save=True,
-                device=device
+                device=device,
             )
 
             logger.info("Treinamento concluído com sucesso")
 
             # Exportar o modelo para formato ONNX para implantação
             try:
-                export_path = model.export(format='onnx')
+                export_path = model.export(format="onnx")
                 logger.info(f"Modelo exportado para ONNX: {export_path}")
             except Exception as e:
                 logger.error(f"Erro ao exportar modelo para ONNX: {str(e)}")
@@ -108,7 +121,9 @@ class YOLOTrainer:
             logger.error(f"Erro durante o treinamento: {str(e)}")
             raise
 
-    def resume_training(self, checkpoint_path: str, data_yaml: str, additional_epochs: int = None) -> Dict[str, Any]:
+    def resume_training(
+        self, checkpoint_path: str, data_yaml: str, additional_epochs: int = None
+    ) -> Dict[str, Any]:
         """
         Retoma o treinamento de um checkpoint.
 
@@ -133,20 +148,22 @@ class YOLOTrainer:
 
         # Determinar dispositivo
         if torch.backends.mps.is_available():
-            device = 'mps'
+            device = "mps"
         elif torch.cuda.is_available():
-            device = '0'
+            device = "0"
         else:
-            device = 'cpu'
+            device = "cpu"
 
         # Calcular épocas totais
         if additional_epochs is None:
             additional_epochs = self.epochs
 
-        total_epochs = model.ckpt['epoch'] + additional_epochs
+        total_epochs = model.ckpt["epoch"] + additional_epochs
 
         # Retomar treinamento
-        logger.info(f"Retomando treinamento do epoch {model.ckpt['epoch']} até {total_epochs}")
+        logger.info(
+            f"Retomando treinamento do epoch {model.ckpt['epoch']} até {total_epochs}"
+        )
 
         try:
             results = model.train(
@@ -159,7 +176,7 @@ class YOLOTrainer:
                 patience=20,
                 save=True,
                 device=device,
-                resume=True
+                resume=True,
             )
 
             logger.info("Treinamento retomado concluído com sucesso")
@@ -193,15 +210,19 @@ class YOLOTrainer:
         best_config = None
 
         # Modelo base
-        model_name = f"yolov8{self.model_size}.pt" if self.pretrained else f"yolov8{self.model_size}.yaml"
+        model_name = (
+            f"yolov8{self.model_size}.pt"
+            if self.pretrained
+            else f"yolov8{self.model_size}.yaml"
+        )
 
         # Determinar dispositivo
         if torch.backends.mps.is_available():
-            device = 'mps'
+            device = "mps"
         elif torch.cuda.is_available():
-            device = '0'
+            device = "0"
         else:
-            device = 'cpu'
+            device = "cpu"
 
         # Testar combinações
         for batch_size in batch_sizes:
@@ -224,7 +245,7 @@ class YOLOTrainer:
                         patience=5,
                         save=True,
                         device=device,
-                        lr0=lr
+                        lr0=lr,
                     )
 
                     # Verificar se este é o melhor resultado
@@ -233,9 +254,9 @@ class YOLOTrainer:
                     if best_result is None or current_map > best_result:
                         best_result = current_map
                         best_config = {
-                            'batch_size': batch_size,
-                            'learning_rate': lr,
-                            'map': current_map
+                            "batch_size": batch_size,
+                            "learning_rate": lr,
+                            "map": current_map,
                         }
 
                     logger.info(f"Resultado: mAP={current_map:.4f}")
@@ -253,14 +274,14 @@ class YOLOTrainer:
                 final_results = model.train(
                     data=data_yaml,
                     epochs=self.epochs,
-                    batch=best_config['batch_size'],
+                    batch=best_config["batch_size"],
                     imgsz=self.image_size,
                     project=self.output_dir,
                     name=f"yolov8_{self.model_size}_optimized",
                     patience=20,
                     save=True,
                     device=device,
-                    lr0=best_config['learning_rate']
+                    lr0=best_config["learning_rate"],
                 )
 
                 logger.info("Treinamento com hiperparâmetros otimizados concluído")
