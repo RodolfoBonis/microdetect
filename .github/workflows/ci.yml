@@ -3,11 +3,34 @@ name: MicroDetect CI
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - "microdetect/__init__.py"
   pull_request:
     branches: [ main ]
 
 jobs:
+  check_skip:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check_commit.outputs.should_skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if version bump commit
+        id: check_commit
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MSG" == *"chore: bump version"* ]]; then
+            echo "Skipping CI for version bump commit"
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
   get_commit_messages:
+    needs: check_skip
+    if: ${{ needs.check_skip.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}

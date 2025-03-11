@@ -174,27 +174,35 @@ jobs:
 
           # If we have previous tag, get commits since then
           if [ "$latest_tag" != "v0.0.0" ]; then
-            # Get PR numbers from commits
-            pr_list=$(git log $latest_tag..HEAD --pretty=format:"%s" | grep -o "#[0-9]*" | tr -d '#' | sort -u)
+            # Try to get PRs via GitHub API first
+            pr_count=$(gh pr list --state merged --base main --json number --jq 'length')
+            pr_list=$(gh pr list --state merged --base main --limit $pr_count --json number,title,author,mergeCommit --jq '.[] | select(.mergeCommit.oid != null)' | jq -s '')
+            if [ ! -z "$pr_list" ] && [ "$pr_list" != "[]" ]; then
+              # Filter PRs that were merged between the latest tag and HEAD
+              echo "$pr_list" | jq -c '.[]' | while read -r pr; do
+                pr_number=$(echo "$pr" | jq -r '.number')
+                pr_title=$(echo "$pr" | jq -r '.title')
+                pr_author=$(echo "$pr" | jq -r '.author.login')
+                merge_commit=$(echo "$pr" | jq -r '.mergeCommit.oid')
 
-            # If we found PRs, list them with details
-            if [ ! -z "$pr_list" ]; then
-              for pr in $pr_list; do
-                pr_info=$(gh pr view $pr --json title,author,url 2>/dev/null)
-                if [ $? -eq 0 ]; then
-                  title=$(echo "$pr_info" | jq -r '.title')
-                  author=$(echo "$pr_info" | jq -r '.author.login')
-                  url=$(echo "$pr_info" | jq -r '.url')
-                  echo "* $title (#$pr) by @$author" >> changelog.md
+                # Check if this merge commit is in our range
+                if git merge-base --is-ancestor "$merge_commit" HEAD && \
+                   ! git merge-base --is-ancestor "$merge_commit" "$latest_tag" 2>/dev/null; then
+                  echo "* $pr_title (#$pr_number) by @$pr_author" >> changelog.md
                 fi
               done
             else
-              # Fall back to commit list if no PRs found
-              git log $latest_tag..HEAD --pretty=format:"* %s (%h)" >> changelog.md
+              # Fall back to commit list excluding merge commits
+              git log $latest_tag..HEAD --no-merges --pretty=format:"* %s (%h)" >> changelog.md
             fi
           else
-            # No previous tag, include all commits
-            git log --pretty=format:"* %s (%h)" >> changelog.md
+            # No previous tag, include all non-merge commits
+            git log --no-merges --pretty=format:"* %s (%h)" >> changelog.md
+          fi
+
+          # Add a note if changelog is empty
+          if [ $(wc -l < changelog.md) -le 2 ]; then
+            echo "* Maintenance updates and bug fixes" >> changelog.md
           fi
 
           echo "" >> changelog.md
@@ -220,7 +228,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: main
+          fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || github.token }}
 
       - name: Install GitHub CLI
@@ -256,9 +265,13 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+
+          # Make sure we're explicitly on main branch
+          git checkout main
+
           git add microdetect/__init__.py
           git commit -m "chore: bump version to ${{ needs.determine_version.outputs.new_version }}" || echo "No changes to commit"
-          git push || echo "Failed to push changes, possibly already up to date"
+          git push origin main || echo "Failed to push changes"
 
       - name: Create Release with GitHub CLI
         id: create_release
