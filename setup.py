@@ -36,11 +36,15 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
         "Topic :: Scientific/Engineering :: Image Recognition",
     ],
-    python_requires=">=3.12",
+    python_requires=">=3.9",
     install_requires=read_requirements(),
     entry_points={
         "console_scripts": [
