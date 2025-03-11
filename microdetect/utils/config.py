@@ -2,18 +2,19 @@
 Módulo para gerenciamento de configuração do projeto.
 """
 
-import os
-import yaml
-from typing import Dict, Any, Optional, List
 import logging
+import os
+from typing import Any, Dict, List, Optional
+
 import pkg_resources
+import yaml
 
 logger = logging.getLogger(__name__)
 
 # Lista de locais onde procurar o config.yaml, em ordem de prioridade
 CONFIG_SEARCH_PATHS = [
-    os.path.join(os.getcwd(), 'config.yaml'),  # Diretório atual
-    os.path.expanduser('~/.microdetect/config.yaml'),  # Diretório do usuário
+    os.path.join(os.getcwd(), "config.yaml"),  # Diretório atual
+    os.path.expanduser("~/.microdetect/config.yaml"),  # Diretório do usuário
 ]
 
 DEFAULT_CONFIG_PATH = None  # Será configurado para o caminho do pacote
@@ -60,16 +61,18 @@ class Config:
             config_path = self._find_config()
 
             if config_path:
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     config = yaml.safe_load(f)
                     logger.info(f"Configuração carregada de: {config_path}")
                     self.config_path = config_path
                     return config
             else:
                 # Se nenhum arquivo foi encontrado, carrega o padrão do pacote
-                logger.warning("Arquivo de configuração não encontrado. "
-                             "Execute 'microdetect init' para criar uma configuração no diretório atual "
-                             "ou use valores padrão.")
+                logger.warning(
+                    "Arquivo de configuração não encontrado. "
+                    "Execute 'microdetect init' para criar uma configuração no diretório atual "
+                    "ou use valores padrão."
+                )
                 return self._get_default_config()
 
         except Exception as e:
@@ -87,13 +90,19 @@ class Config:
         try:
             # Tentar carregar do pacote primeiro
             try:
-                default_config_path = pkg_resources.resource_filename('microdetect', 'default_config.yaml')
+                default_config_path = pkg_resources.resource_filename(
+                    "microdetect", "default_config.yaml"
+                )
                 if os.path.exists(default_config_path):
-                    with open(default_config_path, 'r', encoding='utf-8') as f:
-                        logger.info(f"Configuração padrão carregada do pacote: {default_config_path}")
+                    with open(default_config_path, "r", encoding="utf-8") as f:
+                        logger.info(
+                            f"Configuração padrão carregada do pacote: {default_config_path}"
+                        )
                         return yaml.safe_load(f)
                 else:
-                    raise FileNotFoundError("Arquivo default_config.yaml não encontrado no pacote")
+                    raise FileNotFoundError(
+                        "Arquivo default_config.yaml não encontrado no pacote"
+                    )
             except (ImportError, FileNotFoundError) as e:
                 logger.warning(f"Não foi possível carregar default_config.yaml: {e}")
         except Exception as e:
@@ -107,26 +116,22 @@ class Config:
                 "images": "data/images",
                 "labels": "data/labels",
                 "output": "runs/train",
-                "reports": "reports"
+                "reports": "reports",
             },
             "classes": ["0-levedura", "1-fungo", "2-micro-alga"],
-            "color_map": {
-                "0": [0, 255, 0],
-                "1": [0, 0, 255],
-                "2": [255, 0, 0]
-            },
+            "color_map": {"0": [0, 255, 0], "1": [0, 0, 255], "2": [255, 0, 0]},
             "training": {
                 "model_size": "s",
                 "epochs": 50,
                 "batch_size": 32,
                 "image_size": 640,
-                "pretrained": True
+                "pretrained": True,
             },
             "dataset": {
                 "train_ratio": 0.7,
                 "val_ratio": 0.15,
                 "test_ratio": 0.15,
-                "seed": 42
+                "seed": 42,
             },
             "augmentation": {
                 "factor": 20,
@@ -134,8 +139,8 @@ class Config:
                 "contrast_range": [-30, 30],
                 "flip_probability": 0.5,
                 "rotation_range": [-15, 15],
-                "noise_probability": 0.3
-            }
+                "noise_probability": 0.3,
+            },
         }
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -149,7 +154,7 @@ class Config:
         Returns:
             Valor da configuração ou o valor padrão
         """
-        keys = key.split('.')
+        keys = key.split(".")
         result = self.config_data
 
         try:
@@ -157,7 +162,9 @@ class Config:
                 result = result[k]
             return result
         except (KeyError, TypeError):
-            logger.debug(f"Configuração não encontrada: {key}. Usando valor padrão: {default}")
+            logger.debug(
+                f"Configuração não encontrada: {key}. Usando valor padrão: {default}"
+            )
             return default
 
     def save(self, config_path: Optional[str] = None) -> None:
@@ -167,9 +174,11 @@ class Config:
         Args:
             config_path: Caminho para salvar o arquivo de configuração
         """
-        save_path = config_path or self.config_path or os.path.join(os.getcwd(), 'config.yaml')
+        save_path = (
+            config_path or self.config_path or os.path.join(os.getcwd(), "config.yaml")
+        )
         try:
-            with open(save_path, 'w', encoding='utf-8') as f:
+            with open(save_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.config_data, f, default_flow_style=False)
             logger.info(f"Configuração salva em: {save_path}")
         except Exception as e:

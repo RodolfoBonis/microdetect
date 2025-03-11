@@ -5,5 +5,5 @@ Este pacote fornece ferramentas para converter, anotar, aumentar, treinar
 e avaliar modelos de detecção de microorganismos em imagens de microscopia.
 """
 
-__version__ = '1.0.0'
-__author__ = 'MicroDetect Team'
+__version__ = "1.0.0"
+__author__ = "MicroDetect Team"

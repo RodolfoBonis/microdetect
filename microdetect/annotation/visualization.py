@@ -2,10 +2,11 @@
 Módulo para visualização de anotações em imagens.
 """
 
-import os
 import glob
 import logging
-from typing import List, Dict, Tuple, Optional, Set, Union
+import os
+from typing import Dict, List, Optional, Set, Tuple, Union
+
 import cv2
 import numpy as np
 
@@ -19,9 +20,11 @@ class AnnotationVisualizer:
     Classe para visualizar anotações de bounding boxes em imagens.
     """
 
-    def __init__(self,
-                 class_map: Dict[str, str] = None,
-                 color_map: Dict[str, Tuple[int, int, int]] = None):
+    def __init__(
+        self,
+        class_map: Dict[str, str] = None,
+        color_map: Dict[str, Tuple[int, int, int]] = None,
+    ):
         """
         Inicializa o visualizador de anotações.
 
@@ -29,30 +32,35 @@ class AnnotationVisualizer:
             class_map: Mapeamento de IDs de classe para nomes (ex: {"0": "0-levedura"})
             color_map: Mapeamento de IDs de classe para cores RGB (ex: {"0": (0, 255, 0)})
         """
-        classes = config.get('classes', ["0-levedura", "1-fungo", "2-micro-alga"])
+        classes = config.get("classes", ["0-levedura", "1-fungo", "2-micro-alga"])
 
         # Criar class_map a partir das classes se não fornecido
         if class_map is None:
             self.class_map = {}
             for cls in classes:
-                parts = cls.split('-', 1)
+                parts = cls.split("-", 1)
                 if len(parts) == 2:
                     self.class_map[parts[0]] = cls
         else:
             self.class_map = class_map
 
         # Usar color_map da configuração ou o padrão
-        self.color_map = color_map or config.get('color_map', {
-            "0": (0, 255, 0),  # Verde para levedura
-            "1": (0, 0, 255),  # Vermelho para fungo
-            "2": (255, 0, 0)  # Azul para micro-alga
-        })
+        self.color_map = color_map or config.get(
+            "color_map",
+            {
+                "0": (0, 255, 0),  # Verde para levedura
+                "1": (0, 0, 255),  # Vermelho para fungo
+                "2": (255, 0, 0),  # Azul para micro-alga
+            },
+        )
 
-    def visualize_annotations(self,
-                              image_dir: str,
-                              label_dir: Optional[str] = None,
-                              output_dir: Optional[str] = None,
-                              filter_classes: Optional[Set[str]] = None) -> None:
+    def visualize_annotations(
+        self,
+        image_dir: str,
+        label_dir: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        filter_classes: Optional[Set[str]] = None,
+    ) -> None:
         """
         Desenha bounding boxes em todas as imagens em um diretório e permite navegação entre elas.
 
@@ -63,8 +71,10 @@ class AnnotationVisualizer:
             filter_classes: Conjunto de IDs de classe para exibir (se None, mostra todas as classes)
         """
         # Obter todos os arquivos de imagem
-        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) +
-                             glob.glob(os.path.join(image_dir, "*.png")))
+        image_files = sorted(
+            glob.glob(os.path.join(image_dir, "*.jpg"))
+            + glob.glob(os.path.join(image_dir, "*.png"))
+        )
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -78,7 +88,9 @@ class AnnotationVisualizer:
 
         if filter_classes:
             # Inicializar apenas com classes especificadas visíveis
-            class_visibility = {cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()}
+            class_visibility = {
+                cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()
+            }
 
         save_current = False
 
@@ -108,14 +120,16 @@ class AnnotationVisualizer:
             # Desenhar caixas se as anotações existirem
             annotations = []
             if os.path.exists(label_path):
-                with open(label_path, 'r') as f:
+                with open(label_path, "r") as f:
                     annotations = f.readlines()
 
                 # Desenhar cada anotação
                 box_idx = 0
                 for ann in annotations:
                     parts = ann.strip().split()
-                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
+                    if (
+                        len(parts) == 5
+                    ):  # Formato YOLO: classe x_center y_center width height
                         cls, x_center, y_center, box_w, box_h = parts
 
                         # Pular se a classe for filtrada
@@ -148,15 +162,31 @@ class AnnotationVisualizer:
                         class_name = self.class_map.get(cls, f"Classe {cls}")
 
                         # Adicionar nome da classe e número de identificação
-                        cv2.putText(img, f"{class_name} #{box_idx + 1}", (x1, y1 - 5),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+                        cv2.putText(
+                            img,
+                            f"{class_name} #{box_idx + 1}",
+                            (x1, y1 - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            color,
+                            1,
+                            cv2.LINE_AA,
+                        )
 
                         box_idx += 1
 
             # Adicionar informações de contagem e navegação
             y_offset = 30
-            cv2.putText(img, f"Total visível: {total_visible}", (10, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(
+                img,
+                f"Total visível: {total_visible}",
+                (10, y_offset),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
             y_offset += 30
 
@@ -164,23 +194,51 @@ class AnnotationVisualizer:
             for cls_id, cls_name in self.class_map.items():
                 count = class_counts.get(cls_id, 0)
                 visibility = "✓" if class_visibility.get(cls_id, True) else "✗"
-                color = (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
+                color = (
+                    (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
+                )
 
-                cv2.putText(img, f"{visibility} {cls_name}: {count}", (10, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
+                cv2.putText(
+                    img,
+                    f"{visibility} {cls_name}: {count}",
+                    (10, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    color,
+                    2,
+                    cv2.LINE_AA,
+                )
                 y_offset += 30
 
-            cv2.putText(img, f"Imagem: {current_idx + 1}/{total_images} - {os.path.basename(img_path)}",
-                        (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(
+                img,
+                f"Imagem: {current_idx + 1}/{total_images} - {os.path.basename(img_path)}",
+                (10, y_offset),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
             y_offset += 30
-            cv2.putText(img, "Controles: 'n'=próx, 'p'=ant, 'q'=sair, '0'-'9'=alternar classe",
-                        (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(
+                img,
+                "Controles: 'n'=próx, 'p'=ant, 'q'=sair, '0'-'9'=alternar classe",
+                (10, y_offset),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
             # Salvar se diretório de saída especificado
             if output_dir and save_current:
                 os.makedirs(output_dir, exist_ok=True)
-                output_path = os.path.join(output_dir, f"annotated_{os.path.basename(img_path)}")
+                output_path = os.path.join(
+                    output_dir, f"annotated_{os.path.basename(img_path)}"
+                )
                 cv2.imwrite(output_path, img)
                 logger.info(f"Imagem anotada salva em {output_path}")
                 save_current = False
@@ -197,30 +255,32 @@ class AnnotationVisualizer:
             # Processar entrada do teclado
             key = cv2.waitKey(0) & 0xFF
 
-            if key == ord('q'):  # Sair
+            if key == ord("q"):  # Sair
                 break
-            elif key == ord('n'):  # Próxima imagem
+            elif key == ord("n"):  # Próxima imagem
                 current_idx = (current_idx + 1) % total_images
-            elif key == ord('p'):  # Imagem anterior
+            elif key == ord("p"):  # Imagem anterior
                 current_idx = (current_idx - 1) % total_images
-            elif key == ord('s'):  # Salvar imagem atual
+            elif key == ord("s"):  # Salvar imagem atual
                 save_current = True
-            elif key >= ord('0') and key <= ord('9'):  # Alternar visibilidade da classe
+            elif key >= ord("0") and key <= ord("9"):  # Alternar visibilidade da classe
                 cls_id = chr(key)
                 if cls_id in class_visibility:
                     class_visibility[cls_id] = not class_visibility[cls_id]
-            elif key == ord('a'):  # Mostrar todas as classes
+            elif key == ord("a"):  # Mostrar todas as classes
                 for cls_id in class_visibility:
                     class_visibility[cls_id] = True
 
         cv2.destroyAllWindows()
         logger.info("Visualização de anotações encerrada")
 
-    def save_annotated_images(self,
-                              image_dir: str,
-                              label_dir: Optional[str] = None,
-                              output_dir: str = "annotated_images",
-                              filter_classes: Optional[Set[str]] = None) -> int:
+    def save_annotated_images(
+        self,
+        image_dir: str,
+        label_dir: Optional[str] = None,
+        output_dir: str = "annotated_images",
+        filter_classes: Optional[Set[str]] = None,
+    ) -> int:
         """
         Salva todas as imagens com suas anotações desenhadas.
 
@@ -236,8 +296,10 @@ class AnnotationVisualizer:
         os.makedirs(output_dir, exist_ok=True)
 
         # Obter todos os arquivos de imagem
-        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) +
-                             glob.glob(os.path.join(image_dir, "*.png")))
+        image_files = sorted(
+            glob.glob(os.path.join(image_dir, "*.jpg"))
+            + glob.glob(os.path.join(image_dir, "*.png"))
+        )
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -246,7 +308,9 @@ class AnnotationVisualizer:
         # Rastrear quais classes mostrar
         class_visibility = {cls_id: True for cls_id in self.class_map.keys()}
         if filter_classes:
-            class_visibility = {cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()}
+            class_visibility = {
+                cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()
+            }
 
         saved_count = 0
 
@@ -270,14 +334,16 @@ class AnnotationVisualizer:
 
             # Desenhar caixas se as anotações existirem
             if os.path.exists(label_path):
-                with open(label_path, 'r') as f:
+                with open(label_path, "r") as f:
                     annotations = f.readlines()
 
                 # Desenhar cada anotação
                 box_idx = 0
                 for ann in annotations:
                     parts = ann.strip().split()
-                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
+                    if (
+                        len(parts) == 5
+                    ):  # Formato YOLO: classe x_center y_center width height
                         cls, x_center, y_center, box_w, box_h = parts
 
                         # Pular se a classe for filtrada
@@ -306,18 +372,30 @@ class AnnotationVisualizer:
                         class_name = self.class_map.get(cls, f"Classe {cls}")
 
                         # Adicionar nome da classe e número de identificação
-                        cv2.putText(img, f"{class_name} #{box_idx + 1}", (x1, y1 - 5),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+                        cv2.putText(
+                            img,
+                            f"{class_name} #{box_idx + 1}",
+                            (x1, y1 - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            color,
+                            1,
+                            cv2.LINE_AA,
+                        )
 
                         box_idx += 1
 
                 # Salvar imagem anotada
-                output_path = os.path.join(output_dir, f"annotated_{os.path.basename(img_path)}")
+                output_path = os.path.join(
+                    output_dir, f"annotated_{os.path.basename(img_path)}"
+                )
                 cv2.imwrite(output_path, img)
                 saved_count += 1
 
             else:
                 logger.warning(f"Arquivo de anotação não encontrado para: {img_path}")
 
-        logger.info(f"Processo concluído: {saved_count} imagens anotadas salvas em {output_dir}")
+        logger.info(
+            f"Processo concluído: {saved_count} imagens anotadas salvas em {output_dir}"
+        )
         return saved_count

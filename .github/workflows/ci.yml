@@ -1,0 +1,295 @@
+name: MicroDetect CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  get_commit_messages:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    outputs:
+      commit_messages: ${{ steps.format_messages.outputs.messages }}
+    steps:
+      - name: Install GitHub CLI
+        run: sudo apt-get install gh -y
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Get commit information
+        id: commit_info
+        run: |
+          # Determine if this is a PR or push to main
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "Processing Pull Request #${{ github.event.pull_request.number }}"
+            
+            # Get all commits in the PR
+            echo "📦 PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}" > commit_messages.txt
+            echo "" >> commit_messages.txt
+            
+            if [ "${{ github.event.pull_request.body }}" != "null" ] && [ ! -z "${{ github.event.pull_request.body }}" ]; then
+              echo "📝 Description:" >> commit_messages.txt
+              echo "${{ github.event.pull_request.body }}" >> commit_messages.txt
+              echo "" >> commit_messages.txt
+            fi
+            
+            echo "🔄 Commits in this PR:" >> commit_messages.txt
+            
+            # Use GitHub CLI to get commits in the PR
+            gh pr view ${{ github.event.pull_request.number }} --json commits --jq '.commits[] | "• " + .messageHeadline + if .messageBody then "\n  " + (.messageBody | gsub("\n"; "\n  ")) else "" end' >> commit_messages.txt
+          else
+            echo "Processing push to main branch"
+            
+            # Find the latest tag or merge commit
+            latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            
+            if [ ! -z "$latest_tag" ]; then
+              echo "📦 Commits since tag $latest_tag:" > commit_messages.txt
+              git_range="$latest_tag..HEAD"
+            else
+              # Find latest merge commit
+              latest_merge=$(git log --merges -n 1 --pretty=format:"%H" 2>/dev/null || echo "")
+              
+              if [ ! -z "$latest_merge" ]; then
+                echo "📦 Commits since last merge:" > commit_messages.txt
+                git_range="$latest_merge..HEAD"
+              else
+                # If no tags or merges, get last 10 commits
+                echo "📦 Recent commits:" > commit_messages.txt
+                git_range="HEAD~10..HEAD"
+              fi
+            fi
+            
+            echo "" >> commit_messages.txt
+            git log $git_range --pretty=format:"• %s%n  %b" | sed 's/^  $//' >> commit_messages.txt
+          fi
+          
+          cat commit_messages.txt
+
+      - name: Format messages for output
+        id: format_messages
+        run: |
+          # Escape newlines and other special characters for GitHub Actions output
+          formatted_message=$(cat commit_messages.txt | jq -sR .)
+          echo "messages=$formatted_message" >> $GITHUB_OUTPUT
+
+      - name: Upload commit messages
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-messages
+          path: commit_messages.txt
+
+  lint:
+    name: Code Quality
+    needs: get_commit_messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+          pip install -e .
+
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check formatting with black
+        run: |
+          black --check --diff microdetect
+
+      - name: Check imports with isort
+        run: |
+          isort --check-only --profile black microdetect
+
+  test:
+    name: Tests
+    needs: get_commit_messages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.12']
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      - name: Test with pytest
+        run: |
+          # Create placeholder test directory if not exists
+          mkdir -p tests
+          touch tests/__init__.py
+          
+          # Run tests if they exist, else just validate import
+          if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
+            pytest --cov=microdetect
+          else
+            python -c "import microdetect; print('Import test successful')"
+          fi
+
+  build:
+    name: Package Build
+    needs: get_commit_messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build wheel twine
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Check package with twine
+        run: |
+          python -m twine check dist/*
+
+      - name: Test installation
+        run: |
+          pip install dist/*.whl
+          python -c "import microdetect; print(f'MicroDetect version: {microdetect.__version__}')"
+
+  security:
+    name: Security Scan
+    needs: get_commit_messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit safety
+
+      - name: Run bandit (security linting)
+        run: |
+          bandit -r microdetect -ll
+
+      - name: Check dependencies with safety
+        run: |
+          safety check -r requirements.txt --full-report || true
+
+  notify:
+    name: Send Notification
+    needs: [get_commit_messages, lint, test, build, security]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Set job status
+        id: status
+        run: |
+          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.test.result }}" == "success" && "${{ needs.build.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Process commit messages
+        id: process_messages
+        run: |
+          # Decode the JSON-encoded message from outputs
+          echo '${{ needs.get_commit_messages.outputs.commit_messages }}' | jq -r > processed_message.txt
+          
+          # Read and format for GitHub Actions output
+          processed=$(cat processed_message.txt)
+          delimiter="EOF_MESSAGE"
+          echo "processed<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$processed" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+
+      - name: Set branch name
+        id: branch_name
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PR, use the source branch name
+            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          else
+            # For direct push, use regular branch name
+            echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Success Message via Telegram
+        if: steps.status.outputs.status == 'success'
+        uses: akeylimepie/telegram-action@main
+        with:
+            token: ${{ secrets.BOTTOKEN }}
+            chat_id: ${{ secrets.CHAT_ID }}
+            message_thread_id: ${{ secrets.THREAD_ID }}
+            parse_mode: 'markdown'
+            text: |
+              ✅ *CI Passed Successfully!*
+              
+              *Build Details:*
+              • Repository: ${{ github.repository }}
+              • Branch: ${{ steps.branch_name.outputs.branch }}
+              • Triggered by: ${{ github.actor }}
+              
+              ${{ steps.process_messages.outputs.processed }}
+              
+              🔍 [View Details](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      - name: Send Error Message via Telegram
+        if: steps.status.outputs.status == 'failure'
+        uses: akeylimepie/telegram-action@main
+        with:
+          token: ${{ secrets.BOTTOKEN }}
+          chat_id: ${{ secrets.CHAT_ID }}
+          message_thread_id: ${{ secrets.THREAD_ID }}
+          parse_mode: 'markdown'
+          text: |
+            ❌ *CI Failed!*
+            
+            *Error Details:*
+            • Repository: ${{ github.repository }}
+            • Branch: ${{ steps.branch_name.outputs.branch }}
+            • Triggered by: ${{ github.actor }}
+            
+            *Job Status:*
+            • Lint: ${{ needs.lint.result }}
+            • Test: ${{ needs.test.result }}
+            • Build: ${{ needs.build.result }}
+            • Security: ${{ needs.security.result }}
+            
+            ${{ steps.process_messages.outputs.processed }}
+            
+            ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
