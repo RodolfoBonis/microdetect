@@ -1,9 +1,10 @@
 name: Auto Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["CI"]  # Use the exact name of your CI workflow here
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       version_type:
@@ -23,34 +24,23 @@ on:
         type: boolean
 
 jobs:
-  check_ci_status:
+  check_workflow_status:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_ci_check != 'true' }}
-    outputs:
-      ci_success: ${{ steps.check_ci.outputs.success }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
-      - name: Check latest CI run status
-        id: check_ci
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      - name: Check status
         run: |
-          # Get the latest CI workflow run for the current SHA
-          ci_status=$(gh api repos/${{ github.repository }}/actions/runs \
-            --jq '.workflow_runs[] | select(.name=="MicroDetect CI" and .head_sha=="${{ github.sha }}") | .conclusion' \
-            | head -n 1)
-
-          echo "Latest CI status: $ci_status"
-
-          if [ "$ci_status" == "success" ]; then
-            echo "success=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "Running after successful CI workflow"
+            echo "Workflow name: ${{ github.event.workflow_run.name }}"
+            echo "Workflow conclusion: ${{ github.event.workflow_run.conclusion }}"
+            echo "Commit SHA: ${{ github.event.workflow_run.head_sha }}"
           else
-            echo "success=false" >> $GITHUB_OUTPUT
-            echo "CI needs to pass before creating a release. Current status: $ci_status"
+            echo "Running from manual workflow dispatch"
           fi
 
   determine_version:
-    needs: [check_ci_status]
-    if: ${{ github.event_name == 'workflow_dispatch' || needs.check_ci_status.outputs.ci_success == 'true' }}
+    needs: [check_workflow_status]
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.set_version.outputs.new_version }}
@@ -61,8 +51,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Use the SHA from the workflow_run event if available, otherwise normal checkout
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
           fetch-depth: 0
 
+      # Rest of the job remains unchanged
       - name: Get latest tag
         id: get_latest_tag
         run: |
