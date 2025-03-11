@@ -156,6 +156,74 @@ def setup_aws_parser(subparsers):
     parser.add_argument("--test", action="store_true", help="Testar conexão com AWS CodeArtifact")
 
 
+def setup_docs_parser(subparsers):
+    """Configurar parser para comando de documentação."""
+    parser = subparsers.add_parser("docs", help="Abrir documentação no navegador")
+    parser.add_argument("--port", type=int, default=8080, help="Porta para o servidor de documentação")
+    parser.add_argument("--no-browser", action="store_true", help="Não abrir navegador automaticamente")
+
+    # Opções para execução em background
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--background", action="store_true", help="Executar servidor em background")
+    group.add_argument("--stop", action="store_true", help="Parar servidor em execução em background")
+    group.add_argument("--status", action="store_true", help="Verificar status do servidor em background")
+
+
+def handle_docs(args):
+    """Manipular comando de documentação."""
+    try:
+        from microdetect.utils.docs_server import (
+            check_server_status,
+            start_docs_server,
+            start_server_in_background,
+            stop_background_server,
+        )
+
+        # Verificar se queremos parar o servidor
+        if args.stop:
+            stop_background_server()
+            return
+
+        # Verificar status do servidor
+        if args.status:
+            status = check_server_status()
+            if status["status"] == "running":
+                logger.info(f"Documentation server is running (PID: {status['pid']})")
+                logger.info(f"Server URL: {status['url']}")
+            else:
+                logger.info("Documentation server is not running")
+            return
+
+        # Configurar opções globais (se necessário)
+        if args.port != 8080:
+            import microdetect.utils.docs_server as docs_server
+
+            docs_server.PORT = args.port
+
+        if args.no_browser:
+
+            def do_nothing(url):
+                print(f"Servidor de documentação iniciado em {url}")
+                print("Acesse o URL acima no seu navegador para ver a documentação.")
+                print("Pressione Ctrl+C para parar o servidor.")
+
+            import microdetect.utils.docs_server as docs_server
+
+            docs_server.open_browser = do_nothing
+
+        # Iniciar servidor em background ou foreground
+        if args.background:
+            start_server_in_background(args.port)
+        else:
+            # Iniciar servidor em primeiro plano
+            start_docs_server()
+    except ImportError as e:
+        logger.error(f"Erro ao carregar o servidor de documentação: {str(e)}")
+        logger.info("Tente instalar as dependências necessárias: pip install markdown pygments")
+    except Exception as e:
+        logger.error(f"Erro ao iniciar o servidor de documentação: {str(e)}")
+
+
 def handle_setup_aws(args):
     """Manipular comando de configuração AWS."""
     # Verificar e instalar AWS CLI se necessário
@@ -530,8 +598,9 @@ def main(args: Optional[List[str]] = None):
     setup_dataset_parser(subparsers)
     setup_train_parser(subparsers)
     setup_evaluate_parser(subparsers)
-    setup_update_parser(subparsers)  # Comando de atualização
-    setup_aws_parser(subparsers)  # Comando de configuração AWS
+    setup_update_parser(subparsers)
+    setup_aws_parser(subparsers)
+    setup_docs_parser(subparsers)
 
     # Adicionar versão e ajuda
     parser.add_argument(
@@ -570,6 +639,8 @@ def main(args: Optional[List[str]] = None):
             handle_update(parsed_args)
         elif parsed_args.command == "setup-aws":
             handle_setup_aws(parsed_args)
+        elif parsed_args.command == "docs":
+            handle_docs(parsed_args)
         else:
             parser.print_help()
             return

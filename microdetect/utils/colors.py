@@ -15,3 +15,5 @@ except ImportError:
     # Fallback se colorama não estiver disponível
     INFO = WARNING = SUCCESS = ERROR = BRIGHT = RESET = ""
     COLORS_AVAILABLE = False
+    Fore = type("Fore", (), {"GREEN": "", "YELLOW": "", "RED": "", "CYAN": ""})
+    Style = type("Style", (), {"BRIGHT": "", "RESET_ALL": ""})
