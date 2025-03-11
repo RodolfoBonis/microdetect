@@ -122,6 +122,8 @@ jobs:
     name: Build and Deploy to AWS CodeArtifact
     needs: get_release_info
     runs-on: ubuntu-latest
+    outputs:
+      error_message: ${{ steps.set_version.outputs.error_message || steps.install_deps.outputs.error_message || steps.build.outputs.error_message || steps.aws_credentials.outputs.error_message || steps.login_codeartifact.outputs.error_message || steps.deploy.outputs.error_message }}
     steps:
       - uses: actions/checkout@v4
 
@@ -131,21 +133,25 @@ jobs:
           python-version: '3.10'
 
       - name: Set package version
+        id: set_version
         run: |
           # Update version in __init__.py
           sed -i "s/__version__ = .*/__version__ = '${{ needs.get_release_info.outputs.version }}'/" microdetect/__init__.py
           cat microdetect/__init__.py | grep "__version__"
 
       - name: Install build dependencies
+        id: install_deps
         run: |
           python -m pip install --upgrade pip
           pip install build wheel twine
 
       - name: Build package
+        id: build
         run: |
           python -m build
 
       - name: Configure AWS credentials
+        id: aws_credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -175,19 +181,24 @@ jobs:
           echo "repository_url=$repository_endpoint" >> $GITHUB_OUTPUT
 
       - name: Deploy to AWS CodeArtifact
+        id: deploy
         env:
           TWINE_USERNAME: aws
           TWINE_PASSWORD: ${{ steps.login_codeartifact.outputs.codeartifact_token }}
           TWINE_REPOSITORY_URL: ${{ steps.login_codeartifact.outputs.repository_url }}
         run: |
           twine upload dist/*
-          
+
+          # Add a delay to allow CodeArtifact to index the package
+          echo "Waiting for package to be available in CodeArtifact..."
+          sleep 30
+
           # Verify package was uploaded
           pip install microdetect==${{ needs.get_release_info.outputs.version }} \
             --index-url ${{ steps.login_codeartifact.outputs.repository_url }} \
             --extra-index-url https://pypi.org/simple \
             --no-deps
-          
+
           python -c "import microdetect; print(f'Deployed MicroDetect version: {microdetect.__version__}')"
 
   notify:
@@ -204,23 +215,6 @@ jobs:
           else
             echo "status=failure" >> $GITHUB_OUTPUT
           fi
-
-      - name: Format release info for Telegram
-        if: always()
-        id: format_telegram
-        run: |
-          # Get the release info and escape markdown special characters
-          release_info="${{ needs.get_release_info.outputs.release_info }}"
-
-          # Remove JSON quotes and process the content
-          release_info=$(echo "$release_info" | sed 's/^"//;s/"$//')
-
-          # Escape markdown special characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
-          escaped_info=$(echo "$release_info" | sed 's/\([_*\[\]()~`>#+=|{}\.!]\)/\\\1/g')
-
-          echo "telegram_info<<EOF" >> $GITHUB_OUTPUT
-          echo "$escaped_info" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Send Success Message via Telegram
         if: steps.status.outputs.status == 'success'
@@ -239,9 +233,9 @@ jobs:
             • Repository: ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }}
             • Domain: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
 
-            ${{ steps.format_telegram.outputs.telegram_info }}
-
-            📦 [View GitHub Action](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                  📦 [View GitHub Action](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+                  🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.get_release_info.outputs.version }})
+                  📝 [View Changelog](https://github.com/${{ github.repository }}/compare/v$(echo "${{ needs.get_release_info.outputs.version }}" | awk -F. '{print $1"."$2"."$3-1}')...v${{ needs.get_release_info.outputs.version }})
 
       - name: Send Error Message via Telegram
         if: steps.status.outputs.status == 'failure'
@@ -260,6 +254,6 @@ jobs:
             • Repository: ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }}
             • Domain: ${{ secrets.AWS_CODEARTIFACT_DOMAIN }}
             
-            ${{ steps.format_telegram.outputs.telegram_info }}
+            ${{ needs.build_and_deploy.outputs.error_message }}
             
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
