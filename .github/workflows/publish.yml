@@ -2,7 +2,7 @@ name: Deploy to AWS CodeArtifact
 
 on:
   release:
-    types: [created, published]
+    types: [published]
   workflow_dispatch:
     inputs:
       version_increment:
@@ -160,18 +160,18 @@ jobs:
             --domain-owner ${{ secrets.AWS_CODEARTIFACT_OWNER || secrets.AWS_ACCOUNT_ID || '$(aws sts get-caller-identity --query "Account" --output text)' }} \
             --query authorizationToken \
             --output text)
-          
+
           echo "::add-mask::$token"
           echo "codeartifact_token=$token" >> $GITHUB_OUTPUT
-          
+
           repository_endpoint=$(aws codeartifact get-repository-endpoint \
             --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
             --domain-owner ${{ secrets.AWS_CODEARTIFACT_OWNER || secrets.AWS_ACCOUNT_ID || '$(aws sts get-caller-identity --query "Account" --output text)' }} \
-            --repository ${{ secrets.AWS_CODEARTIFACT_URL }} \
+            --repository ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }} \
             --format pypi \
             --query repositoryEndpoint \
             --output text)
-          
+
           echo "repository_url=$repository_endpoint" >> $GITHUB_OUTPUT
 
       - name: Deploy to AWS CodeArtifact
