@@ -62,12 +62,27 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || github.token }}
 
+      - name: Fetch all tags
+        run: |
+          git fetch --tags --force
+          echo "All tags:"
+          git tag -n | sort -V
+
       # Rest of the job remains unchanged
       - name: Get latest tag
         id: get_latest_tag
         run: |
-          # Get latest tag or set to v0.0.0 if none exists
-          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Force fetching all tags first
+          git fetch --tags --force
+
+          # Get latest tag sorted by version number (not commit date)
+          latest_tag=$(git tag -l "v*" | sort -V | tail -n1)
+
+          # If no tags found, default to v0.0.0
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v0.0.0"
+          fi
+
           echo "latest_tag=$latest_tag" >> $GITHUB_ENV
 
           # Parse version
