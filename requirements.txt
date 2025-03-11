@@ -17,3 +17,5 @@ torchvision>=0.15.0
 # Utilidades para processamento de dados
 pandas>=2.0.0
 scikit-learn>=1.3.0
+setuptools~=75.8.0
+colorama>=0.4.6

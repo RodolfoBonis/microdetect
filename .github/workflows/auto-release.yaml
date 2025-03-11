@@ -51,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.set_version.outputs.new_version }}
+      old_version: ${{ steps.get_latest_tag.outputs.latest_tag }}
       version_type: ${{ steps.determine_type.outputs.version_type || steps.analyze_pr.outputs.version_type }}
       changelog: ${{ steps.generate_changelog.outputs.changelog }}
       error_message: ${{ steps.generate_changelog.outputs.error_message || steps.set_version.outputs.error_message || steps.determine_type.outputs.error_message || steps.analyze_pr.outputs.error_message }}
@@ -355,8 +356,8 @@ jobs:
             ➡️ The deployment to AWS CodeArtifact will start automatically.
 
             📦 [View GitHub Action](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-            🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/v${{ needs.create_release.outputs.version }})
-            📝 [View Changelog](https://github.com/${{ github.repository }}/compare/v$(echo "${{ needs.create_release.outputs.version }}" | awk -F. '{print $1"."$2"."$3-1}')...v${{ needs.create_release.outputs.version }})
+            🔗 [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.create_release.outputs.version }})
+            📝 [View Changelog](https://github.com/${{ github.repository }}/compare/v${{ needs.determine_version.outputs.old_version }}...${{ needs.create_release.outputs.version }})
 
       - name: Send Error Message via Telegram
         if: needs.create_release.outputs.release_status == 'failure' || needs.create_release.result == 'failure'

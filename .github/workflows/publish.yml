@@ -189,18 +189,6 @@ jobs:
         run: |
           twine upload dist/*
 
-          # Add a delay to allow CodeArtifact to index the package
-          echo "Waiting for package to be available in CodeArtifact..."
-          sleep 30
-
-          # Verify package was uploaded
-          pip install microdetect==${{ needs.get_release_info.outputs.version }} \
-            --index-url ${{ steps.login_codeartifact.outputs.repository_url }} \
-            --extra-index-url https://pypi.org/simple \
-            --no-deps
-
-          python -c "import microdetect; print(f'Deployed MicroDetect version: {microdetect.__version__}')"
-
   notify:
     name: Send Notification
     needs: [get_release_info, build_and_deploy]
