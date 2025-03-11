@@ -11,6 +11,7 @@
 ## Table of Contents
 
 - [Key Features](#key-features)
+- [Documentation](#documentation)
 - [Supported Microorganisms](#supported-microorganisms)
 - [Installation](#installation)
 - [Quick Guide](#quick-guide)
@@ -23,6 +24,7 @@
   - [Data Augmentation](#data-augmentation)
   - [Training with Checkpoints](#training-with-checkpoints)
   - [Model Evaluation](#model-evaluation)
+  - [Automatic Updates](#automatic-updates)
 - [Custom Configuration](#custom-configuration)
 - [Using with Makefile](#using-with-makefile)
 - [Contributing](#contributing)
@@ -38,6 +40,21 @@
 - 📊 **Dataset Preparation**: Splits and organizes data for training/validation/testing
 - 🧠 **Training with Checkpoints**: Trains custom YOLOv8 models with checkpoint system for resuming
 - 📈 **Evaluation**: Evaluates models with detailed metrics and visual reports
+- 🔄 **Automatic Updates**: Checks for and installs updates from AWS CodeArtifact
+
+## Documentation
+
+For more detailed information about MicroDetect, refer to our documentation:
+
+- [Installation Guide](docs/installation_guide.md) - Detailed installation instructions for different environments
+- [Update System](docs/update_system.md) - How to use and configure the automatic update system
+- [AWS CodeArtifact Setup](docs/aws_codeartifact_setup.md) - Setting up AWS CodeArtifact for updates
+- [Troubleshooting](docs/troubleshooting.md) - Solutions for common issues
+- [Advanced Configuration](docs/advanced_configuration.md) - Advanced configuration options
+- [Development Guide](docs/development_guide.md) - Guide for developers who want to contribute
+- [Update and Release Model](docs/update_and_release_model.md) - Versioning and release strategy
+
+These documents provide comprehensive information about installation, configuration, usage, and development of MicroDetect. If you encounter any issues not covered in the documentation, please open an issue on GitHub.
 
 ## Supported Microorganisms
 
@@ -165,6 +182,24 @@ microdetect train --resume runs/train/yolov8_s_custom/weights/last.pt --dataset_
 microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset --confusion_matrix
 ```
 
+### AWS CodeArtifact Setup for Updates
+
+```bash
+microdetect setup-aws --domain your-domain --repository your-repository --configure-aws
+```
+
+### Checking for Updates
+
+```bash
+microdetect update --check-only
+```
+
+### Installing Updates
+
+```bash
+microdetect update
+```
+
 ## Project Structure
 
 ```
@@ -193,7 +228,9 @@ microdetect/
 │   │   └── evaluate.py        # Model evaluation
 │   └── utils/                 # Utility functions and classes
 │       ├── __init__.py
-│       └── config.py          # Configuration management
+│       ├── config.py          # Configuration management
+│       ├── updater.py         # Update system
+│       └── aws_setup.py       # AWS configuration
 └── scripts/                   # Helper scripts
     ├── install_production_robust.sh  # Linux/Mac installation
     └── install_production_robust.bat # Windows installation
@@ -347,6 +384,34 @@ Evaluation reports include:
 - Performance graphs
 - Confusion matrix (optional)
 
+### Automatic Updates
+
+MicroDetect includes an automatic update system that connects to AWS CodeArtifact to check for and install updates:
+
+```bash
+# Configure AWS CodeArtifact connection
+microdetect setup-aws --domain your-domain --repository your-repository --configure-aws
+
+# Check for updates
+microdetect update --check-only
+
+# Install available updates
+microdetect update
+
+# Force update without confirmation
+microdetect update --force
+```
+
+**Key features:**
+
+- Automatically checks for updates after each command
+- Colorized interface for better user experience
+- Secure connection to AWS CodeArtifact
+- Stores credentials securely
+- Handles version comparison using semantic versioning
+
+MicroDetect will notify you when updates are available but won't install them automatically without your confirmation. You can disable automatic update checks by setting the environment variable `MICRODETECT_SKIP_UPDATE_CHECK=1`.
+
 ## Custom Configuration
 
 MicroDetect uses a `config.yaml` file for centralized configuration. When you run `microdetect init`, this file is created in the current directory with default values.
@@ -405,6 +470,12 @@ make evaluate
 
 # Complete pipeline
 make pipeline
+
+# Configure AWS CodeArtifact
+make setup-aws DOMAIN=your-domain REPOSITORY=your-repo
+
+# Update application
+make update
 ```
 
 You can customize parameters:

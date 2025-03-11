@@ -12,11 +12,17 @@ OUTPUT_DIR = runs/train
 REPORTS_DIR = reports
 
 # Parâmetros de treinamento (podem ser sobrescritos com make VAR=valor)
-MODEL_SIZE = s
+MODEL_SIZE = m
 EPOCHS = 100
 BATCH_SIZE = 32
 IMAGE_SIZE = 640
 AUGMENT_FACTOR = 20
+
+# Parâmetros para AWS CodeArtifact
+DOMAIN = seu-dominio
+REPOSITORY = seu-repositorio
+DOMAIN_OWNER =
+REGION = us-east-1
 
 # Alvo padrão
 all: help
@@ -93,6 +99,24 @@ evaluate:
 	python -m microdetect evaluate --model_path $(OUTPUT_DIR)/yolov8_$(MODEL_SIZE)_custom/weights/best.pt \
 		--dataset_dir $(DATASET_DIR) --output_dir $(REPORTS_DIR) --confusion_matrix
 
+# Configurar AWS CodeArtifact para atualizações
+setup-aws:
+	@echo "Configurando AWS CodeArtifact para atualizações..."
+	python -m microdetect setup-aws --domain $(DOMAIN) --repository $(REPOSITORY) \
+		$(if $(DOMAIN_OWNER),--domain-owner $(DOMAIN_OWNER),) \
+		$(if $(REGION),--region $(REGION),) \
+		--configure-aws --test
+
+# Verificar se há atualizações
+check-update:
+	@echo "Verificando se há atualizações..."
+	python -m microdetect update --check-only
+
+# Atualizar aplicação
+update:
+	@echo "Atualizando aplicação..."
+	python -m microdetect update
+
 # Pipeline completa: desde a preparação até a avaliação
 pipeline: prepare-data augment train evaluate
 	@echo "Pipeline completa executada com sucesso!"
@@ -109,7 +133,7 @@ clean-all: clean
 	rm -rf $(DATASET_DIR)/* $(OUTPUT_DIR)/* $(REPORTS_DIR)/*
 
 # Atualizar dependências
-update:
+update-deps:
 	@echo "Atualizando dependências..."
 	./scripts/setup.sh --update
 
@@ -131,10 +155,13 @@ help:
 	@echo "  make train          - Treinar modelo YOLO"
 	@echo "  make train-hyperparams - Treinar com busca de hiperparâmetros"
 	@echo "  make evaluate       - Avaliar modelo e gerar relatório"
+	@echo "  make setup-aws      - Configurar AWS CodeArtifact para atualizações"
+	@echo "  make check-update   - Verificar se há atualizações disponíveis"
+	@echo "  make update         - Atualizar aplicação para a versão mais recente"
 	@echo "  make pipeline       - Executar pipeline completa"
 	@echo "  make clean          - Limpar dados augmentados"
 	@echo "  make clean-all      - Limpar todos os dados gerados"
-	@echo "  make update         - Atualizar dependências"
+	@echo "  make update-deps    - Atualizar dependências"
 	@echo ""
 	@echo "Configuração (sobrescreva com make VAR=valor):"
 	@echo "  SOURCE_IMG_DIR = $(SOURCE_IMG_DIR)"
@@ -143,5 +170,8 @@ help:
 	@echo "  EPOCHS = $(EPOCHS)"
 	@echo "  BATCH_SIZE = $(BATCH_SIZE)"
 	@echo "  AUGMENT_FACTOR = $(AUGMENT_FACTOR)"
+	@echo "  DOMAIN = $(DOMAIN) (para AWS CodeArtifact)"
+	@echo "  REPOSITORY = $(REPOSITORY) (para AWS CodeArtifact)"
+	@echo "  REGION = $(REGION) (região AWS)"
 
-.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate pipeline clean clean-all update help
+.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate setup-aws check-update update pipeline clean clean-all update-deps help

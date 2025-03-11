@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import sys
+from getpass import getpass
 from typing import List, Optional
 
 from microdetect import __version__
@@ -16,6 +17,25 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
+from microdetect.utils import AWSSetupManager, UpdateManager
+
+try:
+    from colorama import Fore, Style, init
+
+    # Inicializar colorama (necessário para Windows)
+    init(autoreset=True)
+    # Definir cores e estilos
+    INFO = Fore.CYAN
+    SUCCESS = Fore.GREEN
+    WARNING = Fore.YELLOW
+    ERROR = Fore.RED
+    BRIGHT = Style.BRIGHT
+    RESET = Style.RESET_ALL
+    COLORS_AVAILABLE = True
+except ImportError:
+    # Fallback se colorama não estiver disponível
+    INFO = WARNING = SUCCESS = ERROR = BRIGHT = RESET = ""
+    COLORS_AVAILABLE = False
 
 # Configuração de logging
 logging.basicConfig(
@@ -129,6 +149,103 @@ def setup_init_parser(subparsers):
         default=".",
         help="Diretório para inicializar (padrão: diretório atual)",
     )
+
+
+def setup_update_parser(subparsers):
+    """Configurar parser para comando de atualização."""
+    parser = subparsers.add_parser("update", help="Verificar e instalar atualizações")
+    parser.add_argument("--force", action="store_true", help="Forçar atualização sem confirmação")
+    parser.add_argument("--check-only", action="store_true", help="Apenas verificar se há atualizações")
+
+
+def setup_aws_parser(subparsers):
+    """Configurar parser para comando de configuração AWS."""
+    parser = subparsers.add_parser("setup-aws", help="Configurar AWS CodeArtifact para atualizações")
+    parser.add_argument("--domain", required=True, help="Nome do domínio AWS CodeArtifact")
+    parser.add_argument("--repository", required=True, help="Nome do repositório AWS CodeArtifact")
+    parser.add_argument("--domain-owner", help="ID da conta proprietária do domínio (opcional)")
+    parser.add_argument("--region", help="Região AWS (padrão: us-east-1)")
+    parser.add_argument("--configure-aws", action="store_true", help="Configurar credenciais AWS")
+    parser.add_argument("--test", action="store_true", help="Testar conexão com AWS CodeArtifact")
+
+
+def handle_setup_aws(args):
+    """Manipular comando de configuração AWS."""
+    # Verificar e instalar AWS CLI se necessário
+    if not AWSSetupManager.check_aws_cli():
+        print(f"{INFO}AWS CLI não encontrado. Iniciando instalação...{RESET}")
+        if not AWSSetupManager.install_aws_cli():
+            print(f"{ERROR}Falha ao instalar AWS CLI. Por favor, instale manualmente.{RESET}")
+            return
+
+    # Configurar credenciais AWS se solicitado
+    aws_access_key = None
+    aws_secret_key = None
+    region = args.region or "us-east-1"
+
+    if args.configure_aws:
+        print(f"\n{BRIGHT}{INFO}=== Configuração de Credenciais AWS ==={RESET}")
+        print(f"{INFO}Essas credenciais serão usadas para acessar o AWS CodeArtifact.{RESET}")
+
+        print(f"{BRIGHT}AWS Access Key ID: {RESET}", end="")
+        aws_access_key = input()
+        print(f"{BRIGHT}AWS Secret Access Key: {RESET}", end="")
+        aws_secret_key = getpass.getpass("")
+        if not args.region:
+            print(f"{BRIGHT}AWS Region [{region}]: {RESET}", end="")
+            region = input() or region
+
+    # Configurar AWS e variáveis de ambiente para o CodeArtifact
+    success = AWSSetupManager.configure_aws(
+        domain=args.domain,
+        repository=args.repository,
+        domain_owner=args.domain_owner,
+        aws_access_key=aws_access_key,
+        aws_secret_key=aws_secret_key,
+        aws_region=region,
+    )
+
+    if not success:
+        print(f"{ERROR}Falha ao configurar AWS CodeArtifact.{RESET}")
+        return
+
+    # Testar conexão
+    if args.test or args.configure_aws:
+        success, message = AWSSetupManager.test_codeartifact_login()
+        if success:
+            print(f"{SUCCESS}Teste de conexão: {message}{RESET}")
+        else:
+            print(f"{ERROR}Teste de conexão falhou: {message}{RESET}")
+
+    print(f"\n{BRIGHT}{SUCCESS}=== Configuração concluída! ==={RESET}")
+    print(f"{INFO}Agora você pode usar o comando '{BRIGHT}microdetect update{RESET}{INFO}' para atualizar a aplicação.{RESET}")
+    print(f"{INFO}Todas as vezes que executar comandos microdetect, o sistema verificará{RESET}")
+    print(f"{INFO}automaticamente se há atualizações disponíveis.{RESET}")
+
+
+def handle_update(args):
+    """Manipular comando de atualização."""
+    from microdetect.utils.updater import UpdateManager
+
+    if args.check_only:
+        update_info = UpdateManager.check_for_updates()
+        if "error" in update_info:
+            print(f"{ERROR}{update_info['error']}{RESET}")
+            return
+
+        current_version = update_info["current"]
+        latest_version = update_info["latest"]
+        needs_update = update_info["needs_update"]
+
+        if needs_update:
+            print(
+                f"{INFO}Nova versão disponível: {SUCCESS}{latest_version} {INFO}(atual: {WARNING}{current_version}{INFO}){RESET}"
+            )
+            print(f"{INFO}Para atualizar, execute: {BRIGHT}microdetect update{RESET}")
+        else:
+            print(f"{SUCCESS}MicroDetect já está na versão mais recente {BRIGHT}({current_version}){RESET}")
+    else:
+        UpdateManager.update_package(args.force)
 
 
 def handle_init(args):
@@ -415,7 +532,7 @@ def main(args: Optional[List[str]] = None):
     subparsers = parser.add_subparsers(dest="command", help="Comandos disponíveis")
 
     # Registrar parsers para cada comando
-    setup_init_parser(subparsers)  # Novo comando init
+    setup_init_parser(subparsers)
     setup_convert_parser(subparsers)
     setup_annotate_parser(subparsers)
     setup_visualize_parser(subparsers)
@@ -423,6 +540,8 @@ def main(args: Optional[List[str]] = None):
     setup_dataset_parser(subparsers)
     setup_train_parser(subparsers)
     setup_evaluate_parser(subparsers)
+    setup_update_parser(subparsers)  # Comando de atualização
+    setup_aws_parser(subparsers)  # Comando de configuração AWS
 
     # Adicionar versão e ajuda
     parser.add_argument("--version", action="version", version=f"MicroDetect {__version__}")
@@ -430,30 +549,39 @@ def main(args: Optional[List[str]] = None):
     # Analisar argumentos
     parsed_args = parser.parse_args(args)
 
-    # Executar comando apropriado
-    if parsed_args.command == "init":
-        handle_init(parsed_args)
-    elif parsed_args.command == "convert":
-        handle_convert(parsed_args)
-    elif parsed_args.command == "annotate":
-        handle_annotate(parsed_args)
-    elif parsed_args.command == "visualize":
-        handle_visualize(parsed_args)
-    elif parsed_args.command == "augment":
-        handle_augment(parsed_args)
-    elif parsed_args.command == "dataset":
-        handle_dataset(parsed_args)
-    elif parsed_args.command == "train":
-        handle_train(parsed_args)
-    elif parsed_args.command == "evaluate":
-        handle_evaluate(parsed_args)
-    else:
-        parser.print_help()
+    if parsed_args.command not in ["update", "setup-aws"]:
+        from microdetect.utils.updater import UpdateManager
 
+        update_result = UpdateManager.check_for_updates_before_command()
 
-if __name__ == "__main__":
+        if update_result:
+            return
+
     try:
-        main()
+        if parsed_args.command == "init":
+            handle_init(parsed_args)
+        elif parsed_args.command == "convert":
+            handle_convert(parsed_args)
+        elif parsed_args.command == "annotate":
+            handle_annotate(parsed_args)
+        elif parsed_args.command == "visualize":
+            handle_visualize(parsed_args)
+        elif parsed_args.command == "augment":
+            handle_augment(parsed_args)
+        elif parsed_args.command == "dataset":
+            handle_dataset(parsed_args)
+        elif parsed_args.command == "train":
+            handle_train(parsed_args)
+        elif parsed_args.command == "evaluate":
+            handle_evaluate(parsed_args)
+        elif parsed_args.command == "update":
+            handle_update(parsed_args)
+        elif parsed_args.command == "setup-aws":
+            handle_setup_aws(parsed_args)
+        else:
+            parser.print_help()
+            return
+
     except KeyboardInterrupt:
         logger.info("Operação interrompida pelo usuário")
         sys.exit(0)
