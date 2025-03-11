@@ -35,28 +35,20 @@ def setup_convert_parser(subparsers):
     parser = subparsers.add_parser("convert", help="Converter imagens")
     parser.add_argument("--input_dir", required=True, help="Diretório de entrada")
     parser.add_argument("--output_dir", required=True, help="Diretório de saída")
-    parser.add_argument(
-        "--use_opencv", action="store_true", help="Usar OpenCV em vez de PIL"
-    )
+    parser.add_argument("--use_opencv", action="store_true", help="Usar OpenCV em vez de PIL")
     parser.add_argument(
         "--delete_original",
         action="store_true",
         help="Excluir arquivos originais após conversão",
     )
-    parser.add_argument(
-        "--format", default="tiff-to-png", help="Formato de conversão (ex: tiff-to-png)"
-    )
+    parser.add_argument("--format", default="tiff-to-png", help="Formato de conversão (ex: tiff-to-png)")
 
 
 def setup_annotate_parser(subparsers):
     """Configurar parser para comando de anotação."""
     parser = subparsers.add_parser("annotate", help="Anotar imagens manualmente")
-    parser.add_argument(
-        "--image_dir", required=True, help="Diretório com imagens para anotação"
-    )
-    parser.add_argument(
-        "--output_dir", required=True, help="Diretório para salvar as anotações"
-    )
+    parser.add_argument("--image_dir", required=True, help="Diretório com imagens para anotação")
+    parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
 
 
 def setup_visualize_parser(subparsers):
@@ -76,33 +68,19 @@ def setup_visualize_parser(subparsers):
 
 def setup_augment_parser(subparsers):
     """Configurar parser para comando de augmentação."""
-    parser = subparsers.add_parser(
-        "augment", help="Aplicar augmentação em imagens e anotações"
-    )
-    parser.add_argument(
-        "--image_dir", required=True, help="Diretório com imagens originais"
-    )
-    parser.add_argument(
-        "--label_dir", required=True, help="Diretório com anotações originais"
-    )
-    parser.add_argument(
-        "--output_image_dir", help="Diretório para salvar imagens aumentadas"
-    )
-    parser.add_argument(
-        "--output_label_dir", help="Diretório para salvar anotações aumentadas"
-    )
+    parser = subparsers.add_parser("augment", help="Aplicar augmentação em imagens e anotações")
+    parser.add_argument("--image_dir", required=True, help="Diretório com imagens originais")
+    parser.add_argument("--label_dir", required=True, help="Diretório com anotações originais")
+    parser.add_argument("--output_image_dir", help="Diretório para salvar imagens aumentadas")
+    parser.add_argument("--output_label_dir", help="Diretório para salvar anotações aumentadas")
     parser.add_argument("--factor", type=int, help="Fator de augmentação")
 
 
 def setup_dataset_parser(subparsers):
     """Configurar parser para comando de preparação de dataset."""
     parser = subparsers.add_parser("dataset", help="Preparar dataset")
-    parser.add_argument(
-        "--source_img_dir", required=True, help="Diretório com imagens de origem"
-    )
-    parser.add_argument(
-        "--source_label_dir", required=True, help="Diretório com anotações de origem"
-    )
+    parser.add_argument("--source_img_dir", required=True, help="Diretório com imagens de origem")
+    parser.add_argument("--source_label_dir", required=True, help="Diretório com anotações de origem")
     parser.add_argument("--dataset_dir", help="Diretório para dataset estruturado")
     parser.add_argument("--train_ratio", type=float, help="Proporção para treinamento")
     parser.add_argument("--val_ratio", type=float, help="Proporção para validação")
@@ -112,23 +90,17 @@ def setup_dataset_parser(subparsers):
 def setup_train_parser(subparsers):
     """Configurar parser para comando de treinamento."""
     parser = subparsers.add_parser("train", help="Treinar modelo YOLO")
-    parser.add_argument(
-        "--dataset_dir", required=True, help="Diretório com dataset estruturado"
-    )
+    parser.add_argument("--dataset_dir", required=True, help="Diretório com dataset estruturado")
     parser.add_argument(
         "--data_yaml",
         help="Caminho para arquivo data.yaml (se não especificado, será criado)",
     )
-    parser.add_argument(
-        "--model_size", choices=["n", "s", "m", "l", "x"], help="Tamanho do modelo YOLO"
-    )
+    parser.add_argument("--model_size", choices=["n", "s", "m", "l", "x"], help="Tamanho do modelo YOLO")
     parser.add_argument("--epochs", type=int, help="Número de épocas")
     parser.add_argument("--batch_size", type=int, help="Tamanho do batch")
     parser.add_argument("--image_size", type=int, help="Tamanho da imagem")
     parser.add_argument("--output_dir", help="Diretório para resultados")
-    parser.add_argument(
-        "--no_pretrained", action="store_true", help="Não usar pesos pré-treinados"
-    )
+    parser.add_argument("--no_pretrained", action="store_true", help="Não usar pesos pré-treinados")
     parser.add_argument("--resume", help="Continuar de um checkpoint")
     parser.add_argument(
         "--find_hyperparams",
@@ -140,25 +112,17 @@ def setup_train_parser(subparsers):
 def setup_evaluate_parser(subparsers):
     """Configurar parser para comando de avaliação."""
     parser = subparsers.add_parser("evaluate", help="Avaliar modelo treinado")
-    parser.add_argument(
-        "--model_path", required=True, help="Caminho para o modelo (.pt)"
-    )
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo (.pt)")
     parser.add_argument("--dataset_dir", required=True, help="Diretório do dataset")
     parser.add_argument("--data_yaml", help="Caminho para arquivo data.yaml")
     parser.add_argument("--output_dir", help="Diretório para relatórios")
-    parser.add_argument(
-        "--confusion_matrix", action="store_true", help="Gerar matriz de confusão"
-    )
+    parser.add_argument("--confusion_matrix", action="store_true", help="Gerar matriz de confusão")
 
 
 def setup_init_parser(subparsers):
     """Configurar parser para comando de inicialização."""
-    parser = subparsers.add_parser(
-        "init", help="Inicializar ambiente de trabalho MicroDetect"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Sobrescrever arquivos existentes"
-    )
+    parser = subparsers.add_parser("init", help="Inicializar ambiente de trabalho MicroDetect")
+    parser.add_argument("--force", action="store_true", help="Sobrescrever arquivos existentes")
     parser.add_argument(
         "--directory",
         "-d",
@@ -197,21 +161,15 @@ def handle_init(args):
         try:
             # Primeira tentativa: usar pkg_resources
             try:
-                default_config_path = pkg_resources.resource_filename(
-                    "microdetect", "default_config.yaml"
-                )
+                default_config_path = pkg_resources.resource_filename("microdetect", "default_config.yaml")
                 if os.path.exists(default_config_path):
                     shutil.copy(default_config_path, config_path)
                     logger.info(f"Arquivo config.yaml criado em: {config_path}")
                 else:
-                    raise FileNotFoundError(
-                        "Arquivo de configuração padrão não encontrado no pacote"
-                    )
+                    raise FileNotFoundError("Arquivo de configuração padrão não encontrado no pacote")
             except (ImportError, FileNotFoundError):
                 # Segunda tentativa: criar o arquivo diretamente
-                logger.warning(
-                    "Não foi possível localizar o arquivo default_config.yaml no pacote. Criando um novo."
-                )
+                logger.warning("Não foi possível localizar o arquivo default_config.yaml no pacote. Criando um novo.")
 
                 # Configuração padrão
                 default_config = {
@@ -289,9 +247,7 @@ Ou use o Makefile para passos automáticos (se disponível).
 
 def handle_convert(args):
     """Manipular comando de conversão de imagens."""
-    logger.info(
-        f"Iniciando conversão de imagens de {args.input_dir} para {args.output_dir}"
-    )
+    logger.info(f"Iniciando conversão de imagens de {args.input_dir} para {args.output_dir}")
 
     converter = ImageConverter()
 
@@ -314,11 +270,7 @@ def handle_convert(args):
     if error_messages:
         logger.warning(
             f"Erros durante a conversão: {', '.join(error_messages[:5])}"
-            + (
-                f" e mais {len(error_messages) - 5} erros"
-                if len(error_messages) > 5
-                else ""
-            )
+            + (f" e mais {len(error_messages) - 5} erros" if len(error_messages) > 5 else "")
         )
 
 
@@ -344,15 +296,11 @@ def handle_visualize(args):
 
     if args.output_dir:
         # Modo de salvamento batch
-        count = visualizer.save_annotated_images(
-            args.image_dir, args.label_dir, args.output_dir, filter_classes
-        )
+        count = visualizer.save_annotated_images(args.image_dir, args.label_dir, args.output_dir, filter_classes)
         logger.info(f"Visualização em batch concluída: {count} imagens anotadas salvas")
     else:
         # Modo interativo
-        visualizer.visualize_annotations(
-            args.image_dir, args.label_dir, args.output_dir, filter_classes
-        )
+        visualizer.visualize_annotations(args.image_dir, args.label_dir, args.output_dir, filter_classes)
         logger.info("Visualização interativa concluída")
 
 
@@ -369,18 +317,14 @@ def handle_augment(args):
         args.factor,
     )
 
-    logger.info(
-        f"Augmentação concluída: {augmented} novas imagens geradas a partir de {original} originais"
-    )
+    logger.info(f"Augmentação concluída: {augmented} novas imagens geradas a partir de {original} originais")
 
 
 def handle_dataset(args):
     """Manipular comando de preparação de dataset."""
     logger.info(f"Iniciando preparação de dataset a partir de {args.source_img_dir}")
 
-    manager = DatasetManager(
-        args.dataset_dir, args.train_ratio, args.val_ratio, args.test_ratio
-    )
+    manager = DatasetManager(args.dataset_dir, args.train_ratio, args.val_ratio, args.test_ratio)
 
     split_counts = manager.split_dataset(args.source_img_dir, args.source_label_dir)
 
@@ -455,9 +399,7 @@ def handle_evaluate(args):
         if conf_matrix_path:
             report_paths["confusion_matrix"] = conf_matrix_path
 
-    logger.info(
-        f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}"
-    )
+    logger.info(f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}")
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
 
 
@@ -469,9 +411,7 @@ def main(args: Optional[List[str]] = None):
         args: Lista de argumentos da linha de comando (opcional)
     """
     # Criar parser principal
-    parser = argparse.ArgumentParser(
-        description="MicroDetect: Detecção de Microorganismos com YOLOv8"
-    )
+    parser = argparse.ArgumentParser(description="MicroDetect: Detecção de Microorganismos com YOLOv8")
     subparsers = parser.add_subparsers(dest="command", help="Comandos disponíveis")
 
     # Registrar parsers para cada comando
@@ -485,9 +425,7 @@ def main(args: Optional[List[str]] = None):
     setup_evaluate_parser(subparsers)
 
     # Adicionar versão e ajuda
-    parser.add_argument(
-        "--version", action="version", version=f"MicroDetect {__version__}"
-    )
+    parser.add_argument("--version", action="version", version=f"MicroDetect {__version__}")
 
     # Analisar argumentos
     parsed_args = parser.parse_args(args)

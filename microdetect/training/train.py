@@ -43,11 +43,7 @@ class YOLOTrainer:
         self.epochs = epochs or config.get("training.epochs", 100)
         self.batch_size = batch_size or config.get("training.batch_size", 16)
         self.image_size = image_size or config.get("training.image_size", 640)
-        self.pretrained = (
-            pretrained
-            if pretrained is not None
-            else config.get("training.pretrained", True)
-        )
+        self.pretrained = pretrained if pretrained is not None else config.get("training.pretrained", True)
         self.output_dir = output_dir or config.get("directories.output", "runs/train")
 
     def train(self, data_yaml: str) -> Dict[str, Any]:
@@ -61,11 +57,7 @@ class YOLOTrainer:
             Resultados do treinamento
         """
         # Selecionar modelo com base no tamanho
-        model_name = (
-            f"yolov8{self.model_size}.pt"
-            if self.pretrained
-            else f"yolov8{self.model_size}.yaml"
-        )
+        model_name = f"yolov8{self.model_size}.pt" if self.pretrained else f"yolov8{self.model_size}.yaml"
 
         # Inicializar modelo
         try:
@@ -121,9 +113,7 @@ class YOLOTrainer:
             logger.error(f"Erro durante o treinamento: {str(e)}")
             raise
 
-    def resume_training(
-        self, checkpoint_path: str, data_yaml: str, additional_epochs: int = None
-    ) -> Dict[str, Any]:
+    def resume_training(self, checkpoint_path: str, data_yaml: str, additional_epochs: int = None) -> Dict[str, Any]:
         """
         Retoma o treinamento de um checkpoint.
 
@@ -161,9 +151,7 @@ class YOLOTrainer:
         total_epochs = model.ckpt["epoch"] + additional_epochs
 
         # Retomar treinamento
-        logger.info(
-            f"Retomando treinamento do epoch {model.ckpt['epoch']} até {total_epochs}"
-        )
+        logger.info(f"Retomando treinamento do epoch {model.ckpt['epoch']} até {total_epochs}")
 
         try:
             results = model.train(
@@ -210,11 +198,7 @@ class YOLOTrainer:
         best_config = None
 
         # Modelo base
-        model_name = (
-            f"yolov8{self.model_size}.pt"
-            if self.pretrained
-            else f"yolov8{self.model_size}.yaml"
-        )
+        model_name = f"yolov8{self.model_size}.pt" if self.pretrained else f"yolov8{self.model_size}.yaml"
 
         # Determinar dispositivo
         if torch.backends.mps.is_available():

@@ -86,9 +86,7 @@ class ModelEvaluator:
             "Precisão (mAP50-95)": float(results.box.map),
             "Recall": float(results.box.recall),
             "Precisão": float(results.box.precision),
-            "F1-Score": self._calculate_f1(
-                float(results.box.precision), float(results.box.recall)
-            ),
+            "F1-Score": self._calculate_f1(float(results.box.precision), float(results.box.recall)),
             "Taxa de Erro": 1.0 - float(results.box.map50),
         }
 
@@ -96,11 +94,7 @@ class ModelEvaluator:
         class_metrics = []
         for i, class_name in enumerate(results.names.values()):
             if i < len(results.box.ap_class_index):
-                idx = (
-                    results.box.ap_class_index.tolist().index(i)
-                    if i in results.box.ap_class_index
-                    else -1
-                )
+                idx = results.box.ap_class_index.tolist().index(i) if i in results.box.ap_class_index else -1
                 if idx >= 0:
                     class_metrics.append(
                         {
@@ -108,9 +102,7 @@ class ModelEvaluator:
                             "Precisão (AP50)": float(results.box.ap50[idx]),
                             "Recall": float(results.box.r[idx]),
                             "Precisão": float(results.box.p[idx]),
-                            "F1-Score": self._calculate_f1(
-                                float(results.box.p[idx]), float(results.box.r[idx])
-                            ),
+                            "F1-Score": self._calculate_f1(float(results.box.p[idx]), float(results.box.r[idx])),
                         }
                     )
 
@@ -133,9 +125,7 @@ class ModelEvaluator:
         """
         return 2 * (precision * recall) / (precision + recall + 1e-10)
 
-    def generate_report(
-        self, metrics: Dict[str, Any], model_path: str
-    ) -> Dict[str, str]:
+    def generate_report(self, metrics: Dict[str, Any], model_path: str) -> Dict[str, str]:
         """
         Gera relatórios detalhados de avaliação do modelo.
 
@@ -151,9 +141,7 @@ class ModelEvaluator:
 
         # Caminho para os arquivos de saída
         csv_path = os.path.join(self.output_dir, f"relatorio_metricas_{timestamp}.csv")
-        json_path = os.path.join(
-            self.output_dir, f"relatorio_metricas_{timestamp}.json"
-        )
+        json_path = os.path.join(self.output_dir, f"relatorio_metricas_{timestamp}.json")
         graph_path = os.path.join(self.output_dir, f"metricas_grafico_{timestamp}.png")
 
         # 1. Salvar resultados em CSV
@@ -190,9 +178,7 @@ class ModelEvaluator:
                     writer.writerow([key, f"{value:.4f}"])
 
                 writer.writerow([])
-                writer.writerow(
-                    ["Classe", "Precisão (AP50)", "Recall", "Precisão", "F1-Score"]
-                )
+                writer.writerow(["Classe", "Precisão (AP50)", "Recall", "Precisão", "F1-Score"])
 
                 # Métricas por classe
                 for item in metrics["metricas_por_classe"]:
@@ -210,9 +196,7 @@ class ModelEvaluator:
         except Exception as e:
             logger.error(f"Erro ao salvar relatório CSV: {str(e)}")
 
-    def _save_json_report(
-        self, json_path: str, metrics: Dict[str, Any], model_path: str
-    ) -> None:
+    def _save_json_report(self, json_path: str, metrics: Dict[str, Any], model_path: str) -> None:
         """
         Salva as métricas em formato JSON com informações adicionais.
 
@@ -252,11 +236,7 @@ class ModelEvaluator:
 
             # Gráfico de barras para métricas gerais
             plt.subplot(2, 1, 1)
-            metrics_to_plot = {
-                k: v
-                for k, v in metrics["metricas_gerais"].items()
-                if k != "Taxa de Erro"
-            }
+            metrics_to_plot = {k: v for k, v in metrics["metricas_gerais"].items() if k != "Taxa de Erro"}
             bars = plt.bar(metrics_to_plot.keys(), metrics_to_plot.values())
             plt.title("Métricas Gerais do Modelo")
             plt.xticks(rotation=45)
@@ -276,9 +256,7 @@ class ModelEvaluator:
             if metrics["metricas_por_classe"]:
                 plt.subplot(2, 1, 2)
                 classes = [m["Classe"] for m in metrics["metricas_por_classe"]]
-                ap_values = [
-                    m["Precisão (AP50)"] for m in metrics["metricas_por_classe"]
-                ]
+                ap_values = [m["Precisão (AP50)"] for m in metrics["metricas_por_classe"]]
 
                 bars = plt.bar(classes, ap_values)
                 plt.title("Precisão (AP50) por Classe")
@@ -313,9 +291,7 @@ class ModelEvaluator:
             Caminho para a imagem da matriz de confusão
         """
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        conf_matrix_path = os.path.join(
-            self.output_dir, f"confusion_matrix_{timestamp}.png"
-        )
+        conf_matrix_path = os.path.join(self.output_dir, f"confusion_matrix_{timestamp}.png")
 
         try:
             # Carregar modelo
@@ -324,25 +300,17 @@ class ModelEvaluator:
             # Rodar validação para gerar matriz de confusão
             results = model.val(data=data_yaml, conf_matrix=True)
 
-            if hasattr(results, "confusion_matrix") and hasattr(
-                results.confusion_matrix, "plot"
-            ):
+            if hasattr(results, "confusion_matrix") and hasattr(results.confusion_matrix, "plot"):
                 try:
                     # Usar método integrado para plotar matriz de confusão
-                    results.confusion_matrix.plot(
-                        save_dir=self.output_dir, names=results.names
-                    )
+                    results.confusion_matrix.plot(save_dir=self.output_dir, names=results.names)
                     logger.info(f"Matriz de confusão salva em: {self.output_dir}")
                     return conf_matrix_path
                 except Exception as plot_error:
-                    logger.error(
-                        f"Erro ao plotar matriz de confusão: {str(plot_error)}"
-                    )
+                    logger.error(f"Erro ao plotar matriz de confusão: {str(plot_error)}")
 
                     # Fallback manual
-                    self._plot_confusion_matrix_manually(
-                        results.confusion_matrix.matrix, results.names, conf_matrix_path
-                    )
+                    self._plot_confusion_matrix_manually(results.confusion_matrix.matrix, results.names, conf_matrix_path)
                     return conf_matrix_path
             else:
                 logger.warning("Matriz de confusão não disponível nos resultados")
@@ -352,9 +320,7 @@ class ModelEvaluator:
             logger.error(f"Erro ao gerar matriz de confusão: {str(e)}")
             return ""
 
-    def _plot_confusion_matrix_manually(
-        self, matrix: np.ndarray, class_names: Dict[int, str], save_path: str
-    ) -> None:
+    def _plot_confusion_matrix_manually(self, matrix: np.ndarray, class_names: Dict[int, str], save_path: str) -> None:
         """
         Plota a matriz de confusão manualmente.
 
@@ -367,9 +333,7 @@ class ModelEvaluator:
             plt.figure(figsize=(10, 8))
 
             # Normalizar a matriz por linha (previsões verdadeiras)
-            matrix_normalized = matrix.astype("float") / (
-                matrix.sum(axis=1, keepdims=True) + 1e-6
-            )
+            matrix_normalized = matrix.astype("float") / (matrix.sum(axis=1, keepdims=True) + 1e-6)
 
             plt.imshow(matrix_normalized, interpolation="nearest", cmap=plt.cm.Blues)
             plt.title("Matriz de Confusão Normalizada")

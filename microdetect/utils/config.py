@@ -90,19 +90,13 @@ class Config:
         try:
             # Tentar carregar do pacote primeiro
             try:
-                default_config_path = pkg_resources.resource_filename(
-                    "microdetect", "default_config.yaml"
-                )
+                default_config_path = pkg_resources.resource_filename("microdetect", "default_config.yaml")
                 if os.path.exists(default_config_path):
                     with open(default_config_path, "r", encoding="utf-8") as f:
-                        logger.info(
-                            f"Configuração padrão carregada do pacote: {default_config_path}"
-                        )
+                        logger.info(f"Configuração padrão carregada do pacote: {default_config_path}")
                         return yaml.safe_load(f)
                 else:
-                    raise FileNotFoundError(
-                        "Arquivo default_config.yaml não encontrado no pacote"
-                    )
+                    raise FileNotFoundError("Arquivo default_config.yaml não encontrado no pacote")
             except (ImportError, FileNotFoundError) as e:
                 logger.warning(f"Não foi possível carregar default_config.yaml: {e}")
         except Exception as e:
@@ -162,9 +156,7 @@ class Config:
                 result = result[k]
             return result
         except (KeyError, TypeError):
-            logger.debug(
-                f"Configuração não encontrada: {key}. Usando valor padrão: {default}"
-            )
+            logger.debug(f"Configuração não encontrada: {key}. Usando valor padrão: {default}")
             return default
 
     def save(self, config_path: Optional[str] = None) -> None:
@@ -174,9 +166,7 @@ class Config:
         Args:
             config_path: Caminho para salvar o arquivo de configuração
         """
-        save_path = (
-            config_path or self.config_path or os.path.join(os.getcwd(), "config.yaml")
-        )
+        save_path = config_path or self.config_path or os.path.join(os.getcwd(), "config.yaml")
         try:
             with open(save_path, "w", encoding="utf-8") as f:
                 yaml.dump(self.config_data, f, default_flow_style=False)

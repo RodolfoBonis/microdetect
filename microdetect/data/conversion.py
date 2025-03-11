@@ -81,9 +81,7 @@ class ImageConverter:
 
                     # Normalizar se necessário (para imagens de 16 bits)
                     if img.dtype == np.uint16:
-                        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(
-                            np.uint8
-                        )
+                        img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
 
                     cv2.imwrite(png_path, img)
                 else:
@@ -111,9 +109,7 @@ class ImageConverter:
         # Fechar barra de progresso
         progress_bar.close()
 
-        logger.info(
-            f"Conversão concluída: {success} arquivos convertidos com sucesso, {errors} erros"
-        )
+        logger.info(f"Conversão concluída: {success} arquivos convertidos com sucesso, {errors} erros")
         return success, errors, error_messages
 
     @staticmethod
@@ -141,9 +137,7 @@ class ImageConverter:
         """
         # Atualmente, só implementamos conversão de TIFF para PNG
         if source_format.lower() in ["tif", "tiff"] and target_format.lower() == "png":
-            return ImageConverter.convert_tiff_to_png(
-                input_dir, output_dir, use_opencv, delete_original
-            )
+            return ImageConverter.convert_tiff_to_png(input_dir, output_dir, use_opencv, delete_original)
         else:
             msg = f"Conversão de {source_format} para {target_format} não implementada"
             logger.error(msg)

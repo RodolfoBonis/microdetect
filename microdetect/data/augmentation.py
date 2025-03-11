@@ -40,21 +40,11 @@ class DataAugmenter:
             noise_probability: Probabilidade de aplicar ruído gaussiano
         """
         # Usar valores da configuração ou os padrões fornecidos
-        self.brightness_range = brightness_range or config.get(
-            "augmentation.brightness_range", [0.8, 1.2]
-        )
-        self.contrast_range = contrast_range or config.get(
-            "augmentation.contrast_range", [-30, 30]
-        )
-        self.flip_probability = flip_probability or config.get(
-            "augmentation.flip_probability", 0.5
-        )
-        self.rotation_range = rotation_range or config.get(
-            "augmentation.rotation_range", [-15, 15]
-        )
-        self.noise_probability = noise_probability or config.get(
-            "augmentation.noise_probability", 0.3
-        )
+        self.brightness_range = brightness_range or config.get("augmentation.brightness_range", [0.8, 1.2])
+        self.contrast_range = contrast_range or config.get("augmentation.contrast_range", [-30, 30])
+        self.flip_probability = flip_probability or config.get("augmentation.flip_probability", 0.5)
+        self.rotation_range = rotation_range or config.get("augmentation.rotation_range", [-15, 15])
+        self.noise_probability = noise_probability or config.get("augmentation.noise_probability", 0.3)
 
     def augment_data(
         self,
@@ -80,9 +70,7 @@ class DataAugmenter:
         # Configurar diretórios de saída (se não especificados, usa os de entrada)
         output_image_dir = output_image_dir or input_image_dir
         output_label_dir = output_label_dir or input_label_dir
-        augmentation_factor = augmentation_factor or config.get(
-            "augmentation.factor", 5
-        )
+        augmentation_factor = augmentation_factor or config.get("augmentation.factor", 5)
 
         # Criar diretórios de saída se não existirem
         os.makedirs(output_image_dir, exist_ok=True)
@@ -98,8 +86,7 @@ class DataAugmenter:
             return 0, 0
 
         logger.info(
-            f"Iniciando augmentação para {len(image_files)} imagens, "
-            f"gerando {augmentation_factor} variações de cada"
+            f"Iniciando augmentação para {len(image_files)} imagens, " f"gerando {augmentation_factor} variações de cada"
         )
 
         # Configurar barra de progresso
@@ -120,9 +107,7 @@ class DataAugmenter:
 
             # Carregar anotações
             base_name = os.path.basename(img_path)
-            label_path = os.path.join(
-                input_label_dir, os.path.splitext(base_name)[0] + ".txt"
-            )
+            label_path = os.path.join(input_label_dir, os.path.splitext(base_name)[0] + ".txt")
 
             if not os.path.exists(label_path):
                 logger.warning(f"Arquivo de anotação não encontrado para {img_path}")
@@ -135,12 +120,8 @@ class DataAugmenter:
             # Gerar augmentações
             for i in range(augmentation_factor):
                 # 1. Variação de brilho e contraste
-                alpha = np.random.uniform(
-                    self.brightness_range[0], self.brightness_range[1]
-                )  # Contraste
-                beta = np.random.uniform(
-                    self.contrast_range[0], self.contrast_range[1]
-                )  # Brilho
+                alpha = np.random.uniform(self.brightness_range[0], self.brightness_range[1])  # Contraste
+                beta = np.random.uniform(self.contrast_range[0], self.contrast_range[1])  # Brilho
                 img_aug = cv2.convertScaleAbs(img, alpha=alpha, beta=beta)
 
                 # 2. Flip horizontal
@@ -152,9 +133,7 @@ class DataAugmenter:
 
                 # 3. Rotação leve
                 if np.random.random() < self.flip_probability:
-                    angle = np.random.uniform(
-                        self.rotation_range[0], self.rotation_range[1]
-                    )
+                    angle = np.random.uniform(self.rotation_range[0], self.rotation_range[1])
                     M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
                     img_aug = cv2.warpAffine(img_aug, M, (w, h))
                     # Para simplificar, mantemos as anotações originais para pequenas rotações
@@ -167,9 +146,7 @@ class DataAugmenter:
                 # Salvar imagem e anotação aumentadas
                 aug_filename = f"{os.path.splitext(base_name)[0]}_aug{i}{os.path.splitext(base_name)[1]}"
                 aug_img_path = os.path.join(output_image_dir, aug_filename)
-                aug_label_path = os.path.join(
-                    output_label_dir, os.path.splitext(aug_filename)[0] + ".txt"
-                )
+                aug_label_path = os.path.join(output_label_dir, os.path.splitext(aug_filename)[0] + ".txt")
 
                 cv2.imwrite(aug_img_path, img_aug)
                 with open(aug_label_path, "w") as f:
@@ -182,15 +159,11 @@ class DataAugmenter:
         # Fechar barra de progresso
         progress_bar.close()
 
-        logger.info(
-            f"Augmentação concluída: geradas {total_augmented} novas imagens a partir de {len(image_files)} originais"
-        )
+        logger.info(f"Augmentação concluída: geradas {total_augmented} novas imagens a partir de {len(image_files)} originais")
         return len(image_files), total_augmented
 
     @staticmethod
-    def _adjust_annotations_for_flip(
-        annotations: List[str], image_width: int
-    ) -> List[str]:
+    def _adjust_annotations_for_flip(annotations: List[str], image_width: int) -> List[str]:
         """
         Ajusta as coordenadas das anotações para o flip horizontal.
 

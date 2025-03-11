@@ -1,0 +1,14 @@
+[tool.black]
+line-length = 127
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.venv
+    | build
+    | dist
+  )/
+  | microdetect/__init__.py
+)
+'''

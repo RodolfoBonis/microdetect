@@ -49,9 +49,7 @@ class DatasetManager:
         # Verificar se as proporções somam 1
         total_ratio = self.train_ratio + self.val_ratio + self.test_ratio
         if abs(total_ratio - 1.0) > 1e-5:
-            logger.warning(
-                f"As proporções do dataset não somam 1.0 (soma: {total_ratio}). Normalizando..."
-            )
+            logger.warning(f"As proporções do dataset não somam 1.0 (soma: {total_ratio}). Normalizando...")
             # Normalizar as proporções
             self.train_ratio /= total_ratio
             self.val_ratio /= total_ratio
@@ -64,15 +62,11 @@ class DatasetManager:
         # Criar diretórios para as divisões train/val/test
         for split in ["train", "val", "test"]:
             for subdir in ["images", "labels"]:
-                os.makedirs(
-                    os.path.join(self.dataset_dir, split, subdir), exist_ok=True
-                )
+                os.makedirs(os.path.join(self.dataset_dir, split, subdir), exist_ok=True)
 
         logger.info(f"Estrutura de diretórios criada em {self.dataset_dir}")
 
-    def split_dataset(
-        self, source_img_dir: str, source_label_dir: str
-    ) -> Dict[str, int]:
+    def split_dataset(self, source_img_dir: str, source_label_dir: str) -> Dict[str, int]:
         """
         Divide o dataset em conjuntos de treino/validação/teste e copia os arquivos.
 
@@ -128,9 +122,7 @@ class DatasetManager:
 
         return split_counts
 
-    def _copy_files_to_split(
-        self, files: List[str], target_split: str, source_label_dir: str
-    ) -> int:
+    def _copy_files_to_split(self, files: List[str], target_split: str, source_label_dir: str) -> int:
         """
         Copia arquivos de imagem e anotação para um diretório de divisão específico.
 
@@ -149,13 +141,9 @@ class DatasetManager:
             base_name = os.path.splitext(os.path.basename(img_path))[0]
 
             # Definir caminhos de origem e destino
-            img_dest = os.path.join(
-                self.dataset_dir, target_split, "images", os.path.basename(img_path)
-            )
+            img_dest = os.path.join(self.dataset_dir, target_split, "images", os.path.basename(img_path))
             label_path = os.path.join(source_label_dir, f"{base_name}.txt")
-            label_dest = os.path.join(
-                self.dataset_dir, target_split, "labels", f"{base_name}.txt"
-            )
+            label_dest = os.path.join(self.dataset_dir, target_split, "labels", f"{base_name}.txt")
 
             try:
                 # Copiar arquivo de imagem

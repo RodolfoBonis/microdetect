@@ -71,10 +71,7 @@ class AnnotationVisualizer:
             filter_classes: Conjunto de IDs de classe para exibir (se None, mostra todas as classes)
         """
         # Obter todos os arquivos de imagem
-        image_files = sorted(
-            glob.glob(os.path.join(image_dir, "*.jpg"))
-            + glob.glob(os.path.join(image_dir, "*.png"))
-        )
+        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) + glob.glob(os.path.join(image_dir, "*.png")))
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -88,9 +85,7 @@ class AnnotationVisualizer:
 
         if filter_classes:
             # Inicializar apenas com classes especificadas visíveis
-            class_visibility = {
-                cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()
-            }
+            class_visibility = {cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()}
 
         save_current = False
 
@@ -127,9 +122,7 @@ class AnnotationVisualizer:
                 box_idx = 0
                 for ann in annotations:
                     parts = ann.strip().split()
-                    if (
-                        len(parts) == 5
-                    ):  # Formato YOLO: classe x_center y_center width height
+                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
                         cls, x_center, y_center, box_w, box_h = parts
 
                         # Pular se a classe for filtrada
@@ -194,9 +187,7 @@ class AnnotationVisualizer:
             for cls_id, cls_name in self.class_map.items():
                 count = class_counts.get(cls_id, 0)
                 visibility = "✓" if class_visibility.get(cls_id, True) else "✗"
-                color = (
-                    (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
-                )
+                color = (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
 
                 cv2.putText(
                     img,
@@ -236,9 +227,7 @@ class AnnotationVisualizer:
             # Salvar se diretório de saída especificado
             if output_dir and save_current:
                 os.makedirs(output_dir, exist_ok=True)
-                output_path = os.path.join(
-                    output_dir, f"annotated_{os.path.basename(img_path)}"
-                )
+                output_path = os.path.join(output_dir, f"annotated_{os.path.basename(img_path)}")
                 cv2.imwrite(output_path, img)
                 logger.info(f"Imagem anotada salva em {output_path}")
                 save_current = False
@@ -296,10 +285,7 @@ class AnnotationVisualizer:
         os.makedirs(output_dir, exist_ok=True)
 
         # Obter todos os arquivos de imagem
-        image_files = sorted(
-            glob.glob(os.path.join(image_dir, "*.jpg"))
-            + glob.glob(os.path.join(image_dir, "*.png"))
-        )
+        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) + glob.glob(os.path.join(image_dir, "*.png")))
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -308,9 +294,7 @@ class AnnotationVisualizer:
         # Rastrear quais classes mostrar
         class_visibility = {cls_id: True for cls_id in self.class_map.keys()}
         if filter_classes:
-            class_visibility = {
-                cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()
-            }
+            class_visibility = {cls_id: (cls_id in filter_classes) for cls_id in self.class_map.keys()}
 
         saved_count = 0
 
@@ -341,9 +325,7 @@ class AnnotationVisualizer:
                 box_idx = 0
                 for ann in annotations:
                     parts = ann.strip().split()
-                    if (
-                        len(parts) == 5
-                    ):  # Formato YOLO: classe x_center y_center width height
+                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
                         cls, x_center, y_center, box_w, box_h = parts
 
                         # Pular se a classe for filtrada
@@ -386,16 +368,12 @@ class AnnotationVisualizer:
                         box_idx += 1
 
                 # Salvar imagem anotada
-                output_path = os.path.join(
-                    output_dir, f"annotated_{os.path.basename(img_path)}"
-                )
+                output_path = os.path.join(output_dir, f"annotated_{os.path.basename(img_path)}")
                 cv2.imwrite(output_path, img)
                 saved_count += 1
 
             else:
                 logger.warning(f"Arquivo de anotação não encontrado para: {img_path}")
 
-        logger.info(
-            f"Processo concluído: {saved_count} imagens anotadas salvas em {output_dir}"
-        )
+        logger.info(f"Processo concluído: {saved_count} imagens anotadas salvas em {output_dir}")
         return saved_count

@@ -313,6 +313,4 @@ jobs:
             • Build: ${{ needs.build.result }}
             • Security: ${{ needs.security.result }}
             
-            ${{ steps.process_messages.outputs.processed }}
-            
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
