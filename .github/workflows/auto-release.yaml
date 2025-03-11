@@ -1,0 +1,264 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version increment'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+      skip_ci_check:
+        description: 'Skip checking CI status'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  check_ci_status:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.skip_ci_check != 'true' }}
+    outputs:
+      ci_success: ${{ steps.check_ci.outputs.success }}
+    steps:
+      - name: Check latest CI run status
+        id: check_ci
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          # Get the latest CI workflow run for the current SHA
+          ci_status=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.workflow_runs[] | select(.name=="MicroDetect CI" and .head_sha=="${{ github.sha }}") | .conclusion' \
+            | head -n 1)
+          
+          echo "Latest CI status: $ci_status"
+          
+          if [ "$ci_status" == "success" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "CI needs to pass before creating a release. Current status: $ci_status"
+          fi
+
+  determine_version:
+    needs: [check_ci_status]
+    if: ${{ github.event_name == 'workflow_dispatch' || needs.check_ci_status.outputs.ci_success == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.set_version.outputs.new_version }}
+      version_type: ${{ steps.determine_type.outputs.version_type }}
+      changelog: ${{ steps.generate_changelog.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          # Get latest tag or set to v0.0.0 if none exists
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$latest_tag" >> $GITHUB_ENV
+          
+          # Parse version
+          if [[ $latest_tag == v* ]]; then
+            version=${latest_tag#v}
+          else
+            version=$latest_tag
+          fi
+          
+          IFS='.' read -r major minor patch <<< "$version"
+          echo "current_major=$major" >> $GITHUB_ENV
+          echo "current_minor=$minor" >> $GITHUB_ENV
+          echo "current_patch=$patch" >> $GITHUB_ENV
+          
+          echo "Current version: $latest_tag (Major: $major, Minor: $minor, Patch: $patch)"
+
+      - name: Determine version type
+        id: determine_type
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          # For manual trigger, use the specified version type
+          version_type="${{ github.event.inputs.version_type }}"
+          
+          if [ "$version_type" == "auto" ]; then
+            # Auto-detect based on PR labels or commit messages
+            # For now, just use patch as default
+            version_type="patch"
+          fi
+          
+          echo "version_type=$version_type" >> $GITHUB_OUTPUT
+          echo "Version type: $version_type"
+
+      - name: Analyze PR for version type
+        id: analyze_pr
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          # Get the PR that was just merged
+          pr_number=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
+          
+          if [ -z "$pr_number" ]; then
+            echo "No recent merged PR found. Using patch increment as default."
+            echo "version_type=patch" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Analyzing PR #$pr_number..."
+          
+          # Get PR labels and title
+          pr_data=$(gh pr view $pr_number --json labels,title)
+          
+          # Check for version labels
+          if echo "$pr_data" | grep -q '"name": "major"'; then
+            echo "Found major version label"
+            echo "version_type=major" >> $GITHUB_OUTPUT
+          elif echo "$pr_data" | grep -q '"name": "minor"'; then
+            echo "Found minor version label"
+            echo "version_type=minor" >> $GITHUB_OUTPUT
+          elif echo "$pr_data" | grep -q '"name": "patch"'; then
+            echo "Found patch version label"
+            echo "version_type=patch" >> $GITHUB_OUTPUT
+          # Check for keywords in PR title
+          elif echo "$pr_data" | grep -i -q '"title":.*\(feat\|feature\|enhancement\)'; then
+            echo "Detected feature from PR title, using minor version"
+            echo "version_type=minor" >> $GITHUB_OUTPUT
+          elif echo "$pr_data" | grep -i -q '"title":.*\(fix\|bugfix\|patch\)'; then
+            echo "Detected bugfix from PR title, using patch version"
+            echo "version_type=patch" >> $GITHUB_OUTPUT
+          else
+            echo "No specific version indicator found, using patch as default"
+            echo "version_type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set version
+        id: set_version
+        run: |
+          # Combine the version type from either source
+          version_type="${{ steps.determine_type.outputs.version_type || steps.analyze_pr.outputs.version_type }}"
+          
+          # Calculate new version
+          case "$version_type" in
+            major)
+              new_version="v$(($current_major + 1)).0.0"
+              ;;
+            minor)
+              new_version="v${current_major}.$(($current_minor + 1)).0"
+              ;;
+            patch|*)
+              new_version="v${current_major}.${current_minor}.$(($current_patch + 1))"
+              ;;
+          esac
+          
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+          echo "New version will be: $new_version"
+
+      - name: Generate changelog
+        id: generate_changelog
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+          
+          # If we have previous tag, get commits since then
+          if [ "$latest_tag" != "v0.0.0" ]; then
+            # Get PR numbers from commits
+            pr_list=$(git log $latest_tag..HEAD --pretty=format:"%s" | grep -o "#[0-9]*" | tr -d '#' | sort -u)
+            
+            # If we found PRs, list them with details
+            if [ ! -z "$pr_list" ]; then
+              for pr in $pr_list; do
+                pr_info=$(gh pr view $pr --json title,author,url 2>/dev/null)
+                if [ $? -eq 0 ]; then
+                  title=$(echo "$pr_info" | jq -r '.title')
+                  author=$(echo "$pr_info" | jq -r '.author.login')
+                  url=$(echo "$pr_info" | jq -r '.url')
+                  echo "* $title (#$pr) by @$author" >> changelog.md
+                fi
+              done
+            else
+              # Fall back to commit list if no PRs found
+              git log $latest_tag..HEAD --pretty=format:"* %s (%h)" >> changelog.md
+            fi
+          else
+            # No previous tag, include all commits
+            git log --pretty=format:"* %s (%h)" >> changelog.md
+          fi
+          
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$latest_tag...${{ steps.set_version.outputs.new_version }}" >> changelog.md
+          
+          # Save changelog to output (escape newlines for GitHub Actions)
+          changelog=$(cat changelog.md)
+          delimiter="EOF_CHANGELOG"
+          echo "changelog<<$delimiter" >> $GITHUB_OUTPUT
+          echo "$changelog" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
+          
+          cat changelog.md
+
+  create_release:
+    needs: [determine_version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update version in code
+        run: |
+          # Extract version number (remove 'v' prefix)
+          VERSION="${{ needs.determine_version.outputs.new_version }}"
+          VERSION_NUM="${VERSION#v}"
+          
+          # Update version in __init__.py
+          sed -i "s/__version__ = .*/__version__ = '$VERSION_NUM'/" microdetect/__init__.py
+          cat microdetect/__init__.py | grep "__version__"
+
+      - name: Commit version update
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add microdetect/__init__.py
+          git commit -m "chore: bump version to ${{ needs.determine_version.outputs.new_version }}"
+          git push
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        with:
+          tag_name: ${{ needs.determine_version.outputs.new_version }}
+          release_name: Release ${{ needs.determine_version.outputs.new_version }}
+          body: ${{ needs.determine_version.outputs.changelog }}
+          draft: false
+          prerelease: false
+
+      - name: Send Notification via Telegram
+        uses: akeylimepie/telegram-action@main
+        with:
+          token: ${{ secrets.BOTTOKEN }}
+          chat_id: ${{ secrets.CHAT_ID }}
+          message_thread_id: ${{ secrets.THREAD_ID }}
+          parse_mode: 'markdown'
+          text: |
+            🚀 *New Release Created: ${{ needs.determine_version.outputs.new_version }}*
+            
+            Type: ${{ needs.determine_version.outputs.version_type }} release
+            
+            ${{ needs.determine_version.outputs.changelog }}
+            
+            ➡️ The deployment to AWS CodeArtifact will start automatically.
+            
+            [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ needs.determine_version.outputs.new_version }})
