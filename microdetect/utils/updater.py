@@ -13,7 +13,7 @@ import time
 from typing import Dict, Tuple
 
 try:
-    from colorama import init, Fore, Style
+    from colorama import Fore, Style, init
 
     # Inicializar colorama (necessário para Windows)
     init(autoreset=True)

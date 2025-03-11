@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 try:
-    from colorama import init, Fore, Style
+    from colorama import Fore, Style, init
 
     # Inicializar colorama (necessário para Windows)
     init(autoreset=True)

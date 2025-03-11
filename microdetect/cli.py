@@ -17,11 +17,10 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import UpdateManager, AWSSetupManager
-
+from microdetect.utils import AWSSetupManager, UpdateManager
 
 try:
-    from colorama import init, Fore, Style
+    from colorama import Fore, Style, init
 
     # Inicializar colorama (necessário para Windows)
     init(autoreset=True)
