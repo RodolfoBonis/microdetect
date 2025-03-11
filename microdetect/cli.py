@@ -190,7 +190,7 @@ def handle_setup_aws(args):
         print(f"{BRIGHT}AWS Access Key ID: {RESET}", end="")
         aws_access_key = input()
         print(f"{BRIGHT}AWS Secret Access Key: {RESET}", end="")
-        aws_secret_key = getpass.getpass("")
+        aws_secret_key = getpass("")
         if not args.region:
             print(f"{BRIGHT}AWS Region [{region}]: {RESET}", end="")
             region = input() or region
