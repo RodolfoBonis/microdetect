@@ -1,22 +1,42 @@
 # MicroDetect
 
-![Versão](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.12-blue)
-![Licença](https://img.shields.io/badge/license-PROPRIETARY-green)
+![Versão](https://img.shields.io/badge/versão-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
+![Licença](https://img.shields.io/badge/licença-MIT-green)
 
-**MicroDetect** é uma ferramenta completa para detecção e classificação de microorganismos em imagens de microscopia utilizando YOLOv8. Este projeto fornece uma pipeline completa desde a conversão de imagens, anotação manual, augmentação de dados, treinamento até avaliação de modelos.
+*Read this in [English](README.md)*
 
-## Idiomas da Documentação
-[Inglês](README.md) | [Português](README.pt.md)(Atual)
+**MicroDetect** é uma ferramenta completa para detecção e classificação de microorganismos em imagens de microscopia utilizando YOLOv8. Este projeto fornece uma pipeline completa desde a conversão de imagens, anotação manual com sistema de retomada, augmentação de dados, treinamento com checkpoints até avaliação de modelos.
+
+## Índice
+
+- [Principais Recursos](#principais-recursos)
+- [Microorganismos Suportados](#microorganismos-suportados)
+- [Instalação](#instalação)
+- [Guia Rápido](#guia-rápido)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Funcionalidades Detalhadas](#funcionalidades-detalhadas)
+  - [Conversão de Imagens](#conversão-de-imagens)
+  - [Anotação Manual com Retomada](#anotação-manual-com-retomada)
+  - [Visualização de Anotações](#visualização-de-anotações)
+  - [Preparação de Dataset](#preparação-de-dataset)
+  - [Augmentação de Dados](#augmentação-de-dados)
+  - [Treinamento com Checkpoints](#treinamento-com-checkpoints)
+  - [Avaliação de Modelos](#avaliação-de-modelos)
+- [Configuração Personalizada](#configuração-personalizada)
+- [Uso com Makefile](#uso-com-makefile)
+- [Contribuição](#contribuição)
+- [Licença](#licença)
+- [Contato](#contato)
 
 ## Principais Recursos
 
 - 🔍 **Conversão de Imagens**: Converte imagens TIFF para formatos adequados ao processamento
-- 🏷️ **Anotação Manual**: Interface gráfica para marcação de microorganismos em imagens
+- 🏷️ **Anotação Manual com Retomada**: Interface gráfica para marcação de microorganismos com capacidade de salvar progresso e retomar de onde parou
 - 👁️ **Visualização**: Visualiza anotações existentes em imagens
 - 🔄 **Augmentação de Dados**: Melhora o conjunto de dados com técnicas de augmentação
 - 📊 **Preparação de Dataset**: Divide e organiza dados para treinamento/validação/teste
-- 🧠 **Treinamento de Modelos**: Treina modelos YOLOv8 personalizados com suas imagens
+- 🧠 **Treinamento com Checkpoints**: Treina modelos YOLOv8 personalizados com sistema de checkpoints para retomada
 - 📈 **Avaliação**: Avalia modelos com métricas detalhadas e relatórios visuais
 
 ## Microorganismos Suportados
@@ -29,49 +49,49 @@
 
 ### Pré-requisitos
 
-- Python 3.12 ou superior
+- Python 3.9 ou superior
 - Conda (recomendado para gerenciamento de ambiente)
 
 ### Configuração com Conda (Recomendado)
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/seu-usuario/microdetect.git
+git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
 # Configurar ambiente
-chmod +x scripts/setup.sh
-./scripts/setup.sh --create
+chmod +x scripts/install_production_robust.sh
+./scripts/install_production.sh
 
-# Ativar ambiente
-conda activate yeast_detection
+# OU para criar um ambiente virtual
+./scripts/install_production.sh --virtual-env
 
-# Instalar dependências
-./scripts/setup.sh --install
+# Para criar também um projeto exemplo
+./scripts/install_production.sh --with-example
 ```
 
 ### Configuração no Windows
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/seu-usuario/microdetect.git
+git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
 # Configurar ambiente
-scripts\setup.bat --create
+scripts\install_production.bat
 
-# Ativar ambiente
-conda activate yeast_detection
+# OU para criar um ambiente virtual
+scripts\install_production.bat --virtual-env
 
-# Instalar dependências
-scripts\setup.bat --install
+# Para criar também um projeto exemplo
+scripts\install_production.bat --with-example
 ```
 
 ### Instalação Manual
 
 ```bash
 # Clonar o repositório
-git clone https://github.com/seu-usuario/microdetect.git
+git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
 # Criar ambiente virtual
@@ -86,13 +106,24 @@ pip install -e .
 
 ## Guia Rápido
 
+### Inicializar Projeto
+
+```bash
+# Criar um diretório para seu projeto
+mkdir meu_projeto
+cd meu_projeto
+
+# Inicializar o MicroDetect
+microdetect init
+```
+
 ### Conversão de Imagens TIFF para PNG
 
 ```bash
 microdetect convert --input_dir data/raw_images --output_dir data/images --use_opencv
 ```
 
-### Anotação Manual de Imagens
+### Anotação Manual de Imagens (com sistema de retomada)
 
 ```bash
 microdetect annotate --image_dir data/images --output_dir data/labels
@@ -104,22 +135,28 @@ microdetect annotate --image_dir data/images --output_dir data/labels
 microdetect visualize --image_dir data/images --label_dir data/labels
 ```
 
-### Augmentação de Dados
-
-```bash
-microdetect augment --image_dir data/images --label_dir data/labels --factor 10
-```
-
 ### Preparação de Dataset
 
 ```bash
 microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
 ```
 
+### Augmentação de Dados
+
+```bash
+microdetect augment --image_dir data/images --label_dir data/labels --factor 10
+```
+
 ### Treinamento de Modelo
 
 ```bash
 microdetect train --dataset_dir dataset --model_size s --epochs 100
+```
+
+### Retomada de Treinamento de um Checkpoint
+
+```bash
+microdetect train --resume runs/train/yolov8_s_custom/weights/last.pt --dataset_dir dataset --epochs 50
 ```
 
 ### Avaliação de Modelo
@@ -133,6 +170,7 @@ microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --d
 ```
 microdetect/
 ├── README.md                  # Documentação principal
+├── README_PT.md               # Documentação em português
 ├── requirements.txt           # Dependências do projeto
 ├── setup.py                   # Script de instalação
 ├── Makefile                   # Comandos make para automação
@@ -157,60 +195,222 @@ microdetect/
 │       ├── __init__.py
 │       └── config.py          # Gerenciamento de configuração
 └── scripts/                   # Scripts auxiliares
-    ├── setup.sh               # Configuração no Linux/Mac
-    └── setup.bat              # Configuração no Windows
+    ├── install_production_robust.sh  # Instalação em Linux/Mac
+    └── install_production_robust.bat # Instalação em Windows
 ```
 
-## Estrutura dos Datasets
+## Funcionalidades Detalhadas
 
-O projeto segue a estrutura padrão do YOLOv8:
+### Conversão de Imagens
 
-```
-dataset/
-├── train/                     # Dados de treinamento
-│   ├── images/                # Imagens para treinamento
-│   └── labels/                # Anotações em formato YOLO
-├── val/                       # Dados de validação
-│   ├── images/
-│   └── labels/
-├── test/                      # Dados de teste
-│   ├── images/
-│   └── labels/
-└── data.yaml                  # Configuração do dataset
-```
+O módulo de conversão permite transformar imagens TIFF em formatos mais adequados para processamento, como PNG:
 
-## Formato das Anotações
+```bash
+# Uso básico
+microdetect convert --input_dir data/raw_images --output_dir data/images
 
-As anotações seguem o formato YOLO:
+# Com OpenCV para melhor processamento de imagens de 16 bits
+microdetect convert --input_dir data/raw_images --output_dir data/images --use_opencv
 
-```
-<class_id> <x_center> <y_center> <width> <height>
+# Excluir arquivos originais após conversão
+microdetect convert --input_dir data/raw_images --output_dir data/images --delete_original
 ```
 
-Onde:
-- `class_id`: ID da classe (0=levedura, 1=fungo, 2=micro-alga)
-- `x_center`, `y_center`: Coordenadas normalizadas (0-1) do centro da caixa
-- `width`, `height`: Largura e altura normalizadas (0-1) da caixa
+A conversão é especialmente importante para imagens de microscopia, que frequentemente são salvas em formatos TIFF de alta resolução.
+
+### Anotação Manual com Retomada
+
+O sistema de anotação possui uma interface gráfica completa para marcar microorganismos e permite retomar o trabalho de onde você parou:
+
+```bash
+microdetect annotate --image_dir data/images --output_dir data/labels
+```
+
+**Características principais:**
+
+- Carrega automaticamente anotações existentes ao editar uma imagem
+- Salva progresso para retomada posterior
+- Permite pausar e continuar de onde parou
+- Opções para pular, editar ou sobrescrever anotações existentes
+
+**Atalhos de teclado:**
+
+- **R**: Reiniciar (limpar todas as anotações da imagem atual)
+- **D**: Excluir a última caixa desenhada
+- **S**: Salvar anotações e ir para próxima imagem
+- **Q**: Sair sem salvar
+- **E**: Salvar anotação atual e sair (para retomar depois)
+
+Quando você reinicia a ferramenta de anotação, ela pergunta se deseja retomar do ponto onde parou anteriormente.
+
+### Visualização de Anotações
+
+Para revisar as anotações feitas:
+
+```bash
+# Visualização interativa
+microdetect visualize --image_dir data/images --label_dir data/labels
+
+# Salvar imagens com anotações desenhadas
+microdetect visualize --image_dir data/images --label_dir data/labels --output_dir data/annotated_images
+
+# Filtrar classes específicas
+microdetect visualize --image_dir data/images --label_dir data/labels --filter_classes "0,1"
+```
+
+A visualização permite navegar entre imagens usando as teclas:
+- 'n': próxima imagem
+- 'p': imagem anterior
+- '0'-'9': alternar visibilidade de classes
+- 's': salvar imagem atual com anotações
+- 'q': sair
+
+### Preparação de Dataset
+
+Organiza seu dataset em estrutura para treinamento:
+
+```bash
+microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
+```
+
+Isso cria:
+- Divisão em treino/validação/teste
+- Arquivo de configuração YAML para o treinamento
+- Estrutura de diretórios compatível com YOLOv8
+
+Você pode personalizar as proporções:
+
+```bash
+microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset --train_ratio 0.8 --val_ratio 0.1 --test_ratio 0.1
+```
+
+### Augmentação de Dados
+
+Aumenta seu dataset com variações automáticas:
+
+```bash
+microdetect augment --image_dir data/images --label_dir data/labels --factor 10
+```
+
+Técnicas de augmentação aplicadas:
+- Variação de brilho e contraste
+- Espelhamento horizontal
+- Rotação leve
+- Adição de ruído gaussiano
+
+Os parâmetros de augmentação podem ser personalizados no `config.yaml`.
+
+### Treinamento com Checkpoints
+
+Treina modelos YOLOv8 com sistema de checkpoints:
+
+```bash
+# Treinamento básico
+microdetect train --dataset_dir dataset --model_size s --epochs 100
+
+# Configuração avançada
+microdetect train --dataset_dir dataset --model_size m --epochs 200 --batch_size 16 --image_size 640
+```
+
+**Sistema de Checkpoints:**
+
+O treinamento salva automaticamente:
+- O melhor modelo (`best.pt`)
+- O modelo mais recente (`last.pt`)
+- Estado do otimizador e métricas
+
+Para retomar um treinamento interrompido:
+
+```bash
+microdetect train --resume runs/train/yolov8_s_custom/weights/last.pt --dataset_dir dataset --epochs 50
+```
+
+### Avaliação de Modelos
+
+Avalie o desempenho do modelo treinado:
+
+```bash
+microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset
+```
+
+Para gerar uma matriz de confusão:
+
+```bash
+microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset --confusion_matrix
+```
+
+Os relatórios de avaliação incluem:
+- Precisão (mAP50, mAP50-95)
+- Recall
+- F1-Score
+- Métricas por classe
+- Gráficos de desempenho
+- Matriz de confusão (opcional)
+
+## Configuração Personalizada
+
+O MicroDetect usa um arquivo `config.yaml` para configuração centralizada. Quando você executa `microdetect init`, esse arquivo é criado no diretório atual com valores padrão.
+
+Exemplo de personalização:
+
+```yaml
+# config.yaml
+directories:
+  dataset: ./meu_dataset
+  images: ./minhas_imagens
+  labels: ./minhas_anotacoes
+
+classes:
+  - "0-levedura"
+  - "1-fungo"
+  - "2-micro-alga"
+  - "3-minha-nova-classe"
+
+training:
+  model_size: m
+  epochs: 300
+  batch_size: 16
+```
+
+Após personalizar, os comandos usarão automaticamente esses valores como padrão.
 
 ## Uso com Makefile
 
-O projeto inclui um Makefile para conveniência:
+O projeto inclui um Makefile para automação de tarefas:
 
 ```bash
 # Criar diretórios
 make create-dirs
 
+# Converter imagens TIFF
+make convert-tiff
+
 # Anotar imagens
 make annotate
+
+# Visualizar anotações
+make visualize
 
 # Preparar dataset
 make prepare-data
 
+# Aplicar augmentação
+make augment
+
 # Treinar modelo
 make train
 
+# Avaliar modelo
+make evaluate
+
 # Pipeline completa
 make pipeline
+```
+
+Você pode personalizar parâmetros:
+
+```bash
+make train MODEL_SIZE=m EPOCHS=200 BATCH_SIZE=16
 ```
 
 ## Contribuição
@@ -225,5 +425,5 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo LICENSE para d
 
 Para questões, sugestões ou colaborações, entre em contato:
 
-- Email: contato@exemplo.com
-- GitHub Issues: [https://github.com/seu-usuario/microdetect/issues](https://github.com/seu-usuario/microdetect/issues)
+- Email: dev@rodolfodebonis.com.br
+- GitHub Issues: [https://github.com/RodolfoBonis/microdetect/issues](https://github.com/RodolfoBonis/microdetect/issues)
