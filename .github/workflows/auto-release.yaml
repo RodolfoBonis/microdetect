@@ -316,13 +316,10 @@ jobs:
         if: always()
         id: format_telegram
         run: |
-          # Get the release info and escape markdown special characters
           release_info="${{ needs.determine_version.outputs.changelog }}"
 
-          # Remove JSON quotes and process the content
           release_info=$(echo "$release_info" | sed 's/^"//;s/"$//')
 
-          # Escape markdown special characters: _ * [ ] ( ) ~ ` > # + - = | { } . !
           escaped_info=$(echo "$release_info" | sed 's/\([_*\[\]()~`>#+=|{}\.!]\)/\\\1/g')
 
           echo "telegram_info<<EOF" >> $GITHUB_OUTPUT
