@@ -14,8 +14,7 @@ import time
 from pathlib import Path
 from typing import Dict, Tuple
 
-from microdetect.utils.colors import (BRIGHT, ERROR, INFO, RESET, SUCCESS,
-                                      WARNING)
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)
 

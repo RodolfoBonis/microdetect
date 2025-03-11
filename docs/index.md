@@ -10,8 +10,8 @@ MicroDetect é uma ferramenta completa para detecção e classificação de micr
 
 Se você é novo no MicroDetect, recomendamos começar com os seguintes guias:
 
-- [Guia de Instalação](installation_guide.md) - Instruções para instalar o MicroDetect
-- [Tutorial de Início Rápido](troubleshooting.md) - Comece a usar o MicroDetect rapidamente
+- [Guia de Instalação](installation_guide.md/?file=installation_guide.md) - Instruções para instalar o MicroDetect
+- [Tutorial de Início Rápido](troubleshooting.md/?file=troubleshooting.md) - Comece a usar o MicroDetect rapidamente
 
 ## Principais Recursos
 
@@ -73,6 +73,6 @@ Para informações mais detalhadas sobre cada comando, consulte as respectivas p
 
 Se você encontrar algum problema ou tiver dúvidas não abordadas na documentação, por favor:
 
-1. Consulte o guia de [Solução de Problemas](troubleshooting.md)
+1. Consulte o guia de [Solução de Problemas](troubleshooting.md/?file=troubleshooting.md)
 2. Abra uma issue no [GitHub](https://github.com/RodolfoBonis/microdetect/issues)
 3. Entre em contato conosco pelo e-mail dev@rodolfodebonis.com.br

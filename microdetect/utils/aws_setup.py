@@ -10,8 +10,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
-from microdetect.utils.colors import (BRIGHT, ERROR, INFO, RESET, SUCCESS,
-                                      WARNING)
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)
 

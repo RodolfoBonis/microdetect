@@ -14,8 +14,15 @@ from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 # Importar as constantes de cores do módulo existente
-from microdetect.utils.colors import (BRIGHT, COLORS_AVAILABLE, ERROR, INFO,
-                                      RESET, SUCCESS, WARNING)
+from microdetect.utils.colors import (
+    BRIGHT,
+    COLORS_AVAILABLE,
+    ERROR,
+    INFO,
+    RESET,
+    SUCCESS,
+    WARNING,
+)
 
 # Declaração inicial das variáveis globais
 MARKDOWN_AVAILABLE = False

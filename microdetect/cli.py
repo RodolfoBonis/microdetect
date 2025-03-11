@@ -17,10 +17,12 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import (AWSSetupManager, ColoredHelpFormatter,
-                               ColoredVersionAction)
-from microdetect.utils.colors import (BRIGHT, ERROR, INFO, RESET, SUCCESS,
-                                      WARNING)
+from microdetect.utils import (
+    AWSSetupManager,
+    ColoredHelpFormatter,
+    ColoredVersionAction,
+)
+from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 # Configuração de logging
 logging.basicConfig(
@@ -170,10 +172,12 @@ def setup_docs_parser(subparsers):
 def handle_docs(args):
     """Manipular comando de documentação."""
     try:
-        from microdetect.utils.docs_server import (check_server_status,
-                                                   start_docs_server,
-                                                   start_server_in_background,
-                                                   stop_background_server)
+        from microdetect.utils.docs_server import (
+            check_server_status,
+            start_docs_server,
+            start_server_in_background,
+            stop_background_server,
+        )
 
         # Verificar se queremos parar o servidor
         if args.stop:
