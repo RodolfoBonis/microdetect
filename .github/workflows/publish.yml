@@ -167,7 +167,7 @@ jobs:
           repository_endpoint=$(aws codeartifact get-repository-endpoint \
             --domain ${{ secrets.AWS_CODEARTIFACT_DOMAIN }} \
             --domain-owner ${{ secrets.AWS_CODEARTIFACT_OWNER || secrets.AWS_ACCOUNT_ID || '$(aws sts get-caller-identity --query "Account" --output text)' }} \
-            --repository ${{ secrets.AWS_CODEARTIFACT_REPOSITORY }} \
+            --repository ${{ secrets.AWS_CODEARTIFACT_URL }} \
             --format pypi \
             --query repositoryEndpoint \
             --output text)
