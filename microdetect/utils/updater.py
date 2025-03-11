@@ -1,7 +1,7 @@
 """
 Módulo para gerenciamento de atualizações do pacote MicroDetect.
 """
-
+import configparser
 import json
 import logging
 import os
@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from pathlib import Path
 from typing import Dict, Tuple
 
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
@@ -29,6 +30,42 @@ class UpdateManager:
             Tupla contendo (sucesso, token, endpoint)
         """
         try:
+            # Determinar domínio e repositório CodeArtifact
+            domain = os.environ.get("AWS_CODEARTIFACT_DOMAIN")
+            repository = os.environ.get("AWS_CODEARTIFACT_REPOSITORY")
+            domain_owner = os.environ.get("AWS_CODEARTIFACT_OWNER")
+
+            # Se não encontrado nas variáveis de ambiente, procurar em ~/.microdetect/config.ini
+            if not domain or not repository:
+                config_file = Path.home() / ".microdetect" / "config.ini"
+                if config_file.exists():
+                    config = configparser.ConfigParser()
+                    config.read(config_file)
+                    if "codeartifact" in config:
+                        domain = domain or config["codeartifact"].get("domain")
+                        repository = repository or config["codeartifact"].get("repository")
+                        domain_owner = domain_owner or config["codeartifact"].get("domain_owner")
+
+            # Se ainda não encontrado, tentar no .env local (compatibilidade)
+            if not domain or not repository:
+                env_file = Path(".env")
+                if env_file.exists():
+                    with env_file.open() as f:
+                        for line in f:
+                            if line.strip() and not line.startswith('#'):
+                                key, value = line.strip().split('=', 1)
+                                if key == "AWS_CODEARTIFACT_DOMAIN" and not domain:
+                                    domain = value
+                                elif key == "AWS_CODEARTIFACT_REPOSITORY" and not repository:
+                                    repository = value
+                                elif key == "AWS_CODEARTIFACT_OWNER" and not domain_owner:
+                                    domain_owner = value
+
+            # Verificar se temos as informações necessárias
+            if not domain or not repository:
+                logger.debug("Domínio ou repositório AWS CodeArtifact não configurado")
+                return False, "", ""
+
             # Obter token AWS CodeArtifact
             aws_cmd = [
                 "aws",
@@ -43,8 +80,8 @@ class UpdateManager:
             ]
 
             # Se houver um domain owner específico, adicione
-            if os.environ.get("AWS_CODEARTIFACT_OWNER"):
-                aws_cmd.extend(["--domain-owner", os.environ.get("AWS_CODEARTIFACT_OWNER")])
+            if domain_owner:
+                aws_cmd.extend(["--domain-owner", domain_owner])
 
             token = subprocess.check_output(aws_cmd).decode("utf-8").strip()
 
@@ -54,9 +91,9 @@ class UpdateManager:
                 "codeartifact",
                 "get-repository-endpoint",
                 "--domain",
-                os.environ.get("AWS_CODEARTIFACT_DOMAIN", "seu-dominio"),
+                domain,
                 "--repository",
-                os.environ.get("AWS_CODEARTIFACT_REPOSITORY", "seu-repositorio"),
+                repository,
                 "--format",
                 "pypi",
                 "--query",
@@ -66,8 +103,8 @@ class UpdateManager:
             ]
 
             # Se houver um domain owner específico, adicione
-            if os.environ.get("AWS_CODEARTIFACT_OWNER"):
-                repo_cmd.extend(["--domain-owner", os.environ.get("AWS_CODEARTIFACT_OWNER")])
+            if domain_owner:
+                repo_cmd.extend(["--domain-owner", domain_owner])
 
             endpoint = subprocess.check_output(repo_cmd).decode("utf-8").strip()
 

@@ -161,39 +161,28 @@ class AWSSetupManager:
                 print(f"{SUCCESS}Região AWS configurada com sucesso!{RESET}")
 
             # Criar ou atualizar arquivo .env para armazenar configurações do CodeArtifact
-            env_file = Path.cwd() / ".env"
-            env_content = []
+            microdetect_dir = Path.home() / ".microdetect"
+            microdetect_dir.mkdir(exist_ok=True)
 
-            if env_file.exists():
-                with env_file.open("r") as f:
-                    env_content = f.readlines()
+            config_file = microdetect_dir / "config.ini"
+            config = configparser.ConfigParser()
 
-            # Remover variáveis existentes
-            env_content = [
-                line
-                for line in env_content
-                if not line.startswith(("AWS_CODEARTIFACT_DOMAIN=", "AWS_CODEARTIFACT_REPOSITORY=", "AWS_CODEARTIFACT_OWNER="))
-            ]
+            if config_file.exists():
+                config.read(config_file)
 
-            # Adicionar novas variáveis
-            env_content.append(f"AWS_CODEARTIFACT_DOMAIN={domain}\n")
-            env_content.append(f"AWS_CODEARTIFACT_REPOSITORY={repository}\n")
+            if "codeartifact" not in config:
+                config["codeartifact"] = {}
+
+            config["codeartifact"]["domain"] = domain
+            config["codeartifact"]["repository"] = repository
             if domain_owner:
-                env_content.append(f"AWS_CODEARTIFACT_OWNER={domain_owner}\n")
+                config["codeartifact"]["domain_owner"] = domain_owner
 
-            # Salvar arquivo .env
-            with env_file.open("w") as f:
-                f.writelines(env_content)
+            with config_file.open("w") as f:
+                config.write(f)
 
-            print(f"{SUCCESS}Configurações do AWS CodeArtifact salvas em {BRIGHT}{env_file}{RESET}")
-            print(f"{INFO}Para carregar essas variáveis, execute:{RESET}")
+            print(f"{SUCCESS}Configurações do AWS CodeArtifact salvas em {BRIGHT}{config_file}{RESET}")
 
-            if sys.platform == "win32":
-                print(f'{BRIGHT}   for /f "tokens=*" %i in (.env) do set %i{RESET}')
-            else:
-                print(f"{BRIGHT}   export $(grep -v '^#' .env | xargs){RESET}")
-
-            # Definir variáveis de ambiente para a sessão atual
             os.environ["AWS_CODEARTIFACT_DOMAIN"] = domain
             os.environ["AWS_CODEARTIFACT_REPOSITORY"] = repository
             if domain_owner:
