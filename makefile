@@ -79,6 +79,9 @@ prepare-data:
 augment:
 	@echo "Realizando augmentação de dados..."
 	python -m microdetect augment --image_dir $(SOURCE_IMG_DIR) --label_dir $(SOURCE_LABEL_DIR) --factor $(AUGMENT_FACTOR)
+docs:
+	@echo "Iniciando servidor de documentação web..."
+	python -m microdetect docs
 
 # Treinar modelo YOLO
 train:
@@ -155,6 +158,7 @@ help:
 	@echo "  make train          - Treinar modelo YOLO"
 	@echo "  make train-hyperparams - Treinar com busca de hiperparâmetros"
 	@echo "  make evaluate       - Avaliar modelo e gerar relatório"
+	@echo "  make docs           - Iniciar servidor de documentação web"
 	@echo "  make setup-aws      - Configurar AWS CodeArtifact para atualizações"
 	@echo "  make check-update   - Verificar se há atualizações disponíveis"
 	@echo "  make update         - Atualizar aplicação para a versão mais recente"
@@ -174,4 +178,4 @@ help:
 	@echo "  REPOSITORY = $(REPOSITORY) (para AWS CodeArtifact)"
 	@echo "  REGION = $(REGION) (região AWS)"
 
-.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate setup-aws check-update update pipeline clean clean-all update-deps help
+.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate setup-aws check-update update pipeline clean clean-all update-deps help docs

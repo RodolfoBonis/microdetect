@@ -54,6 +54,7 @@ setup(
     include_package_data=True,
     package_data={
         'microdetect': ['default_config.yaml'],
+        '': ['docs/*.md']
     },
     zip_safe=False,
 )
