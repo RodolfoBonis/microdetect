@@ -64,6 +64,26 @@ def find_docs_dir() -> Path:
     if docs_dir.exists():
         return docs_dir
 
+    # Buscar na pasta de compartilhamento de dados padrão da instalação
+    try:
+        import site
+
+        for site_dir in site.getsitepackages():
+            share_docs_dir = Path(site_dir) / "../share/microdetect/docs"
+            if share_docs_dir.exists() and share_docs_dir.is_dir():
+                return share_docs_dir.resolve()
+    except (ImportError, AttributeError):
+        pass
+
+    # Verificar também em userbase para instalações por usuário
+    try:
+        user_base = site.USER_BASE
+        share_docs_dir = Path(user_base) / "share/microdetect/docs"
+        if share_docs_dir.exists() and share_docs_dir.is_dir():
+            return share_docs_dir.resolve()
+    except (ImportError, AttributeError):
+        pass
+
     # Se não encontrar, criar um diretório temporário
     import tempfile
 
