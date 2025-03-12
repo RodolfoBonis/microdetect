@@ -106,3 +106,9 @@ Icon?
 # Conda environment
 .conda/
 conda-meta/
+
+# Coverage
+.coverage
+.coverage.*
+
+!tests/data/test_augmentation.py

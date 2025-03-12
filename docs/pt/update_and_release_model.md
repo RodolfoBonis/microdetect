@@ -1,6 +1,18 @@
-# Modelo de Atualizações e Releases do MicroDetect
+# Modelo de Atualizações e Releases
 
-Este documento descreve o modelo de atualizações e o ciclo de vida de versões do MicroDetect, explicando como o projeto é versionado, atualizado e distribuído.
+Este documento descreve o sistema de atualização e o ciclo de vida de versões do MicroDetect, explicando como o projeto é versionado, atualizado e distribuído.
+
+## Sumário
+- [Estratégia de Versionamento](#estratégia-de-versionamento)
+- [Canais de Distribuição](#canais-de-distribuição)
+- [Tipos de Release](#tipos-de-release)
+- [Ciclo de Vida de Desenvolvimento](#ciclo-de-vida-de-desenvolvimento)
+- [Sistema de Atualização Automática](#sistema-de-atualização-automática)
+- [Ciclo de Release e Frequência](#ciclo-de-release-e-frequência)
+- [Implementação Técnica](#implementação-técnica)
+- [Política de Suporte a Versões](#política-de-suporte-a-versões)
+- [Changelog e Documentação](#changelog-e-documentação)
+- [Rollback e Recuperação](#rollback-e-recuperação)
 
 ## Estratégia de Versionamento
 
@@ -272,6 +284,66 @@ Para testes de novas versões sem afetar o ambiente de produção:
 python -m venv test_env
 source test_env/bin/activate
 pip install microdetect==2.0.0
+```
+
+## Utilizando o Sistema de Atualização
+
+### Verificando Atualizações
+
+Para verificar manualmente se há atualizações disponíveis:
+
+```bash
+microdetect update --check-only
+```
+
+Este comando mostrará informações sobre a versão atual e indicará se há uma versão mais recente disponível.
+
+### Atualizando o MicroDetect
+
+Para atualizar o MicroDetect para a versão mais recente:
+
+```bash
+microdetect update
+```
+
+O processo de atualização irá:
+1. Verificar se há uma nova versão
+2. Pedir confirmação antes de atualizar
+3. Baixar e instalar a nova versão
+4. Exibir o progresso da atualização
+
+### Forçando uma Atualização
+
+Para atualizar sem confirmação:
+
+```bash
+microdetect update --force
+```
+
+### Configuração do AWS CodeArtifact
+
+Antes de usar o sistema de atualização, você precisa configurar o AWS CodeArtifact:
+
+```bash
+microdetect setup-aws --domain seu-dominio --repository seu-repositorio --configure-aws
+```
+
+Você precisará fornecer:
+- Credenciais de acesso AWS
+- Nome do domínio CodeArtifact
+- Nome do repositório
+- Região (opcional)
+
+### Desativando Verificações Automáticas de Atualização
+
+Se você não deseja verificações automáticas de atualização, defina a variável de ambiente:
+
+```bash
+# Linux/macOS
+export MICRODETECT_SKIP_UPDATE_CHECK=1
+
+# Windows
+set MICRODETECT_SKIP_UPDATE_CHECK=1
 ```
 
 ## Conclusão

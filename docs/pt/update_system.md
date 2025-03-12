@@ -170,3 +170,45 @@ microdetect update --check-only
 ```
 
 Os logs ajudarão a diagnosticar problemas no processo de atualização.
+
+## Perguntas Frequentes
+
+### Com que frequência o MicroDetect verifica atualizações?
+
+Por padrão, o MicroDetect verifica atualizações uma vez por dia quando você executa qualquer comando. O intervalo de verificação pode ser configurado no arquivo `config.yaml`.
+
+### Posso atualizar para uma versão específica?
+
+Sim, você pode atualizar para uma versão específica usando:
+
+```bash
+microdetect update --version 1.2.3
+```
+
+### Como sei qual versão estou usando atualmente?
+
+Você pode verificar sua versão atual com:
+
+```bash
+microdetect --version
+```
+
+### O que acontece se uma atualização falhar?
+
+Se uma atualização falhar, o MicroDetect manterá a versão atual e exibirá uma mensagem de erro. Você pode tentar novamente ou verificar os logs para mais informações.
+
+### Posso reverter para uma versão anterior?
+
+Sim, você pode instalar uma versão anterior específica usando:
+
+```bash
+microdetect update --version 1.1.0
+```
+
+## Melhores Práticas
+
+1. **Atualizações Regulares**: Mantenha o MicroDetect atualizado para se beneficiar das mais recentes funcionalidades e correções de bugs.
+2. **Teste Após Atualizações**: Após atualizar para uma nova versão, teste seus fluxos de trabalho para garantir que tudo funcione como esperado.
+3. **Backup de Dados Importantes**: Antes de atualizações de versões principais, faça backup da sua configuração e dados importantes.
+4. **Atualize Primeiro em Desenvolvimento**: Se estiver usando o MicroDetect em produção, teste as atualizações em um ambiente de desenvolvimento primeiro.
+5. **Verifique as Notas de Release**: Revise as notas de release antes de atualizar para entender as mudanças na nova versão.

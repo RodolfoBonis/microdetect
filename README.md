@@ -1,500 +1,130 @@
 # MicroDetect
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
-![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+<div align="center">
 
-*Leia em [Português](README_PT.md)*
+![MicroDetect Logo](https://img.shields.io/badge/MicroDetect-Microorganism%20Detection-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjYiLz48L3N2Zz4=)
 
-**MicroDetect** is a comprehensive tool for detecting and classifying microorganisms in microscopy images using YOLOv8. This project provides a complete pipeline from image conversion, manual annotation with resume capability, data augmentation, checkpoint training to model evaluation.
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/RodolfoBonis/microdetect)
+[![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](docs/en/index.md)
 
-## Table of Contents
+*Read in [Português](README.pt.md)*
 
-- [Key Features](#key-features)
-- [Documentation](#documentation)
-- [Supported Microorganisms](#supported-microorganisms)
-- [Installation](#installation)
-- [Quick Guide](#quick-guide)
-- [Project Structure](#project-structure)
-- [Detailed Features](#detailed-features)
-  - [Image Conversion](#image-conversion)
-  - [Manual Annotation with Resume](#manual-annotation-with-resume)
-  - [Annotation Visualization](#annotation-visualization)
-  - [Dataset Preparation](#dataset-preparation)
-  - [Data Augmentation](#data-augmentation)
-  - [Training with Checkpoints](#training-with-checkpoints)
-  - [Model Evaluation](#model-evaluation)
-  - [Automatic Updates](#automatic-updates)
-- [Custom Configuration](#custom-configuration)
-- [Using with Makefile](#using-with-makefile)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+</div>
 
-## Key Features
+## Overview
 
-- 🔍 **Image Conversion**: Converts TIFF images to formats suitable for processing
-- 🏷️ **Manual Annotation with Resume**: Graphical interface for marking microorganisms with the ability to save progress and resume where you left off
-- 👁️ **Visualization**: Visualizes existing annotations in images
-- 🔄 **Data Augmentation**: Enhances dataset with augmentation techniques
-- 📊 **Dataset Preparation**: Splits and organizes data for training/validation/testing
-- 🧠 **Training with Checkpoints**: Trains custom YOLOv8 models with checkpoint system for resuming
-- 📈 **Evaluation**: Evaluates models with detailed metrics and visual reports
-- 🔄 **Automatic Updates**: Checks for and installs updates from AWS CodeArtifact
+**MicroDetect** is a complete toolkit for detection and classification of microorganisms in microscopy images using YOLOv8. It streamlines the entire process from image preparation to model evaluation.
 
-## Documentation
+<div align="center">
+<img src="https://img.shields.io/badge/YOLOv8-Powered-blue?style=for-the-badge" alt="YOLOv8 Powered"/>
+</div>
 
-For more detailed information about MicroDetect, refer to our documentation:
+## 🔑 Key Features
 
-- [Installation Guide](docs/installation_guide.md) - Detailed installation instructions for different environments
-- [Update System](docs/update_system.md) - How to use and configure the automatic update system
-- [AWS CodeArtifact Setup](docs/aws_codeartifact_setup.md) - Setting up AWS CodeArtifact for updates
-- [Troubleshooting](docs/troubleshooting.md) - Solutions for common issues
-- [Advanced Configuration](docs/advanced_configuration.md) - Advanced configuration options
-- [Development Guide](docs/development_guide.md) - Guide for developers who want to contribute
-- [Update and Release Model](docs/update_and_release_model.md) - Versioning and release strategy
+- 📷 **Image Conversion** - Transform microscopy TIFF images to optimized formats
+- 🏷️ **Smart Annotation** - User-friendly interface with resumable sessions
+- 📊 **Data Management** - Organize and prepare your datasets efficiently 
+- 🔄 **Data Augmentation** - Enhance datasets with advanced transformation techniques
+- 🧠 **Model Training** - Train custom YOLOv8 models with checkpoint management
+- 📈 **Performance Evaluation** - Comprehensive metrics and visualizations
+- 🔄 **Automatic Updates** - Seamless updates through AWS CodeArtifact
 
-These documents provide comprehensive information about installation, configuration, usage, and development of MicroDetect. If you encounter any issues not covered in the documentation, please open an issue on GitHub.
+## 🦠 Supported Microorganisms
 
-## Supported Microorganisms
+- **Yeasts**
+- **Fungi**
+- **Micro-algae**
+- **Custom Classes** - Easily configurable for other microorganism types
 
-- 🦠 **Yeasts**
-- 🍄 **Fungi**
-- 🌱 **Micro-algae**
+## 📋 Quick Start
 
-## Installation
-
-### Prerequisites
-
-- Python 3.9 or higher
-- Conda (recommended for environment management)
-
-### Setup with Conda (Recommended)
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
-# Setup environment
+# Install with script (recommended)
 chmod +x scripts/install_production.sh
-./scripts/install_production.sh
-
-# OR to create a virtual environment
 ./scripts/install_production.sh --virtual-env
-
-# To also create an example project
-./scripts/install_production.sh --with-example
 ```
-
-### Windows Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/RodolfoBonis/microdetect.git
-cd microdetect
-
-# Setup environment
-scripts\install_production.bat
-
-# OR to create a virtual environment
-scripts\install_production.bat --virtual-env
-
-# To also create an example project
-scripts\install_production.bat --with-example
-```
-
-### Manual Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/RodolfoBonis/microdetect.git
-cd microdetect
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -e .
-```
-
-## Quick Guide
 
 ### Initialize Project
 
 ```bash
-# Create a directory for your project
 mkdir my_project
 cd my_project
-
-# Initialize MicroDetect
 microdetect init
 ```
 
-### Converting TIFF Images to PNG
+### Basic Workflow
 
 ```bash
-microdetect convert --input_dir data/raw_images --output_dir data/images --use_opencv
-```
-
-### Manual Image Annotation (with resume system)
-
-```bash
-microdetect annotate --image_dir data/images --output_dir data/labels
-```
-
-### Visualizing Annotations
-
-```bash
-microdetect visualize --image_dir data/images --label_dir data/labels
-```
-
-### Dataset Preparation
-
-```bash
-microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
-```
-
-### Data Augmentation
-
-```bash
-microdetect augment --image_dir data/images --label_dir data/labels --factor 10
-```
-
-### Model Training
-
-```bash
-microdetect train --dataset_dir dataset --model_size s --epochs 100
-```
-
-### Resuming Training from a Checkpoint
-
-```bash
-microdetect train --resume runs/train/yolov8_s_custom/weights/last.pt --dataset_dir dataset --epochs 50
-```
-
-### Model Evaluation
-
-```bash
-microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset --confusion_matrix
-```
-
-### AWS CodeArtifact Setup for Updates
-
-```bash
-microdetect setup-aws --domain your-domain --repository your-repository --configure-aws
-```
-
-### Checking for Updates
-
-```bash
-microdetect update --check-only
-```
-
-### Installing Updates
-
-```bash
-microdetect update
-```
-
-## Project Structure
-
-```
-microdetect/
-├── README.md                  # Main documentation
-├── README_PT.md               # Portuguese documentation
-├── requirements.txt           # Project dependencies
-├── setup.py                   # Installation script
-├── Makefile                   # Make commands for automation
-├── config.yaml                # Central project configuration
-├── microdetect/               # Main package
-│   ├── __init__.py            # Package initialization
-│   ├── cli.py                 # Command line interface
-│   ├── data/                  # Data processing modules
-│   │   ├── __init__.py
-│   │   ├── augmentation.py    # Image augmentation
-│   │   ├── conversion.py      # Format conversion
-│   │   └── dataset.py         # Dataset management
-│   ├── annotation/            # Annotation modules
-│   │   ├── __init__.py
-│   │   ├── annotator.py       # Annotation tool
-│   │   └── visualization.py   # Annotation visualization
-│   ├── training/              # Training modules
-│   │   ├── __init__.py
-│   │   ├── train.py           # Model training
-│   │   └── evaluate.py        # Model evaluation
-│   └── utils/                 # Utility functions and classes
-│       ├── __init__.py
-│       ├── config.py          # Configuration management
-│       ├── updater.py         # Update system
-│       └── aws_setup.py       # AWS configuration
-└── scripts/                   # Helper scripts
-    ├── install_production_robust.sh  # Linux/Mac installation
-    └── install_production_robust.bat # Windows installation
-```
-
-## Detailed Features
-
-### Image Conversion
-
-The conversion module allows transforming TIFF images into formats more suitable for processing, such as PNG:
-
-```bash
-# Basic usage
-microdetect convert --input_dir data/raw_images --output_dir data/images
-
-# With OpenCV for better processing of 16-bit images
+# Convert TIFF images to PNG
 microdetect convert --input_dir data/raw_images --output_dir data/images --use_opencv
 
-# Delete original files after conversion
-microdetect convert --input_dir data/raw_images --output_dir data/images --delete_original
-```
-
-Conversion is especially important for microscopy images, which are often saved in high-resolution TIFF formats.
-
-### Manual Annotation with Resume
-
-The annotation system has a complete graphical interface for marking microorganisms and allows you to resume work where you left off:
-
-```bash
+# Annotate images
 microdetect annotate --image_dir data/images --output_dir data/labels
-```
 
-**Key features:**
+# Prepare dataset
+microdetect dataset --source_img_dir data/images --source_label_dir data/labels
 
-- Automatically loads existing annotations when editing an image
-- Saves progress for later resumption
-- Allows pausing and continuing where you left off
-- Options to skip, edit, or overwrite existing annotations
-
-**Keyboard shortcuts:**
-
-- **R**: Reset (clear all annotations in current image)
-- **D**: Delete the last drawn box
-- **S**: Save annotations and go to next image
-- **Q**: Quit without saving
-- **E**: Save current annotation and exit (to resume later)
-
-When you restart the annotation tool, it asks if you want to resume from where you previously left off.
-
-### Annotation Visualization
-
-To review the annotations made:
-
-```bash
-# Interactive visualization
-microdetect visualize --image_dir data/images --label_dir data/labels
-
-# Save images with drawn annotations
-microdetect visualize --image_dir data/images --label_dir data/labels --output_dir data/annotated_images
-
-# Filter specific classes
-microdetect visualize --image_dir data/images --label_dir data/labels --filter_classes "0,1"
-```
-
-Visualization allows navigating between images using the keys:
-- 'n': next image
-- 'p': previous image
-- '0'-'9': toggle class visibility
-- 's': save current image with annotations
-- 'q': quit
-
-### Dataset Preparation
-
-Organizes your dataset in a structure for training:
-
-```bash
-microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset
-```
-
-This creates:
-- Split into train/validation/test
-- YAML configuration file for training
-- Directory structure compatible with YOLOv8
-
-You can customize the proportions:
-
-```bash
-microdetect dataset --source_img_dir data/images --source_label_dir data/labels --dataset_dir dataset --train_ratio 0.8 --val_ratio 0.1 --test_ratio 0.1
-```
-
-### Data Augmentation
-
-Increases your dataset with automatic variations:
-
-```bash
-microdetect augment --image_dir data/images --label_dir data/labels --factor 10
-```
-
-Applied augmentation techniques:
-- Brightness and contrast variation
-- Horizontal flipping
-- Slight rotation
-- Gaussian noise addition
-
-Augmentation parameters can be customized in `config.yaml`.
-
-### Training with Checkpoints
-
-Trains YOLOv8 models with checkpoint system:
-
-```bash
-# Basic training
+# Train model
 microdetect train --dataset_dir dataset --model_size s --epochs 100
 
-# Advanced configuration
-microdetect train --dataset_dir dataset --model_size m --epochs 200 --batch_size 16 --image_size 640
-```
-
-**Checkpoint System:**
-
-Training automatically saves:
-- The best model (`best.pt`)
-- The most recent model (`last.pt`)
-- Optimizer state and metrics
-
-To resume an interrupted training:
-
-```bash
-microdetect train --resume runs/train/yolov8_s_custom/weights/last.pt --dataset_dir dataset --epochs 50
-```
-
-### Model Evaluation
-
-Evaluate the performance of the trained model:
-
-```bash
+# Evaluate model
 microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset
 ```
 
-To generate a confusion matrix:
+## 📚 Documentation
+
+For detailed information, see our documentation:
+
+- [Installation Guide](docs/pt/installation_guide.md) - Detailed installation instructions
+- [Troubleshooting](docs/en/troubleshooting.md) - Solutions to common problems
+- [Advanced Configuration](docs/en/advanced_configuration.md) - Customize MicroDetect for your needs
+- [Development Guide](docs/en/development_guide.md) - Contribute to MicroDetect
+
+Browse all documentation with the built-in docs server:
 
 ```bash
-microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --dataset_dir dataset --confusion_matrix
+microdetect docs
 ```
 
-Evaluation reports include:
-- Precision (mAP50, mAP50-95)
-- Recall
-- F1-Score
-- Metrics by class
-- Performance graphs
-- Confusion matrix (optional)
+## 🛠️ Project Structure
 
-### Automatic Updates
+```
+microdetect/
+├── annotation/        # Image annotation tools
+├── data/              # Data processing modules
+├── training/          # Model training and evaluation
+└── utils/             # Utility functions and configuration
+```
 
-MicroDetect includes an automatic update system that connects to AWS CodeArtifact to check for and install updates:
+## 🧪 Testing
+
+Run the comprehensive test suite:
 
 ```bash
-# Configure AWS CodeArtifact connection
-microdetect setup-aws --domain your-domain --repository your-repository --configure-aws
+# Install test dependencies
+pip install pytest pytest-cov
 
-# Check for updates
-microdetect update --check-only
-
-# Install available updates
-microdetect update
-
-# Force update without confirmation
-microdetect update --force
+# Run tests with coverage report
+pytest --cov=microdetect
 ```
 
-**Key features:**
+## 🙏 Contributing
 
-- Automatically checks for updates after each command
-- Colorized interface for better user experience
-- Secure connection to AWS CodeArtifact
-- Stores credentials securely
-- Handles version comparison using semantic versioning
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-MicroDetect will notify you when updates are available but won't install them automatically without your confirmation. You can disable automatic update checks by setting the environment variable `MICRODETECT_SKIP_UPDATE_CHECK=1`.
+## 📄 License
 
-## Custom Configuration
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-MicroDetect uses a `config.yaml` file for centralized configuration. When you run `microdetect init`, this file is created in the current directory with default values.
+## 📞 Contact & Support
 
-Example customization:
-
-```yaml
-# config.yaml
-directories:
-  dataset: ./my_dataset
-  images: ./my_images
-  labels: ./my_annotations
-
-classes:
-  - "0-yeast"
-  - "1-fungus"
-  - "2-micro-algae"
-  - "3-my-new-class"
-
-training:
-  model_size: m
-  epochs: 300
-  batch_size: 16
-```
-
-After customizing, commands will automatically use these values as defaults.
-
-## Using with Makefile
-
-The project includes a Makefile for task automation:
-
-```bash
-# Create directories
-make create-dirs
-
-# Convert TIFF images
-make convert-tiff
-
-# Annotate images
-make annotate
-
-# Visualize annotations
-make visualize
-
-# Prepare dataset
-make prepare-data
-
-# Apply augmentation
-make augment
-
-# Train model
-make train
-
-# Evaluate model
-make evaluate
-
-# Complete pipeline
-make pipeline
-
-# Configure AWS CodeArtifact
-make setup-aws DOMAIN=your-domain REPOSITORY=your-repo
-
-# Update application
-make update
-```
-
-You can customize parameters:
-
-```bash
-make train MODEL_SIZE=m EPOCHS=200 BATCH_SIZE=16
-```
-
-## Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contact
-
-For questions, suggestions, or collaborations, please contact:
-
-- Email: dev@rodolfodebonis.com.br
 - GitHub Issues: [https://github.com/RodolfoBonis/microdetect/issues](https://github.com/RodolfoBonis/microdetect/issues)
+- Email: dev@rodolfodebonis.com.br

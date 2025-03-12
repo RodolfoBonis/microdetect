@@ -57,12 +57,6 @@ jobs:
             echo "📦 PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}" > commit_messages.txt
             echo "" >> commit_messages.txt
             
-            if [ "${{ github.event.pull_request.body }}" != "null" ] && [ ! -z "${{ github.event.pull_request.body }}" ]; then
-              echo "📝 Description:" >> commit_messages.txt
-              echo "${{ github.event.pull_request.body }}" >> commit_messages.txt
-              echo "" >> commit_messages.txt
-            fi
-            
             echo "🔄 Commits in this PR:" >> commit_messages.txt
             
             # Use GitHub CLI to get commits in the PR
@@ -115,15 +109,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort
+          pip install flake8 black isort mypy
           pip install -e .
 
       - name: Lint with flake8
@@ -146,8 +142,12 @@ jobs:
     needs: get_commit_messages
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.9', '3.10', '3.12']
+        include:
+          - python-version: '3.12'
+            coverage: true
 
     steps:
       - uses: actions/checkout@v4
@@ -156,26 +156,48 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov pytest-timeout mock
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install -e .
 
-      - name: Test with pytest
+      - name: Setup test directories
         run: |
-          # Create placeholder test directory if not exists
-          mkdir -p tests
-          touch tests/__init__.py
-          
-          # Run tests if they exist, else just validate import
-          if [ -d "tests" ] && [ "$(ls -A tests)" ]; then
-            pytest --cov=microdetect
-          else
-            python -c "import microdetect; print('Import test successful')"
+          mkdir -p tests/fixtures/images
+          mkdir -p tests/fixtures/labels
+          # Create test_config.yaml if it doesn't exist
+          if [ ! -f tests/test_config.yaml ]; then
+            cp -f tests/test_config.yaml.example tests/test_config.yaml 2>/dev/null || echo "No example config found"
           fi
+
+      - name: Run basic tests
+        if: ${{ !matrix.coverage }}
+        run: |
+          # If no tests directory exists, create a simple import test
+          if [ ! -d "tests" ] || [ -z "$(find tests -name 'test_*.py')" ]; then
+            mkdir -p tests
+            echo "import microdetect; print('Import test successful')" > tests/test_import.py
+          fi
+          
+          # Run tests with verbosity
+          pytest -v
+
+      - name: Run tests with coverage
+        if: ${{ matrix.coverage }}
+        run: |
+          # Run tests with coverage reporting
+          pytest --cov=microdetect --cov-report=xml --cov-report=term tests
+
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.coverage }}
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
 
   build:
     name: Package Build
@@ -188,6 +210,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
 
       - name: Install build dependencies
         run: |
@@ -218,6 +241,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install security tools
         run: |
@@ -246,6 +270,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |

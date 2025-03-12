@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 from typing import Dict, Tuple
 
+import microdetect
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)
@@ -338,8 +339,8 @@ class UpdateManager:
             Dicionário com informações sobre a versão atual e disponível
         """
         try:
-            from microdetect import __version__ as current_version
-        except ImportError:
+            current_version = microdetect.__version__
+        except (ImportError, AttributeError):
             logger.warning("Não foi possível determinar a versão atual do MicroDetect")
             return {"error": "Não foi possível determinar a versão atual"}
 

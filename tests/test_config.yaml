@@ -1,0 +1,72 @@
+# Test configuration for MicroDetect
+# This file contains test-specific settings that won't affect the main application
+
+# Paths for test fixtures
+paths:
+temp_dir: / tmp / microdetect_tests
+sample_images: tests / fixtures / images
+sample_labels: tests / fixtures / labels
+sample_models: tests / fixtures / models
+
+# Mock data for unit tests
+mocks:
+# Sample microorganism classes for tests
+classes:
+- "0-levedura"
+- "1-fungo"
+- "2-micro-alga"
+- "3-test-class"
+
+# Sample color map for visualization tests
+color_map:
+"0": [0, 255, 0]
+"1": [0, 0, 255]
+"2": [255, 0, 0]
+"3": [255, 255, 0]
+
+# Sample annotations for testing (YOLO format)
+annotations:
+- "0 0.5 0.5 0.2 0.2"
+- "1 0.3 0.7 0.1 0.1"
+- "2 0.7 0.3 0.15 0.15"
+
+# Sample dimensions for test images
+image_dimensions:
+width: 640
+height: 480
+
+# Test parameters
+parameters:
+# For augmentation tests
+augmentation:
+factor: 3
+brightness_range: [0.8, 1.2]
+contrast_range: [-10, 10]
+flip_probability: 0.5
+
+# For dataset splitting tests
+dataset:
+train_ratio: 0.6
+val_ratio: 0.2
+test_ratio: 0.2
+seed: 42
+
+# For training tests
+training:
+model_size: n  # Use smallest model for tests
+epochs: 2  # Minimal epochs for testing
+batch_size: 2
+image_size: 320  # Small image size for faster tests
+
+# For AWS tests
+aws:
+dummy_domain: "test-domain"
+dummy_repository: "test-repo"
+dummy_token: "dummy-token"
+
+# Skip tests that require specific resources
+skip:
+gpu_tests: true  # Skip tests requiring GPU if not available
+network_tests: false  # Run tests requiring network access
+aws_tests: true  # Skip tests requiring actual AWS credentials
+gui_tests: true  # Skip tests requiring GUI (headless environments)

@@ -1,57 +1,117 @@
-# Guia de Instalação do MicroDetect
+# Guia de Instalação
 
-Este guia fornece instruções detalhadas para instalar o MicroDetect em diferentes sistemas operacionais e ambientes.
+Este guia fornece instruções detalhadas passo a passo para instalar o MicroDetect em diferentes sistemas operacionais e ambientes.
+
+## Índice
+- [Requisitos do Sistema](#requisitos-do-sistema)
+- [Métodos de Instalação](#métodos-de-instalação)
+  - [Scripts de Instalação Rápida](#scripts-de-instalação-rápida)
+  - [Instalação Manual](#instalação-manual)
+- [Instalação Específica para Plataformas](#instalação-específica-para-plataformas)
+  - [Linux/macOS](#linuxmacos)
+  - [Windows](#windows)
+  - [Apple Silicon (M1/M2/M3)](#apple-silicon-m1m2m3)
+- [Instalação para Desenvolvimento](#instalação-para-desenvolvimento)
+- [Instalação via AWS CodeArtifact](#instalação-via-aws-codeartifact)
+- [Verificando sua Instalação](#verificando-sua-instalação)
+- [Configurar Sistema de Atualização](#configurar-sistema-de-atualização)
+- [Solução de Problemas](#solução-de-problemas)
+- [Desinstalação](#desinstalação)
 
 ## Requisitos do Sistema
 
 ### Requisitos Mínimos
-
-- Python 3.9 ou superior
-- 4GB de RAM (8GB recomendado para treinamento)
-- 2GB de espaço em disco
+- **Python**: 3.9 ou superior
+- **RAM**: 4GB (8GB recomendado para treinamento)
+- **Espaço em Disco**: 2GB para instalação e uso básico
+- **CUDA** (opcional): Para aceleração via GPU em hardware NVIDIA
 
 ### Dependências Principais
-
 - PyTorch (1.7+)
 - OpenCV
 - Ultralytics YOLOv8
-- NumPy, Matplotlib, PIL
+- NumPy, Matplotlib, Pillow
 - AWS CLI (para atualizações automáticas)
 
-## Instalação em Linux/macOS
+## Métodos de Instalação
 
-### Opção 1: Usando o Script de Instalação (Recomendado)
+### Scripts de Instalação Rápida
 
-O método mais simples é usar o script de instalação fornecido:
+Para uma experiência de instalação simplificada, fornecemos scripts de instalação prontos para uso.
 
+#### Linux/macOS
 ```bash
-# Clone o repositório
+# Clonar o repositório
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
 # Tornar o script executável
 chmod +x scripts/install_production.sh
 
-# Instalar com o script (com ambiente conda)
+# Instalar usando o script
 ./scripts/install_production.sh
 
-# OU para criar um ambiente virtual Python
+# Para criar um ambiente virtual durante a instalação
 ./scripts/install_production.sh --virtual-env
 
-# Para criar também um projeto de exemplo
+# Para criar um projeto de exemplo após a instalação
 ./scripts/install_production.sh --with-example
 ```
 
-### Opção 2: Instalação Manual com Ambiente Virtual
-
-Se preferir mais controle sobre o processo de instalação:
-
-```bash
-# Clone o repositório
+#### Windows
+```batch
+# Clonar o repositório
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
-# Criar e ativar ambiente virtual
+# Instalar usando o script
+scripts\install_production.bat
+
+# Para criar um ambiente virtual durante a instalação
+scripts\install_production.bat --virtual-env
+
+# Para criar um projeto de exemplo após a instalação
+scripts\install_production.bat --with-example
+```
+
+### Instalação Manual
+
+Se você preferir ter mais controle sobre o processo de instalação, pode instalar o MicroDetect manualmente.
+
+#### Usando Ambiente Virtual
+```bash
+# Clonar o repositório
+git clone https://github.com/RodolfoBonis/microdetect.git
+cd microdetect
+
+# Criar e ativar um ambiente virtual
+python -m venv venv
+source venv/bin/activate  # No Linux/macOS
+# Ou no Windows:
+# venv\Scripts\activate
+
+# Instalar dependências
+pip install -r requirements.txt
+
+# Instalar o pacote em modo de desenvolvimento
+pip install -e .
+
+# Testar a instalação
+python -c "import microdetect; print(f'MicroDetect versão {microdetect.__version__} instalado com sucesso!')"
+```
+
+## Instalação Específica para Plataformas
+
+### Linux/macOS
+
+Para ambientes Linux e macOS, o processo de instalação é semelhante:
+
+```bash
+# Clonar o repositório
+git clone https://github.com/RodolfoBonis/microdetect.git
+cd microdetect
+
+# Criar e ativar um ambiente virtual
 python3 -m venv venv
 source venv/bin/activate
 
@@ -60,61 +120,18 @@ pip install -r requirements.txt
 
 # Instalar o pacote em modo de desenvolvimento
 pip install -e .
-
-# Testar a instalação
-python -c "import microdetect; print(f'MicroDetect versão {microdetect.__version__} instalado com sucesso!')"
 ```
 
-### Opção 3: Instalação com Conda (para GPU)
+### Windows
 
-Para usar aceleração GPU (recomendado para treinamento):
-
-```bash
-# Clone o repositório
-git clone https://github.com/RodolfoBonis/microdetect.git
-cd microdetect
-
-# Criar ambiente conda
-conda create -n microdetect python=3.10
-conda activate microdetect
-
-# Instalar PyTorch com suporte a CUDA
-conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
-
-# Instalar outras dependências
-pip install -r requirements.txt
-
-# Instalar o pacote
-pip install -e .
-```
-
-## Instalação no Windows
-
-### Opção 1: Usando o Script Batch (Recomendado)
+Para ambientes Windows:
 
 ```batch
-# Clone o repositório
+# Clonar o repositório
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
-# Instalar com o script (com ambiente conda)
-scripts\install_production.bat
-
-# OU para criar um ambiente virtual Python
-scripts\install_production.bat --virtual-env
-
-# Para criar também um projeto de exemplo
-scripts\install_production.bat --with-example
-```
-
-### Opção 2: Instalação Manual com Ambiente Virtual
-
-```batch
-# Clone o repositório
-git clone https://github.com/RodolfoBonis/microdetect.git
-cd microdetect
-
-# Criar e ativar ambiente virtual
+# Criar e ativar um ambiente virtual
 python -m venv venv
 venv\Scripts\activate
 
@@ -123,42 +140,18 @@ pip install -r requirements.txt
 
 # Instalar o pacote em modo de desenvolvimento
 pip install -e .
-
-# Testar a instalação
-python -c "import microdetect; print(f'MicroDetect versão {microdetect.__version__} instalado com sucesso!')"
 ```
 
-### Opção 3: Instalação com Conda (para GPU)
+### Apple Silicon (M1/M2/M3)
 
-```batch
-# Clone o repositório
-git clone https://github.com/RodolfoBonis/microdetect.git
-cd microdetect
-
-# Criar ambiente conda
-conda create -n microdetect python=3.10
-conda activate microdetect
-
-# Instalar PyTorch com suporte a CUDA
-conda install pytorch torchvision pytorch-cuda=11.8 -c pytorch -c nvidia
-
-# Instalar outras dependências
-pip install -r requirements.txt
-
-# Instalar o pacote
-pip install -e .
-```
-
-## Instalação em Apple Silicon (M1/M2/M3)
-
-Para computadores Mac com chips Apple Silicon:
+Para computadores Mac com chips Apple Silicon, são necessárias etapas adicionais para desempenho ideal:
 
 ```bash
-# Clone o repositório
+# Clonar o repositório
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
-# Criar e ativar ambiente virtual
+# Criar e ativar um ambiente virtual
 python3 -m venv venv
 source venv/bin/activate
 
@@ -177,11 +170,11 @@ pip install -e .
 Se você planeja contribuir com o projeto:
 
 ```bash
-# Clone o repositório
+# Clonar o repositório
 git clone https://github.com/RodolfoBonis/microdetect.git
 cd microdetect
 
-# Criar e ativar ambiente virtual
+# Criar e ativar um ambiente virtual
 python3 -m venv venv
 source venv/bin/activate  # ou venv\Scripts\activate no Windows
 
@@ -192,16 +185,16 @@ pip install -r requirements-dev.txt  # ferramentas adicionais para desenvolvimen
 # Instalar o pacote em modo editável
 pip install -e .
 
-# Configurar pre-commit hooks
+# Configurar hooks de pré-commit
 pre-commit install
 ```
 
-## Instalação via AWS CodeArtifact (Usuários Finais)
+## Instalação via AWS CodeArtifact
 
 Para instalar o MicroDetect diretamente do AWS CodeArtifact:
 
 ```bash
-# Configurar AWS CLI com suas credenciais
+# Configurar o AWS CLI com suas credenciais
 aws configure
 
 # Obter token de autenticação
@@ -224,7 +217,7 @@ pip install microdetect \
     --extra-index-url https://pypi.org/simple
 ```
 
-## Verificando a Instalação
+## Verificando sua Instalação
 
 Após a instalação, verifique se tudo está funcionando corretamente:
 
@@ -238,7 +231,7 @@ cd meu_projeto
 microdetect init
 ```
 
-## Configuração do Sistema de Atualização
+## Configurar Sistema de Atualização
 
 Após a instalação, configure o sistema de atualização automática:
 
@@ -250,11 +243,11 @@ microdetect setup-aws --domain seu-dominio --repository seu-repositorio --config
 microdetect update --check-only
 ```
 
-## Solução de Problemas de Instalação
+## Solução de Problemas
 
 ### Problemas com PyTorch
 
-Se encontrar problemas com o PyTorch:
+Se você encontrar problemas com o PyTorch:
 
 ```bash
 # Desinstalar versão atual
@@ -273,7 +266,7 @@ pip install torch==2.6.0 torchvision==0.21.0
 
 ### Problemas com OpenCV
 
-Se encontrar problemas com o OpenCV:
+Se você encontrar problemas com o OpenCV:
 
 ```bash
 # Desinstalar e reinstalar
@@ -283,10 +276,10 @@ pip install opencv-python-headless
 
 ### Problemas com CUDA
 
-Se encontrar problemas com suporte a GPU:
+Se você encontrar problemas com suporte a GPU:
 
 ```bash
-# Verificar disponibilidade de CUDA
+# Verificar disponibilidade do CUDA
 python -c "import torch; print(f'CUDA disponível: {torch.cuda.is_available()}')"
 
 # Ver dispositivos disponíveis
@@ -298,7 +291,7 @@ python -c "import torch; print(f'Versão CUDA: {torch.version.cuda}')"
 
 ### Problemas com Credenciais AWS
 
-Se encontrar problemas com AWS CodeArtifact:
+Se você encontrar problemas com o AWS CodeArtifact:
 
 ```bash
 # Verificar configuração AWS
@@ -329,3 +322,5 @@ rmdir /s /q venv
 conda deactivate
 conda env remove -n microdetect
 ```
+
+Para solução de problemas mais detalhada, consulte o [Guia de Solução de Problemas](troubleshooting.md).
