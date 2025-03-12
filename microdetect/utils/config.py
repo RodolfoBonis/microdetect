@@ -2,11 +2,11 @@
 Módulo para gerenciamento de configuração do projeto.
 """
 
+import importlib.resources
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
-import pkg_resources
 import yaml
 
 logger = logging.getLogger(__name__)
@@ -88,16 +88,33 @@ class Config:
             Dict com valores padrão de configuração
         """
         try:
-            # Tentar carregar do pacote primeiro
+            # Tentar carregar do pacote usando importlib.resources (moderna)
             try:
-                default_config_path = pkg_resources.resource_filename("microdetect", "default_config.yaml")
-                if os.path.exists(default_config_path):
-                    with open(default_config_path, "r", encoding="utf-8") as f:
-                        logger.info(f"Configuração padrão carregada do pacote: {default_config_path}")
+                # Para Python 3.9+
+                import importlib.resources as resources
+                try:
+                    # Modern approach for Python 3.9+
+                    with resources.files('microdetect').joinpath('default_config.yaml').open('r') as f:
+                        logger.info(f"Configuração padrão carregada do pacote")
                         return yaml.safe_load(f)
-                else:
-                    raise FileNotFoundError("Arquivo default_config.yaml não encontrado no pacote")
+                except (ImportError, FileNotFoundError, AttributeError):
+                    # Fallback for Python 3.7-3.8
+                    default_config_text = resources.read_text('microdetect', 'default_config.yaml')
+                    logger.info(f"Configuração padrão carregada do pacote")
+                    return yaml.safe_load(default_config_text)
             except (ImportError, FileNotFoundError) as e:
+                # Further fallback - look for file directly
+                try:
+                    import microdetect
+                    pkg_path = os.path.dirname(microdetect.__file__)
+                    default_config_path = os.path.join(pkg_path, 'default_config.yaml')
+                    if os.path.exists(default_config_path):
+                        with open(default_config_path, 'r', encoding='utf-8') as f:
+                            logger.info(f"Configuração padrão carregada do caminho: {default_config_path}")
+                            return yaml.safe_load(f)
+                except Exception as pkg_error:
+                    logger.warning(f"Erro ao localizar pacote: {pkg_error}")
+
                 logger.warning(f"Não foi possível carregar default_config.yaml: {e}")
         except Exception as e:
             logger.warning(f"Erro ao carregar configuração padrão: {e}")

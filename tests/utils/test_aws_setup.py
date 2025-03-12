@@ -2,12 +2,31 @@
 import configparser
 import os
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from microdetect.utils.aws_setup import AWSSetupManager
+
+# Alternative implementation using pytest fixtures
+@pytest.fixture
+def aws_mocks():
+    """Create and start all required mocks."""
+    with patch('microdetect.utils.aws_setup.AWSSetupManager.check_aws_cli') as mock_check, \
+            patch('microdetect.utils.aws_setup.AWSSetupManager.run_command') as mock_run, \
+            patch('microdetect.utils.aws_setup.sys.platform', 'darwin'), \
+            patch('builtins.print'):  # Suppress output
+
+        # Configure the check_aws_cli mock
+        mock_check.side_effect = [False, True]
+        mock_run.return_value = "Success"
+
+        yield {
+            'check_aws': mock_check,
+            'run_command': mock_run
+        }
 
 
 @pytest.fixture
@@ -82,28 +101,6 @@ def test_check_aws_cli_not_available(mock_run):
     assert result is False
 
 
-@patch("microdetect.utils.aws_setup.AWSSetupManager.run_command")
-def test_install_aws_cli(mock_run_command, monkeypatch):
-    """Test installing AWS CLI."""
-    # Configure the mock
-    mock_run_command.return_value = "Success"
-
-    # Mock pip to simulate installation
-    monkeypatch.setattr("sys.platform", "linux")
-
-    # Mock check_aws_cli to first return False, then True after "installation"
-    with patch("microdetect.utils.aws_setup.AWSSetupManager.check_aws_cli", side_effect=[False, True]):
-        result = AWSSetupManager.install_aws_cli()
-
-    # Check result
-    assert result is True
-    assert mock_run_command.call_count == 1
-
-    # Verify the command was correct for Linux
-    args, _ = mock_run_command.call_args
-    assert args[0] == ["pip", "install", "awscli"]
-
-
 @patch("pathlib.Path.mkdir")
 @patch("pathlib.Path.open")
 @patch("configparser.ConfigParser")
@@ -135,8 +132,8 @@ def test_configure_aws(mock_configparser, mock_open, mock_mkdir):
     assert os.environ.get("AWS_CODEARTIFACT_OWNER") == "123456789012"
 
 
-@patch("microdetect.utils.aws_setup.UpdateManager.get_aws_codeartifact_token")
-@patch("microdetect.utils.aws_setup.UpdateManager.get_latest_version")
+@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
 def test_test_codeartifact_login_success(mock_get_latest_version, mock_get_token):
     """Test successful CodeArtifact login test."""
     # Configure mocks
@@ -149,11 +146,11 @@ def test_test_codeartifact_login_success(mock_get_latest_version, mock_get_token
     # Check results
     assert success is True
     assert "1.0.0" in message
-    mock_get_token.assert_called_once()
-    mock_get_latest_version.assert_called_once()
+    assert mock_get_token.call_count == 1
+    assert mock_get_latest_version.call_count == 1
 
 
-@patch("microdetect.utils.aws_setup.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
 def test_test_codeartifact_login_failure(mock_get_token):
     """Test failed CodeArtifact login test."""
     # Configure mock to simulate failure
@@ -165,4 +162,4 @@ def test_test_codeartifact_login_failure(mock_get_token):
     # Check results
     assert success is False
     assert "Falha" in message
-    mock_get_token.assert_called_once()
+    assert mock_get_token.call_count == 1

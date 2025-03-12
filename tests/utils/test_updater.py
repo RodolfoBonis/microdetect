@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from microdetect.utils.updater import UpdateManager
+from tests.utils.version_helper import mock_microdetect_version
 
 
 @patch("microdetect.utils.updater.subprocess.check_output")
@@ -105,10 +106,16 @@ def test_check_for_updates(mock_get_latest_version):
     # Configure mock
     mock_get_latest_version.return_value = (True, "1.1.0")
 
-    # Patch __version__ import
-    with patch("microdetect.utils.updater.__version__", "1.0.0"):
+    # Create a mock for the __version__ attribute
+    version_patcher = patch("microdetect.__version__", "1.0.0")
+    version_patcher.start()
+
+    try:
         # Call the method
         update_info = UpdateManager.check_for_updates()
+    finally:
+        # Clean up the patch
+        version_patcher.stop()
 
     # Check results
     assert "current" in update_info
@@ -125,10 +132,16 @@ def test_check_for_updates_no_update_needed(mock_get_latest_version):
     # Configure mock
     mock_get_latest_version.return_value = (True, "1.0.0")
 
-    # Patch __version__ import
-    with patch("microdetect.utils.updater.__version__", "1.0.0"):
+    # Create a mock for the __version__ attribute
+    version_patcher = patch("microdetect.__version__", "1.0.0")
+    version_patcher.start()
+
+    try:
         # Call the method
         update_info = UpdateManager.check_for_updates()
+    finally:
+        # Clean up the patch
+        version_patcher.stop()
 
     # Check results
     assert update_info["needs_update"] is False
@@ -140,10 +153,16 @@ def test_check_for_updates_error(mock_get_latest_version):
     # Configure mock to simulate failure
     mock_get_latest_version.return_value = (False, "")
 
-    # Patch __version__ import
-    with patch("microdetect.utils.updater.__version__", "1.0.0"):
+    # Create a mock for the __version__ attribute
+    version_patcher = patch("microdetect.__version__", "1.0.0")
+    version_patcher.start()
+
+    try:
         # Call the method
         update_info = UpdateManager.check_for_updates()
+    finally:
+        # Clean up the patch
+        version_patcher.stop()
 
     # Check results
     assert "error" in update_info
@@ -194,3 +213,54 @@ def test_check_for_updates_before_command_with_cache(mock_check_for_updates, moc
     assert mock_check_for_updates.called
     assert mock_json_dump.called
     assert result is False
+
+@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+def test_check_for_updates_with_helper(mock_get_latest_version):
+    """Test the check_for_updates method using the version helper."""
+    # Configure mock
+    mock_get_latest_version.return_value = (True, "1.1.0")
+
+    # Use our context manager helper
+    with mock_microdetect_version("1.0.0"):
+        # Call the method
+        update_info = UpdateManager.check_for_updates()
+
+    # Check results
+    assert "current" in update_info
+    assert "latest" in update_info
+    assert "needs_update" in update_info
+    assert update_info["current"] == "1.0.0"
+    assert update_info["latest"] == "1.1.0"
+    assert update_info["needs_update"] is True
+
+
+@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+def test_check_for_updates_no_update_needed_with_helper(mock_get_latest_version):
+    """Test the check_for_updates method when no update is needed."""
+    # Configure mock
+    mock_get_latest_version.return_value = (True, "1.0.0")
+
+    # Use our context manager helper
+    with mock_microdetect_version("1.0.0"):
+        # Call the method
+        update_info = UpdateManager.check_for_updates()
+
+    # Check results
+    assert update_info["needs_update"] is False
+
+
+@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+def test_check_for_updates_error_with_helper(mock_get_latest_version):
+    """Test the check_for_updates method when an error occurs."""
+    # Configure mock to simulate failure
+    mock_get_latest_version.return_value = (False, "")
+
+    # Use our context manager helper
+    with mock_microdetect_version("1.0.0"):
+        # Call the method
+        update_info = UpdateManager.check_for_updates()
+
+    # Check results
+    assert "error" in update_info
+    assert "current" in update_info
+    assert update_info["current"] == "1.0.0"

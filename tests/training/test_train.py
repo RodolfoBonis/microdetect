@@ -84,9 +84,21 @@ def test_train(mock_torch, mock_yolo, sample_data_yaml):
     assert kwargs["save"] is True
 
 
+@pytest.fixture
+def checkpoint_path():
+    """Create a temporary file to represent a checkpoint path."""
+    with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as temp:
+        temp_path = temp.name
+
+    # Return the path and ensure it's cleaned up after the test
+    yield temp_path
+    if os.path.exists(temp_path):
+        os.unlink(temp_path)
+
+
 @patch("microdetect.training.train.YOLO")
 @patch("microdetect.training.train.torch")
-def test_resume_training(mock_torch, mock_yolo, sample_data_yaml):
+def test_resume_training(mock_torch, mock_yolo, checkpoint_path, sample_data_yaml):
     """Test resuming training from a checkpoint."""
     # Configure mock YOLO
     mock_model = MagicMock()
@@ -100,8 +112,7 @@ def test_resume_training(mock_torch, mock_yolo, sample_data_yaml):
     # Create trainer
     trainer = YOLOTrainer(model_size="s", epochs=10, batch_size=8)
 
-    # Call resume_training method
-    checkpoint_path = "path/to/checkpoint.pt"
+    # Call resume_training method with actual checkpoint file
     trainer.resume_training(checkpoint_path, sample_data_yaml)
 
     # Check that YOLO was initialized with the checkpoint
