@@ -17,7 +17,7 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction
+from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
 
@@ -647,6 +647,7 @@ def main(args: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(
         description=f"{BRIGHT}{INFO}MicroDetect{RESET}: Detecção de Microorganismos com YOLOv8",
         formatter_class=ColoredHelpFormatter,
+        epilog=get_logo_with_name_ascii(),
     )
     subparsers = parser.add_subparsers(dest="command", help="Comandos disponíveis")
 

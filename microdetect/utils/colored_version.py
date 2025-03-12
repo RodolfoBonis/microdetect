@@ -11,5 +11,7 @@ class ColoredVersionAction(argparse.Action):
         self.version = version
 
     def __call__(self, parser, namespace, values, option_string=None):
-        version_text = f"{INFO}✨ MicroDetect {BRIGHT}{self.version}{RESET}"
-        parser.exit(message=version_text + "\n")
+        version_text = f"{INFO}✨ v{BRIGHT}{self.version}{RESET}"
+        from microdetect.utils import get_logo_with_name_ascii
+
+        parser.exit(message=get_logo_with_name_ascii(custom_text=version_text))

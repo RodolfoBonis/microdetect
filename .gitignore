@@ -63,8 +63,8 @@ runs/
 *.bmp
 *.tif
 *.tiff
-!samples/**/*.jpg
-!samples/**/*.png
+!docs/assets/**/*.jpg
+!docs/assets/**/*.png
 
 # Logs
 logs/
