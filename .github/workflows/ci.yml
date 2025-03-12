@@ -57,12 +57,6 @@ jobs:
             echo "📦 PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}" > commit_messages.txt
             echo "" >> commit_messages.txt
             
-            if [ "${{ github.event.pull_request.body }}" != "null" ] && [ ! -z "${{ github.event.pull_request.body }}" ]; then
-              echo "📝 Description:" >> commit_messages.txt
-              echo "${{ github.event.pull_request.body }}" >> commit_messages.txt
-              echo "" >> commit_messages.txt
-            fi
-            
             echo "🔄 Commits in this PR:" >> commit_messages.txt
             
             # Use GitHub CLI to get commits in the PR
