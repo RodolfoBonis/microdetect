@@ -158,8 +158,9 @@ def setup_docs_parser(subparsers):
     parser = subparsers.add_parser("docs", help="Abrir documentação no navegador")
     parser.add_argument("--port", type=int, default=8080, help="Porta para o servidor de documentação")
     parser.add_argument("--no-browser", action="store_true", help="Não abrir navegador automaticamente")
-    parser.add_argument("--lang", type=str, choices=list(LANGUAGES.keys()), default=DEFAULT_LANGUAGE,
-                        help="Idioma padrão para a documentação")
+    parser.add_argument(
+        "--lang", type=str, choices=list(LANGUAGES.keys()), default=DEFAULT_LANGUAGE, help="Idioma padrão para a documentação"
+    )
 
     # Opções para execução em background
     group = parser.add_mutually_exclusive_group()

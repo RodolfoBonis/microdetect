@@ -92,24 +92,26 @@ class Config:
             try:
                 # Para Python 3.9+
                 import importlib.resources as resources
+
                 try:
                     # Modern approach for Python 3.9+
-                    with resources.files('microdetect').joinpath('default_config.yaml').open('r') as f:
+                    with resources.files("microdetect").joinpath("default_config.yaml").open("r") as f:
                         logger.info(f"Configuração padrão carregada do pacote")
                         return yaml.safe_load(f)
                 except (ImportError, FileNotFoundError, AttributeError):
                     # Fallback for Python 3.7-3.8
-                    default_config_text = resources.read_text('microdetect', 'default_config.yaml')
+                    default_config_text = resources.read_text("microdetect", "default_config.yaml")
                     logger.info(f"Configuração padrão carregada do pacote")
                     return yaml.safe_load(default_config_text)
             except (ImportError, FileNotFoundError) as e:
                 # Further fallback - look for file directly
                 try:
                     import microdetect
+
                     pkg_path = os.path.dirname(microdetect.__file__)
-                    default_config_path = os.path.join(pkg_path, 'default_config.yaml')
+                    default_config_path = os.path.join(pkg_path, "default_config.yaml")
                     if os.path.exists(default_config_path):
-                        with open(default_config_path, 'r', encoding='utf-8') as f:
+                        with open(default_config_path, "r", encoding="utf-8") as f:
                             logger.info(f"Configuração padrão carregada do caminho: {default_config_path}")
                             return yaml.safe_load(f)
                 except Exception as pkg_error:

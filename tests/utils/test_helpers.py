@@ -24,7 +24,7 @@ def create_temp_file(suffix=None, content=None, delete=True):
     Returns:
         Path to the temporary file
     """
-    with tempfile.NamedTemporaryFile(mode='w+', suffix=suffix, delete=False) as temp:
+    with tempfile.NamedTemporaryFile(mode="w+", suffix=suffix, delete=False) as temp:
         if content:
             temp.write(content)
         temp_path = temp.name
@@ -76,7 +76,7 @@ def mock_aws_client():
     patches = [
         patch("microdetect.utils.aws_setup.subprocess.run"),
         patch("microdetect.utils.aws_setup.subprocess.check_output"),
-        patch("microdetect.utils.updater.subprocess.check_output")
+        patch("microdetect.utils.updater.subprocess.check_output"),
     ]
     return patches
 

@@ -1,6 +1,7 @@
 """
 Módulo para gerenciamento de atualizações do pacote MicroDetect.
 """
+
 import microdetect
 
 import configparser

@@ -72,7 +72,7 @@ class MarkdownLinkProcessor:
         def replace_link(match):
             # Extrai as partes do link
             link_path = match.group(1)
-            anchor = match.group(2) or ''
+            anchor = match.group(2) or ""
             attributes = match.group(3)
             link_text = match.group(4)
 
@@ -146,7 +146,9 @@ def find_docs_dir() -> Path:
                 f.write("Documentation directory not found. Please make sure the 'docs' directory exists.\n")
             else:
                 f.write("# Documentação do MicroDetect\n\n")
-                f.write("Diretório de documentação não encontrado. Por favor, certifique-se de que o diretório 'docs' existe.\n")
+                f.write(
+                    "Diretório de documentação não encontrado. Por favor, certifique-se de que o diretório 'docs' existe.\n"
+                )
 
     return temp_docs
 
@@ -174,7 +176,7 @@ def get_doc_files(docs_dir: Path, language: str = DEFAULT_LANGUAGE) -> Dict[str,
             return {}
 
     # Categorias e ordem de exibição
-    if language == 'en':
+    if language == "en":
         categories = {
             "Getting Started": ["installation_guide.md", "troubleshooting.md"],
             "Features": [],
@@ -493,28 +495,53 @@ def markdown_to_html(content: str, current_language: str = DEFAULT_LANGUAGE) -> 
 
     # Configuração da extensão toc para gerar IDs compatíveis para âncoras
     extension_configs = {
-        'markdown.extensions.toc': {
-            'slugify': lambda text, separator: text.lower()
-            .replace(' ', separator)
-            .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
-            .replace('à', 'a').replace('è', 'e').replace('ì', 'i').replace('ò', 'o').replace('ù', 'u')
-            .replace('â', 'a').replace('ê', 'e').replace('î', 'i').replace('ô', 'o').replace('û', 'u')
-            .replace('ã', 'a').replace('õ', 'o').replace('ñ', 'n')
-            .replace('ç', 'c').replace('ü', 'u')
-            .replace('(', '').replace(')', '')
-            .replace('[', '').replace(']', '')
-            .replace('{', '').replace('}', '')
-            .replace(',', '').replace('.', '')
-            .replace(':', '').replace(';', '')
-            .replace('!', '').replace('?', '')
-            .replace('&', 'e').replace('+', 'mais')
-            .replace('/', '-').replace('\\', '-')
-            .replace('\'', '').replace('"', '')
-            .replace('<', '').replace('>', '')
-            .replace('|', ''),
-            'separator': '-',
-            'anchorlink': False,
-            'permalink': False
+        "markdown.extensions.toc": {
+            "slugify": lambda text, separator: text.lower()
+            .replace(" ", separator)
+            .replace("á", "a")
+            .replace("é", "e")
+            .replace("í", "i")
+            .replace("ó", "o")
+            .replace("ú", "u")
+            .replace("à", "a")
+            .replace("è", "e")
+            .replace("ì", "i")
+            .replace("ò", "o")
+            .replace("ù", "u")
+            .replace("â", "a")
+            .replace("ê", "e")
+            .replace("î", "i")
+            .replace("ô", "o")
+            .replace("û", "u")
+            .replace("ã", "a")
+            .replace("õ", "o")
+            .replace("ñ", "n")
+            .replace("ç", "c")
+            .replace("ü", "u")
+            .replace("(", "")
+            .replace(")", "")
+            .replace("[", "")
+            .replace("]", "")
+            .replace("{", "")
+            .replace("}", "")
+            .replace(",", "")
+            .replace(".", "")
+            .replace(":", "")
+            .replace(";", "")
+            .replace("!", "")
+            .replace("?", "")
+            .replace("&", "e")
+            .replace("+", "mais")
+            .replace("/", "-")
+            .replace("\\", "-")
+            .replace("'", "")
+            .replace('"', "")
+            .replace("<", "")
+            .replace(">", "")
+            .replace("|", ""),
+            "separator": "-",
+            "anchorlink": False,
+            "permalink": False,
         }
     }
 
@@ -522,11 +549,7 @@ def markdown_to_html(content: str, current_language: str = DEFAULT_LANGUAGE) -> 
     extensions.append("markdown.extensions.toc")
 
     # Converter com extensões e configurações
-    html_content = markdown.markdown(
-        content,
-        extensions=extensions,
-        extension_configs=extension_configs
-    )
+    html_content = markdown.markdown(content, extensions=extensions, extension_configs=extension_configs)
 
     # Processar os links para trabalhar com o docs server
     link_processor = MarkdownLinkProcessor(current_language)
@@ -552,11 +575,16 @@ def get_language_selector(current_language: str) -> str:
         selector.append(f'<a href="/?lang={lang_code}" class="lang-option {active_class}" title="{lang_info["name"]}">')
         selector.append(f'{lang_info["flag"]} {lang_info["name"]}</a>')
 
-    selector.append('</div>')
+    selector.append("</div>")
     return "\n".join(selector)
 
 
-def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]], active_file: Optional[Path] = None, current_language: str = DEFAULT_LANGUAGE) -> str:
+def create_html_page(
+    content_html: str,
+    docs_by_category: Dict[str, List[Path]],
+    active_file: Optional[Path] = None,
+    current_language: str = DEFAULT_LANGUAGE,
+) -> str:
     """
     Cria uma página HTML completa com menu lateral e seletor de idioma.
 
@@ -939,7 +967,9 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
     else:
         sidebar_title = "MicroDetect Documentation"
 
-    sidebar_html.append(f'    <h1 class="sidebar-title"><a href="/?file=index.md&lang={current_language}">{sidebar_title}</a></h1>')
+    sidebar_html.append(
+        f'    <h1 class="sidebar-title"><a href="/?file=index.md&lang={current_language}">{sidebar_title}</a></h1>'
+    )
     sidebar_html.append("  </div>")
 
     # Adicionar seletor de idioma
@@ -956,7 +986,9 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
             file_name = doc_file.name
             active_class = "active" if active_file and doc_file.samefile(active_file) else ""
 
-            sidebar_html.append(f'      <li><a class="sidebar-link {active_class}" href="/?file={file_name}&lang={current_language}">{title}</a></li>')
+            sidebar_html.append(
+                f'      <li><a class="sidebar-link {active_class}" href="/?file={file_name}&lang={current_language}">{title}</a></li>'
+            )
 
         sidebar_html.append(f"    </ul>")
         sidebar_html.append(f"  </div>")
@@ -1196,10 +1228,14 @@ def start_docs_server(language=None):
                 with open(index_path, "w", encoding="utf-8") as f:
                     if lang["dir"] == "en":
                         f.write("# MicroDetect Documentation\n\n")
-                        f.write("Welcome to MicroDetect documentation. Please add more documentation files to the docs/en directory.\n")
+                        f.write(
+                            "Welcome to MicroDetect documentation. Please add more documentation files to the docs/en directory.\n"
+                        )
                     else:
                         f.write("# Documentação do MicroDetect\n\n")
-                        f.write("Bem-vindo à documentação do MicroDetect. Por favor, adicione mais arquivos de documentação ao diretório docs/pt.\n")
+                        f.write(
+                            "Bem-vindo à documentação do MicroDetect. Por favor, adicione mais arquivos de documentação ao diretório docs/pt.\n"
+                        )
 
     # Obter documentos por categoria
     docs_by_category = get_doc_files(docs_dir, DEFAULT_LANGUAGE)
@@ -1303,8 +1339,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MicroDetect Documentation Server")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon (background process)")
     parser.add_argument("--port", type=int, help="Port for the server")
-    parser.add_argument("--lang", type=str, choices=list(LANGUAGES.keys()), default=DEFAULT_LANGUAGE,
-                        help="Default language for documentation")
+    parser.add_argument(
+        "--lang", type=str, choices=list(LANGUAGES.keys()), default=DEFAULT_LANGUAGE, help="Default language for documentation"
+    )
 
     args = parser.parse_args()
 

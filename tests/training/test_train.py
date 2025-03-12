@@ -87,7 +87,7 @@ def test_train(mock_torch, mock_yolo, sample_data_yaml):
 @pytest.fixture
 def checkpoint_path():
     """Create a temporary file to represent a checkpoint path."""
-    with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as temp:
+    with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as temp:
         temp_path = temp.name
 
     # Return the path and ensure it's cleaned up after the test

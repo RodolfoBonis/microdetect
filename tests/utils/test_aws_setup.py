@@ -10,23 +10,22 @@ import pytest
 
 from microdetect.utils.aws_setup import AWSSetupManager
 
+
 # Alternative implementation using pytest fixtures
 @pytest.fixture
 def aws_mocks():
     """Create and start all required mocks."""
-    with patch('microdetect.utils.aws_setup.AWSSetupManager.check_aws_cli') as mock_check, \
-            patch('microdetect.utils.aws_setup.AWSSetupManager.run_command') as mock_run, \
-            patch('microdetect.utils.aws_setup.sys.platform', 'darwin'), \
-            patch('builtins.print'):  # Suppress output
+    with patch("microdetect.utils.aws_setup.AWSSetupManager.check_aws_cli") as mock_check, patch(
+        "microdetect.utils.aws_setup.AWSSetupManager.run_command"
+    ) as mock_run, patch("microdetect.utils.aws_setup.sys.platform", "darwin"), patch(
+        "builtins.print"
+    ):  # Suppress output
 
         # Configure the check_aws_cli mock
         mock_check.side_effect = [False, True]
         mock_run.return_value = "Success"
 
-        yield {
-            'check_aws': mock_check,
-            'run_command': mock_run
-        }
+        yield {"check_aws": mock_check, "run_command": mock_run}
 
 
 @pytest.fixture

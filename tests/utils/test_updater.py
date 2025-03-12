@@ -214,6 +214,7 @@ def test_check_for_updates_before_command_with_cache(mock_check_for_updates, moc
     assert mock_json_dump.called
     assert result is False
 
+
 @patch("microdetect.utils.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_with_helper(mock_get_latest_version):
     """Test the check_for_updates method using the version helper."""
