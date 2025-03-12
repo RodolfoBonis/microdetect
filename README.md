@@ -84,9 +84,9 @@ microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --d
 For detailed information, see our documentation:
 
 - [Installation Guide](docs/pt/installation_guide.md) - Detailed installation instructions
-- [Troubleshooting](docs/troubleshooting.md) - Solutions to common problems
+- [Troubleshooting](docs/en/troubleshooting.md) - Solutions to common problems
 - [Advanced Configuration](docs/en/advanced_configuration.md) - Customize MicroDetect for your needs
-- [Development Guide](docs/development_guide.md) - Contribute to MicroDetect
+- [Development Guide](docs/en/development_guide.md) - Contribute to MicroDetect
 
 Browse all documentation with the built-in docs server:
 

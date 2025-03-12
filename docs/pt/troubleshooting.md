@@ -1,6 +1,6 @@
-# Solução de Problemas do MicroDetect
+# Guia de Solução de Problemas
 
-Este guia ajuda a solucionar problemas comuns que você pode encontrar ao usar o MicroDetect.
+Este guia ajuda a resolver problemas comuns que você pode encontrar ao usar o MicroDetect.
 
 ## Sumário
 
@@ -12,6 +12,7 @@ Este guia ajuda a solucionar problemas comuns que você pode encontrar ao usar o
 - [Problemas de GPU](#problemas-de-gpu)
 - [Problemas de Atualização](#problemas-de-atualização)
 - [Erros Comuns e Soluções](#erros-comuns-e-soluções)
+- [Logs e Diagnóstico](#logs-e-diagnóstico)
 
 ## Problemas de Instalação
 
@@ -23,7 +24,7 @@ ImportError: No module named 'microdetect'
 ```
 
 **Soluções:**
-1. Verifique se instalou o pacote:
+1. Verifique se o pacote está instalado:
    ```bash
    pip list | grep microdetect
    ```

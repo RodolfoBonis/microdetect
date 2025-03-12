@@ -84,9 +84,9 @@ microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --d
 Para informações detalhadas, consulte nossa documentação:
 
 - [Guia de Instalação](docs/pt/installation_guide.md) - Instruções detalhadas de instalação
-- [Solução de Problemas](docs/troubleshooting.md) - Soluções para problemas comuns
+- [Solução de Problemas](docs/en/troubleshooting.md) - Soluções para problemas comuns
 - [Configuração Avançada](docs/en/advanced_configuration.md) - Personalize o MicroDetect para suas necessidades
-- [Guia de Desenvolvimento](docs/development_guide.md) - Contribua com o MicroDetect
+- [Guia de Desenvolvimento](docs/en/development_guide.md) - Contribua com o MicroDetect
 
 Navegue por toda a documentação com o servidor de documentação integrado:
 
