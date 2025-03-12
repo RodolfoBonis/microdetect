@@ -42,6 +42,51 @@ LANGUAGES = {
 DEFAULT_LANGUAGE = "en"
 
 
+class MarkdownLinkProcessor:
+    """Processador de links para ajustar links relativos para funcionar com o docs server."""
+
+    def __init__(self, current_language):
+        """
+        Inicializa o processador de links.
+
+        Args:
+            current_language: Idioma atual usado para construir os links
+        """
+        self.current_language = current_language
+
+    def process_html(self, html_content):
+        """
+        Processa links em conteúdo HTML para funcionar com o docs server.
+
+        Args:
+            html_content: Conteúdo HTML com links a serem processados
+
+        Returns:
+            HTML com links modificados para funcionar com o docs server
+        """
+        import re
+
+        # Padrão para capturar links que apontam para arquivos .md
+        pattern = r'<a\s+href=["\']([^"\'#]+\.md)(#[^"\']+)?["\']([^>]*)>(.*?)</a>'
+
+        def replace_link(match):
+            # Extrai as partes do link
+            link_path = match.group(1)
+            anchor = match.group(2) or ''
+            attributes = match.group(3)
+            link_text = match.group(4)
+
+            # Cria um link que funciona com o docs server
+            new_href = f"/?file={link_path}&lang={self.current_language}{anchor}"
+
+            return f'<a href="{new_href}"{attributes}>{link_text}</a>'
+
+        # Substitui todos os links para arquivos .md
+        processed_html = re.sub(pattern, replace_link, html_content)
+
+        return processed_html
+
+
 def find_docs_dir() -> Path:
     """
     Localiza o diretório de documentação.
@@ -424,12 +469,13 @@ def get_markdown_title(file_path: Path) -> str:
     return file_path.stem.replace("_", " ").title()
 
 
-def markdown_to_html(content: str) -> str:
+def markdown_to_html(content: str, current_language: str = DEFAULT_LANGUAGE) -> str:
     """
-    Converte Markdown para HTML com realce de sintaxe.
+    Converte Markdown para HTML com realce de sintaxe e corrige links.
 
     Args:
         content: Conteúdo Markdown
+        current_language: Idioma atual (para construção de links)
 
     Returns:
         HTML formatado
@@ -437,17 +483,56 @@ def markdown_to_html(content: str) -> str:
     if not MARKDOWN_AVAILABLE:
         return f"<pre>{content}</pre>"
 
-    # Configurar extensões
+    # Configurar extensões com opções específicas para IDs de cabeçalhos
     extensions = [
         "markdown.extensions.tables",
         "markdown.extensions.fenced_code",
         "markdown.extensions.codehilite",
-        "markdown.extensions.toc",
         "markdown.extensions.nl2br",
     ]
 
-    # Converter com extensões
-    return markdown.markdown(content, extensions=extensions)
+    # Configuração da extensão toc para gerar IDs compatíveis para âncoras
+    extension_configs = {
+        'markdown.extensions.toc': {
+            'slugify': lambda text, separator: text.lower()
+            .replace(' ', separator)
+            .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u')
+            .replace('à', 'a').replace('è', 'e').replace('ì', 'i').replace('ò', 'o').replace('ù', 'u')
+            .replace('â', 'a').replace('ê', 'e').replace('î', 'i').replace('ô', 'o').replace('û', 'u')
+            .replace('ã', 'a').replace('õ', 'o').replace('ñ', 'n')
+            .replace('ç', 'c').replace('ü', 'u')
+            .replace('(', '').replace(')', '')
+            .replace('[', '').replace(']', '')
+            .replace('{', '').replace('}', '')
+            .replace(',', '').replace('.', '')
+            .replace(':', '').replace(';', '')
+            .replace('!', '').replace('?', '')
+            .replace('&', 'e').replace('+', 'mais')
+            .replace('/', '-').replace('\\', '-')
+            .replace('\'', '').replace('"', '')
+            .replace('<', '').replace('>', '')
+            .replace('|', ''),
+            'separator': '-',
+            'anchorlink': False,
+            'permalink': False
+        }
+    }
+
+    # Adicionar a extensão toc após definir suas configurações
+    extensions.append("markdown.extensions.toc")
+
+    # Converter com extensões e configurações
+    html_content = markdown.markdown(
+        content,
+        extensions=extensions,
+        extension_configs=extension_configs
+    )
+
+    # Processar os links para trabalhar com o docs server
+    link_processor = MarkdownLinkProcessor(current_language)
+    html_content = link_processor.process_html(html_content)
+
+    return html_content
 
 
 def get_language_selector(current_language: str) -> str:
@@ -760,16 +845,16 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
         if (activeLink) {
             activeLink.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }
-        
+
         // Add copy buttons to code blocks
         document.querySelectorAll('pre').forEach(function(pre) {
             const copyButton = document.createElement('button');
             copyButton.className = 'copy-button';
             copyButton.textContent = 'Copy';
-            
+
             // Make pre relative for positioning
             pre.style.position = 'relative';
-            
+
             // Add hover states
             copyButton.addEventListener('mouseover', function() {
                 this.style.backgroundColor = 'rgba(0,0,0,0.2)';
@@ -777,19 +862,66 @@ def create_html_page(content_html: str, docs_by_category: Dict[str, List[Path]],
             copyButton.addEventListener('mouseout', function() {
                 this.style.backgroundColor = 'rgba(0,0,0,0.1)';
             });
-            
+
             pre.appendChild(copyButton);
-            
+
             copyButton.addEventListener('click', function() {
                 const code = pre.querySelector('code').textContent;
                 navigator.clipboard.writeText(code);
-                
+
                 copyButton.textContent = 'Copied!';
                 setTimeout(function() {
                     copyButton.textContent = 'Copy';
                 }, 2000);
             });
         });
+
+        // Fix anchor navigation
+        function handleAnchorNavigation() {
+            // Get the hash from URL
+            const hash = window.location.hash;
+            if (!hash) return;
+
+            // Remove the '#' character
+            const targetId = hash.substring(1);
+
+            // Find the target element
+            const targetElement = document.getElementById(targetId);
+            if (targetElement) {
+                // Scroll to the element with a small delay to ensure the page is fully loaded
+                setTimeout(() => {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
+        }
+
+        // Handle anchor navigation on page load
+        handleAnchorNavigation();
+
+        // Handle anchor navigation when clicking on links within the content
+        document.querySelector('#content').addEventListener('click', function(e) {
+            const target = e.target;
+
+            // Check if this is a link
+            if (target.tagName === 'A' || target.closest('a')) {
+                const link = target.tagName === 'A' ? target : target.closest('a');
+                const href = link.getAttribute('href');
+
+                // Check if this is an anchor link to the same page
+                if (href && href.startsWith('#')) {
+                    e.preventDefault();
+
+                    // Update URL hash
+                    window.location.hash = href;
+
+                    // Handle navigation
+                    handleAnchorNavigation();
+                }
+            }
+        });
+
+        // Also handle hash change events
+        window.addEventListener('hashchange', handleAnchorNavigation);
     });
     """
 
@@ -929,8 +1061,8 @@ class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(file_path, "r", encoding="utf-8") as f:
                 markdown_content = f.read()
 
-            # Converter para HTML
-            content_html = markdown_to_html(markdown_content)
+            # Converter para HTML com o novo processador de links
+            content_html = markdown_to_html(markdown_content, lang)
 
             # Criar página completa
             page_html = create_html_page(content_html, self.docs_by_category, file_path, lang)
