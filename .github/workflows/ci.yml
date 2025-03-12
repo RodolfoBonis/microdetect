@@ -296,9 +296,10 @@ jobs:
       - name: Fail CI if Scan or Quality Gate fails
         if: ${{ steps.sonar_scan.outcome == 'failure' || steps.sonar_quality_gate.outcome == 'failure' }}
         run: exit 1
+
   notify:
     name: Send Notification
-    needs: [get_commit_messages, lint, test, build, security]
+    needs: [get_commit_messages, lint, test, build, security, sonar_scan]
     runs-on: ubuntu-latest
     if: always()
     steps:
