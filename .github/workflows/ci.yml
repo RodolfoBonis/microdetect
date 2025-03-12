@@ -232,6 +232,70 @@ jobs:
         run: |
           safety check -r requirements.txt --full-report || true
 
+  sonar_scan:
+    name: Sonar Scan
+    needs: [ get_commit_messages, test ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+
+      - name: Install Python dependencies
+        run: pip install -r .config/scripts/requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=microdetect --cov-report=xml:coverage.xml
+
+      - uses: sonarsource/sonarqube-scan-action@master
+        id: sonar_scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+            -Dsonar.sources=microdetect
+            -Dsonar.tests=tests
+
+      - uses: sonarsource/sonarqube-quality-gate-action@master
+        id: sonar_quality_gate
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Run script
+        id: sonar_metrics
+        if: ${{ github.event_name == 'pull_request' && always()}}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_TOKEN }}
+          SONARQUBE_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONARQUBE_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONARQUBE_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_REPO_NAME: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .config/scripts/generate_sonar_metrics_comment.py
+
+      - name: Fail CI if Scan or Quality Gate fails
+        if: ${{ steps.sonar_scan.outcome == 'failure' || steps.sonar_quality_gate.outcome == 'failure' }}
+        run: exit 1
   notify:
     name: Send Notification
     needs: [get_commit_messages, lint, test, build, security]
