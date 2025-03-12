@@ -94,43 +94,58 @@ def find_docs_dir() -> Path:
     Returns:
         O caminho para o diretório docs.
     """
-    # Buscar a partir do diretório atual
+    # Lista de possíveis locais para procurar os documentos
+    search_paths = []
+
+    # 1. Buscar a partir do diretório atual
     current_dir = Path.cwd()
-    docs_dir = current_dir / "docs"
+    search_paths.append(current_dir / "docs")
 
-    if docs_dir.exists():
-        return docs_dir
+    # 2. Buscar a partir do diretório home do usuário
+    home_dir = Path.home()
+    search_paths.append(home_dir / ".microdetect" / "docs")
 
-    # Buscar a partir do diretório do pacote
+    # 3. Buscar a partir do diretório do pacote (diretório onde o módulo está instalado)
     package_dir = Path(__file__).parent.parent.parent
-    docs_dir = package_dir / "docs"
+    search_paths.append(package_dir / "docs")
 
-    if docs_dir.exists():
-        return docs_dir
-
-    # Buscar na pasta de compartilhamento de dados padrão da instalação
+    # 4. Buscar nas pastas de compartilhamento de dados padrão da instalação
     try:
         import site
+        import sys
 
+        # Diretórios do site-packages para instalações padrão
         for site_dir in site.getsitepackages():
-            share_docs_dir = Path(site_dir) / "../share/microdetect/docs"
-            if share_docs_dir.exists() and share_docs_dir.is_dir():
-                return share_docs_dir.resolve()
-    except (ImportError, AttributeError):
-        pass
+            share_docs_dir = Path(site_dir).parent / "share/microdetect/docs"
+            search_paths.append(share_docs_dir)
 
-    # Verificar também em userbase para instalações por usuário
-    try:
+            # Verificar também em share/microdetect
+            share_dir = Path(site_dir).parent / "share/microdetect"
+            search_paths.append(share_dir)
+
+        # Diretório específico para instalações Conda
+        if 'conda' in sys.prefix.lower() or 'miniconda' in sys.prefix.lower():
+            conda_share_dir = Path(sys.prefix) / "share/microdetect/docs"
+            search_paths.append(conda_share_dir)
+
+        # Verificar também em userbase para instalações por usuário
         user_base = site.USER_BASE
         share_docs_dir = Path(user_base) / "share/microdetect/docs"
-        if share_docs_dir.exists() and share_docs_dir.is_dir():
-            return share_docs_dir.resolve()
+        search_paths.append(share_docs_dir)
+
     except (ImportError, AttributeError):
         pass
 
-    # Se não encontrar, criar um diretório temporário
-    import tempfile
+    # Verificar cada caminho e retornar o primeiro existente
+    for path in search_paths:
+        if path.exists() and path.is_dir():
+            # Verificar se pelo menos um arquivo .md existe no caminho ou seus subdiretórios
+            md_files = list(path.glob('**/*.md'))
+            if md_files:
+                return path
 
+    # Se nenhum diretório existente foi encontrado, criar um temporário
+    import tempfile
     temp_dir = Path(tempfile.mkdtemp(prefix="microdetect_docs_"))
     temp_docs = temp_dir / "docs"
     temp_docs.mkdir(exist_ok=True)
@@ -144,11 +159,17 @@ def find_docs_dir() -> Path:
             if lang["dir"] == "en":
                 f.write("# MicroDetect Documentation\n\n")
                 f.write("Documentation directory not found. Please make sure the 'docs' directory exists.\n")
+                f.write("\nSearched in the following locations:\n")
+                for path in search_paths:
+                    f.write(f"- {path}\n")
             else:
                 f.write("# Documentação do MicroDetect\n\n")
                 f.write(
                     "Diretório de documentação não encontrado. Por favor, certifique-se de que o diretório 'docs' existe.\n"
                 )
+                f.write("\nBuscado nas seguintes localizações:\n")
+                for path in search_paths:
+                    f.write(f"- {path}\n")
 
     return temp_docs
 

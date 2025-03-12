@@ -25,8 +25,28 @@ def read_requirements():
 
 
 # Collect all documentation files
-doc_files = glob.glob('docs/*.md')
-doc_data_files = [('share/microdetect/docs', doc_files)]
+doc_files = glob.glob('docs/**/*.md', recursive=True)
+doc_files += glob.glob('docs/**/*.html', recursive=True)
+doc_files += glob.glob('docs/**/*.css', recursive=True)
+doc_files += glob.glob('docs/**/*.js', recursive=True)
+doc_files += glob.glob('docs/**/*.png', recursive=True)
+doc_files += glob.glob('docs/**/*.jpg', recursive=True)
+doc_files += glob.glob('docs/**/*.svg', recursive=True)
+
+# Organize doc files by directory structure
+doc_dirs = {}
+for doc_file in doc_files:
+    # Extrair diretório relativo
+    rel_dir = os.path.dirname(doc_file)
+    if rel_dir not in doc_dirs:
+        doc_dirs[rel_dir] = []
+    doc_dirs[rel_dir].append(doc_file)
+
+# Create data_files entries for each directory
+doc_data_files = []
+for rel_dir, files in doc_dirs.items():
+    install_dir = os.path.join('share/microdetect', rel_dir)
+    doc_data_files.append((install_dir, files))
 
 setup(
     name="microdetect",

@@ -252,11 +252,11 @@ class UpdateManager:
             print(f"{ERROR}Falha ao obter token do AWS CodeArtifact{RESET}")
             return False
 
+        # Obter URL autenticada para o endpoint
+        auth_endpoint = endpoint.replace("https://", f"https://aws:{token}@")
+
         # Detectar ambiente conda
         in_conda = os.environ.get("CONDA_PREFIX") is not None
-
-        # Instalar versão mais recente
-        print(f"{INFO}Atualizando MicroDetect para versão {SUCCESS}{latest_version}{INFO}...{RESET}")
 
         # Determinar comando pip correto para o ambiente
         if in_conda:
@@ -271,19 +271,24 @@ class UpdateManager:
         else:
             pip_cmd = [sys.executable, "-m", "pip"]
 
+        # Instalar versão mais recente
+        print(f"{INFO}Atualizando MicroDetect para versão {SUCCESS}{latest_version}{INFO}...{RESET}")
+
+        # Usar a versão específica com microdetect=={latest_version}
         cmd = pip_cmd + [
             "install",
             "--upgrade",
-            "microdetect",
+            f"microdetect=={latest_version}",
             "--index-url",
-            f"{endpoint}simple/",
+            f"{auth_endpoint}simple/",
             "--extra-index-url",
             "https://pypi.org/simple",
             "--no-cache-dir",
         ]
 
+        # Configurar variáveis de ambiente para pip
         env = os.environ.copy()
-        env["PIP_INDEX_URL"] = f"{endpoint}simple/"
+        env["PIP_INDEX_URL"] = f"{auth_endpoint}simple/"
         env["PIP_EXTRA_INDEX_URL"] = "https://pypi.org/simple"
         env["TWINE_USERNAME"] = "aws"
         env["TWINE_PASSWORD"] = token
