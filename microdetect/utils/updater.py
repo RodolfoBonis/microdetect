@@ -2,8 +2,6 @@
 Módulo para gerenciamento de atualizações do pacote MicroDetect.
 """
 
-import microdetect
-
 import configparser
 import json
 import logging
@@ -16,6 +14,7 @@ import time
 from pathlib import Path
 from typing import Dict, Tuple
 
+import microdetect
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 logger = logging.getLogger(__name__)

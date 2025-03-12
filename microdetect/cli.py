@@ -19,7 +19,7 @@ from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
 from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
-from microdetect.utils.docs_server import LANGUAGES, DEFAULT_LANGUAGE
+from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
 
 # Configuração de logging
 logging.basicConfig(
