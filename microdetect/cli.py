@@ -168,17 +168,12 @@ def setup_docs_parser(subparsers):
     group.add_argument("--stop", action="store_true", help="Parar servidor em execução em background")
     group.add_argument("--status", action="store_true", help="Verificar status do servidor em background")
 
+
 def setup_install_docs_parser(subparsers):
     """Configurar o parser para o comando install-docs."""
-    parser = subparsers.add_parser(
-        "install-docs", help="Instala ou atualiza a documentação local"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Força a reinstalação mesmo se a documentação já existir"
-    )
-    parser.add_argument(
-        "--no-interactive", dest="interactive", action="store_false", help="Modo não interativo"
-    )
+    parser = subparsers.add_parser("install-docs", help="Instala ou atualiza a documentação local")
+    parser.add_argument("--force", action="store_true", help="Força a reinstalação mesmo se a documentação já existir")
+    parser.add_argument("--no-interactive", dest="interactive", action="store_false", help="Modo não interativo")
     return parser
 
 
@@ -188,8 +183,8 @@ def handle_install_docs(args):
     Copia os arquivos da documentação para a pasta do usuário (.microdetect/docs).
     """
     import shutil
-    from pathlib import Path
     import sys
+    from pathlib import Path
 
     # Diretório home do usuário
     user_docs_dir = Path.home() / ".microdetect" / "docs"
@@ -211,6 +206,7 @@ def handle_install_docs(args):
 
     # Tentar encontrar os arquivos de documentação
     from microdetect.utils.docs_server import find_docs_dir
+
     source_docs_dir = find_docs_dir()
 
     # Verificar se a fonte é um diretório temporário (o que significa que não encontrou docs)
@@ -232,6 +228,7 @@ def handle_install_docs(args):
     except Exception as e:
         print(f"Erro ao instalar a documentação: {str(e)}")
         return
+
 
 def handle_docs(args):
     """Manipular comando de documentação."""

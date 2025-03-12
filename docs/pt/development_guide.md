@@ -213,11 +213,162 @@ pre-commit run --all-files
       └── test_aws_setup.py
   ```
 
-### Documentação
+# Documentação
 
-- Mantenha a documentação atualizada com as alterações de código
-- Documente novos parâmetros em funções e alterações de comportamento
-- Adicione exemplos de uso para novas funcionalidades
+## Empacotamento e Acesso à Documentação
+
+O projeto MicroDetect agora inclui um sistema de documentação abrangente que é devidamente empacotado com a distribuição. Esta seção explica como a documentação é estruturada, empacotada e servida.
+
+## Estrutura da Documentação
+
+A documentação está organizada em uma estrutura baseada em idiomas:
+
+```
+docs/
+├── en/                          # Documentação em inglês
+│   ├── index.md                 # Ponto de entrada principal
+│   ├── installation_guide.md    # Instruções de instalação
+│   ├── ...                      # Outros arquivos de tópicos
+└── pt/                          # Documentação em português
+    ├── index.md                 # Ponto de entrada principal (português)
+    ├── installation_guide.md    # Instruções de instalação (português)
+    └── ...                      # Outros arquivos de tópicos
+```
+
+## Empacotamento da Documentação
+
+A documentação é incluída no pacote MicroDetect durante o processo de build usando dois mecanismos:
+
+### 1. Configuração MANIFEST.in
+
+O arquivo `MANIFEST.in` inclui as seguintes diretivas para incluir arquivos de documentação:
+
+```
+recursive-include docs *.md
+recursive-include docs *.html
+recursive-include docs *.css
+recursive-include docs *.js
+recursive-include docs *.png
+recursive-include docs *.jpg
+recursive-include docs *.svg
+```
+
+### 2. Configuração setup.py
+
+O arquivo `setup.py` inclui código para coletar e organizar arquivos de documentação:
+
+```python
+# Coletar todos os arquivos de documentação
+doc_files = glob.glob('docs/**/*.md', recursive=True)
+doc_files += glob.glob('docs/**/*.html', recursive=True)
+doc_files += glob.glob('docs/**/*.css', recursive=True)
+# ...etc.
+
+# Organizar arquivos de documentação por estrutura de diretórios
+doc_dirs = {}
+for doc_file in doc_files:
+    rel_dir = os.path.dirname(doc_file)
+    if rel_dir not in doc_dirs:
+        doc_dirs[rel_dir] = []
+    doc_dirs[rel_dir].append(doc_file)
+
+# Criar entradas data_files para cada diretório
+doc_data_files = []
+for rel_dir, files in doc_dirs.items():
+    install_dir = os.path.join('share/microdetect', rel_dir)
+    doc_data_files.append((install_dir, files))
+
+# Adicionar ao setup
+setup(
+    # ...outros parâmetros de setup...
+    data_files=doc_data_files,
+)
+```
+
+Isso garante que os arquivos de documentação sejam instalados corretamente no diretório `share/microdetect/docs/` do pacote Python.
+
+## Servidor de Documentação
+
+A CLI do MicroDetect inclui um servidor de documentação integrado:
+
+```python
+# Em microdetect/utils/docs_server.py
+```
+
+Este módulo fornece:
+
+1. Um servidor web que renderiza arquivos Markdown como HTML
+2. Uma barra lateral de navegação com links de documentação organizados
+3. Alternância de idioma entre inglês e português
+4. Funcionalidade de busca
+5. A capacidade de executar em modo de segundo plano
+
+## Comandos CLI para Documentação
+
+Dois comandos principais foram implementados para acesso à documentação:
+
+### 1. `microdetect docs`
+
+Inicia o servidor de documentação:
+
+```bash
+# Uso básico
+microdetect docs
+
+# Opções de idioma
+microdetect docs --lang pt  # Português
+microdetect docs --lang en  # Inglês (padrão)
+
+# Modo de segundo plano
+microdetect docs --background
+microdetect docs --status
+microdetect docs --stop
+```
+
+### 2. `microdetect install-docs`
+
+Instala arquivos de documentação no diretório do usuário:
+
+```bash
+microdetect install-docs [--force]
+```
+
+Isso copia os arquivos de documentação para `~/.microdetect/docs/` para acesso offline.
+
+## Fluxo de Trabalho de Desenvolvimento para Documentação
+
+Ao desenvolver ou atualizar a documentação:
+
+1. Edite os arquivos Markdown apropriados no diretório `docs/`
+2. Teste a documentação localmente usando `microdetect docs`
+3. Certifique-se de atualizar ambas as versões de idioma conforme necessário
+4. As alterações na documentação serão incluídas no próximo build do pacote
+
+## Melhores Práticas para Documentação
+
+1. Mantenha a documentação sincronizada entre os idiomas
+2. Use links relativos entre arquivos de documentação para navegação
+3. Prefixe links de documentação internos com informações de idioma
+4. Use uma estrutura consistente entre as versões de idioma
+5. Inclua exemplos de código e capturas de tela quando apropriado
+6. Lembre-se de atualizar a documentação ao fazer alterações significativas no código
+
+## Testando o Empacotamento da Documentação
+
+Para testar se a documentação está corretamente empacotada:
+
+```bash
+# Construir o pacote
+python setup.py sdist bdist_wheel
+
+# Instalar o pacote em um ambiente de teste
+pip install --force-reinstall dist/microdetect-*.whl
+
+# Iniciar o servidor de documentação para verificar a instalação
+microdetect docs
+```
+
+Isso verificará se os arquivos de documentação estão devidamente incluídos no build e podem ser acessados através do servidor de documentação.
 
 ## Fluxo de Trabalho de Desenvolvimento
 

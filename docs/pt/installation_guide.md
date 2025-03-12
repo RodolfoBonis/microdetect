@@ -231,6 +231,91 @@ cd meu_projeto
 microdetect init
 ```
 
+## Acessando a Documentação
+
+O MicroDetect agora inclui documentação abrangente empacotada com o software. Aqui está como acessá-la:
+
+## Usando o Servidor de Documentação
+
+A maneira mais fácil de visualizar a documentação é através do servidor de documentação integrado:
+
+```bash
+# Iniciar o servidor de documentação
+microdetect docs
+
+# Iniciar com um idioma específico
+microdetect docs --lang pt  # Para documentação em português
+microdetect docs --lang en  # Para documentação em inglês (padrão)
+
+# Usar uma porta diferente
+microdetect docs --port 8888
+```
+
+Este comando iniciará um servidor web local e abrirá automaticamente seu navegador para exibir a documentação.
+
+### Executando em Segundo Plano
+
+Você também pode executar o servidor de documentação em segundo plano:
+
+```bash
+# Iniciar o servidor em segundo plano
+microdetect docs --background
+
+# Verificar status do servidor
+microdetect docs --status
+
+# Parar o servidor
+microdetect docs --stop
+```
+
+## Instalando Documentação Localmente
+
+Se você preferir ter a documentação instalada em seu diretório de usuário:
+
+```bash
+# Instalar arquivos de documentação em ~/.microdetect/docs
+microdetect install-docs
+
+# Forçar reinstalação se os arquivos já existirem
+microdetect install-docs --force
+```
+
+Isso torna a documentação disponível mesmo quando offline e garante que ela seja acessível através do comando `microdetect docs`.
+
+## Acessando Arquivos de Documentação Diretamente
+
+Os arquivos de documentação estão incluídos no pacote MicroDetect e são instalados nos seguintes locais:
+
+1. Diretório do pacote: `<python_site_packages>/share/microdetect/docs/`
+2. Diretório do usuário (se instalado): `~/.microdetect/docs/`
+
+Você pode acessar os arquivos markdown diretamente nesses locais, se necessário.
+
+## Estrutura da Documentação
+
+A documentação está organizada por idioma e tópico:
+
+```
+docs/
+├── en/                          # Documentação em inglês
+│   ├── index.md                 # Ponto de entrada principal
+│   ├── installation_guide.md    # Instruções de instalação
+│   ├── ...                      # Outros tópicos
+└── pt/                          # Documentação em português
+    ├── index.md                 # Ponto de entrada principal (português)
+    ├── installation_guide.md    # Instruções de instalação (português)
+    └── ...                      # Outros tópicos
+```
+
+## Requisitos da Documentação
+
+O servidor de documentação requer os seguintes pacotes:
+
+- `markdown`: Para converter markdown para HTML
+- `pygments`: Para realce de sintaxe em blocos de código
+
+Estes serão instalados automaticamente se você usar o comando `microdetect docs` e escolher instalar as dependências quando solicitado.
+
 ## Configurar Sistema de Atualização
 
 Após a instalação, configure o sistema de atualização automática:

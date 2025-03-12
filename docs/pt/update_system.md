@@ -125,11 +125,18 @@ O sistema de atualização opera da seguinte forma:
    - Usa pip para listar versões disponíveis
    - Extrai e compara versões usando versionamento semântico
 
-3. **Atualização**:
+3. **Fontes de Configuração**:
+   - Busca credenciais AWS em múltiplos locais nesta ordem:
+     1. Variáveis de ambiente (`AWS_CODEARTIFACT_DOMAIN`, `AWS_CODEARTIFACT_REPOSITORY`, `AWS_CODEARTIFACT_OWNER`)
+     2. Arquivo de configuração em `~/.microdetect/config.ini`
+     3. Arquivo `.env` local (para compatibilidade)
+
+4. **Processo de Atualização**:
    - Configura ambiente pip para usar o repositório AWS CodeArtifact
    - Executa a atualização preservando dependências
+   - Detecta se está executando em um ambiente Conda e ajusta conforme necessário
 
-4. **Cache de Verificação**:
+5. **Cache de Verificação**:
    - Armazena data da última verificação para não sobrecarregar
    - Verifica apenas uma vez por dia (configurável)
 

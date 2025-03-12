@@ -213,11 +213,162 @@ pre-commit run --all-files
       └── test_aws_setup.py
   ```
 
-### Documentation
+# Documentation
 
-- Keep documentation up-to-date with code changes
-- Document new parameters in functions and behavior changes
-- Add usage examples for new features
+## Documentation Packaging and Access
+
+The MicroDetect project now includes a comprehensive documentation system that is properly packaged with the distribution. This section explains how the documentation is structured, packaged, and served.
+
+## Documentation Structure
+
+The documentation is organized in a language-based structure:
+
+```
+docs/
+├── en/                          # English documentation
+│   ├── index.md                 # Main entry point
+│   ├── installation_guide.md    # Installation instructions
+│   ├── ...                      # Other topic files
+└── pt/                          # Portuguese documentation
+    ├── index.md                 # Main entry point (Portuguese)
+    ├── installation_guide.md    # Installation instructions (Portuguese)
+    └── ...                      # Other topic files
+```
+
+## Documentation Packaging
+
+The documentation is included in the MicroDetect package during the build process using two mechanisms:
+
+### 1. MANIFEST.in Configuration
+
+The `MANIFEST.in` file includes the following directives to include documentation files:
+
+```
+recursive-include docs *.md
+recursive-include docs *.html
+recursive-include docs *.css
+recursive-include docs *.js
+recursive-include docs *.png
+recursive-include docs *.jpg
+recursive-include docs *.svg
+```
+
+### 2. setup.py Configuration
+
+The `setup.py` file includes code to collect and organize documentation files:
+
+```python
+# Collect all documentation files
+doc_files = glob.glob('docs/**/*.md', recursive=True)
+doc_files += glob.glob('docs/**/*.html', recursive=True)
+doc_files += glob.glob('docs/**/*.css', recursive=True)
+# ...etc.
+
+# Organize doc files by directory structure
+doc_dirs = {}
+for doc_file in doc_files:
+    rel_dir = os.path.dirname(doc_file)
+    if rel_dir not in doc_dirs:
+        doc_dirs[rel_dir] = []
+    doc_dirs[rel_dir].append(doc_file)
+
+# Create data_files entries for each directory
+doc_data_files = []
+for rel_dir, files in doc_dirs.items():
+    install_dir = os.path.join('share/microdetect', rel_dir)
+    doc_data_files.append((install_dir, files))
+
+# Add to setup
+setup(
+    # ...other setup parameters...
+    data_files=doc_data_files,
+)
+```
+
+This ensures that documentation files are properly installed in the `share/microdetect/docs/` directory of the Python package.
+
+## Documentation Server
+
+The MicroDetect CLI includes a built-in documentation server:
+
+```python
+# In microdetect/utils/docs_server.py
+```
+
+This module provides:
+
+1. A web server that renders Markdown files as HTML
+2. A navigation sidebar with organized documentation links
+3. Language switching between English and Portuguese
+4. Search functionality
+5. The ability to run in background mode
+
+## CLI Commands for Documentation
+
+Two main commands have been implemented for documentation access:
+
+### 1. `microdetect docs`
+
+Starts the documentation server:
+
+```bash
+# Basic usage
+microdetect docs
+
+# Language options
+microdetect docs --lang pt  # Portuguese
+microdetect docs --lang en  # English (default)
+
+# Background mode
+microdetect docs --background
+microdetect docs --status
+microdetect docs --stop
+```
+
+### 2. `microdetect install-docs`
+
+Installs documentation files to the user's home directory:
+
+```bash
+microdetect install-docs [--force]
+```
+
+This copies documentation files to `~/.microdetect/docs/` for offline access.
+
+## Development Workflow for Documentation
+
+When developing or updating documentation:
+
+1. Edit the appropriate Markdown files in the `docs/` directory
+2. Test the documentation locally using `microdetect docs`
+3. Make sure to update both language versions as needed
+4. Documentation changes will be included in the next package build
+
+## Best Practices for Documentation
+
+1. Keep documentation in sync across languages
+2. Use relative links between documentation files for navigation
+3. Prefix internal documentation links with language information
+4. Use a consistent structure across language versions
+5. Include code examples and screenshots when appropriate
+6. Remember to update documentation when making significant code changes
+
+## Testing Documentation Packaging
+
+To test that documentation is correctly packaged:
+
+```bash
+# Build the package
+python setup.py sdist bdist_wheel
+
+# Install the package in a test environment
+pip install --force-reinstall dist/microdetect-*.whl
+
+# Start the documentation server to verify installation
+microdetect docs
+```
+
+This will verify that documentation files are properly included in the build and can be accessed through the documentation server.
 
 ## Development Workflow
 

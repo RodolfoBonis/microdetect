@@ -125,11 +125,18 @@ The update system operates as follows:
    - Uses pip to list available versions
    - Extracts and compares versions using semantic versioning
 
-3. **Update**:
+3. **Configuration Sources**:
+   - Looks for AWS credentials in multiple locations in this order:
+     1. Environment variables (`AWS_CODEARTIFACT_DOMAIN`, `AWS_CODEARTIFACT_REPOSITORY`, `AWS_CODEARTIFACT_OWNER`)
+     2. Configuration file at `~/.microdetect/config.ini`
+     3. Local `.env` file (for compatibility)
+
+4. **Update Process**:
    - Sets up pip environment to use AWS CodeArtifact repository
    - Runs the update preserving dependencies
+   - Detects if running in a Conda environment and adjusts accordingly
 
-4. **Check Caching**:
+5. **Check Caching**:
    - Stores the last check date to avoid overloading
    - Checks only once per day (configurable)
 

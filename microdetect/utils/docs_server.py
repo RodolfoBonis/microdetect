@@ -124,7 +124,7 @@ def find_docs_dir() -> Path:
             search_paths.append(share_dir)
 
         # Diretório específico para instalações Conda
-        if 'conda' in sys.prefix.lower() or 'miniconda' in sys.prefix.lower():
+        if "conda" in sys.prefix.lower() or "miniconda" in sys.prefix.lower():
             conda_share_dir = Path(sys.prefix) / "share/microdetect/docs"
             search_paths.append(conda_share_dir)
 
@@ -140,12 +140,13 @@ def find_docs_dir() -> Path:
     for path in search_paths:
         if path.exists() and path.is_dir():
             # Verificar se pelo menos um arquivo .md existe no caminho ou seus subdiretórios
-            md_files = list(path.glob('**/*.md'))
+            md_files = list(path.glob("**/*.md"))
             if md_files:
                 return path
 
     # Se nenhum diretório existente foi encontrado, criar um temporário
     import tempfile
+
     temp_dir = Path(tempfile.mkdtemp(prefix="microdetect_docs_"))
     temp_docs = temp_dir / "docs"
     temp_docs.mkdir(exist_ok=True)
