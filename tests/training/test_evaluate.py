@@ -1,10 +1,11 @@
 # tests/training/test_evaluate.py
+import json
 import os
 import tempfile
-import json
-import pytest
 from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 from microdetect.training.evaluate import ModelEvaluator
 

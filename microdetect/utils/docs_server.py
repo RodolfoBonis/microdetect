@@ -665,6 +665,23 @@ def create_html_page(
         margin-bottom: 20px;
     }
     
+    .logo-container {
+        text-align: center;
+        display: flex;
+        justify-content: center;
+    }
+    
+    .logo-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    
+    .sidebar-title {
+        margin-top: 4px;
+    }
+    
     .sidebar-title a {
         color: var(--heading-color);
         text-decoration: none;
@@ -983,6 +1000,11 @@ def create_html_page(
     sidebar_html.append('<div id="sidebar">')
     sidebar_html.append('  <div class="sidebar-header">')
 
+    # Adicionar a logo
+    sidebar_html.append('    <div class="logo-container">')
+    sidebar_html.append(f'      <img src="/assets/images/logo.png" alt="MicroDetect Logo" class="logo-image">')
+    sidebar_html.append("    </div>")
+
     # Título baseado no idioma
     if current_language == "pt":
         sidebar_title = "Documentação MicroDetect"
@@ -1058,6 +1080,10 @@ class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Analisar URL
         url_parts = urlparse(self.path)
         query_params = parse_qs(url_parts.query)
+
+        if url_parts.path.startswith("/assets/"):
+            self.serve_static_file(url_parts.path)
+            return
 
         # Determinar idioma
         lang = query_params.get("lang", [self.current_language])[0]
@@ -1139,6 +1165,40 @@ class DocsRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             page_html = create_html_page(error_html, self.docs_by_category, current_language=lang)
             self.wfile.write(page_html.encode())
+
+    def serve_static_file(self, path):
+        """Serve arquivos estáticos como imagens e outros recursos."""
+        file_path = os.path.join(self.docs_dir, path[1:])
+
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            self.send_error(404, "File not found")
+            return
+
+        # Determinar o tipo MIME com base na extensão
+        _, ext = os.path.splitext(file_path)
+        mime_types = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".svg": "image/svg+xml",
+            ".css": "text/css",
+            ".js": "application/javascript",
+        }
+
+        content_type = mime_types.get(ext.lower(), "application/octet-stream")
+
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+
+            self.send_response(200)
+            self.send_header("Content-type", content_type)
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            self.send_error(500, f"Internal error: {str(e)}")
 
 
 def _check_dependencies():
