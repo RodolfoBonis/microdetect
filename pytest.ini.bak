@@ -1,0 +1,52 @@
+[pytest]
+# Test discovery locations
+testpaths = tests
+
+# Test file patterns
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+
+# Default command line options
+addopts =
+    --cov=microdetect
+    --cov-report=term-missing
+    --cov-report=html
+
+# Markers for test categorization
+markers =
+    slow: marks tests as slow (deselect with '-m "not slow"')
+    integration: marks tests that require external resources
+    unit: marks unit tests
+    functional: marks functional tests
+    requires_gpu: marks tests that require a GPU
+    requires_aws: marks tests that require AWS credentials
+
+# Test log settings
+log_cli = False
+log_cli_level = INFO
+log_cli_format = %(asctime)s [%(levelname)s] %(message)s (%(filename)s:%(lineno)s)
+log_cli_date_format = %Y-%m-%d %H:%M:%S
+
+# Configure which warnings to report
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+    ignore::ImportWarning
+    ignore::ResourceWarning
+    error::UserWarning
+
+# Environment variables for tests
+env =
+    MICRODETECT_SKIP_UPDATE_CHECK=1
+    PYTHONPATH=.
+
+# Test directories to exclude
+norecursedirs =
+    .git
+    .tox
+    .venv
+    __pycache__
+    dist
+    build
+    *.egg-info

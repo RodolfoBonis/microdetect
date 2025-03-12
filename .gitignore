@@ -106,3 +106,5 @@ Icon?
 # Conda environment
 .conda/
 conda-meta/
+
+!tests/data/test_augmentation.py

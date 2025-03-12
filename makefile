@@ -140,6 +140,97 @@ update-deps:
 	@echo "Atualizando dependências..."
 	./scripts/setup.sh --update
 
+# Comandos para testes
+
+# Preparar ambiente para testes
+test-setup:
+	@echo "Preparando ambiente para testes..."
+	pip install pytest pytest-cov pytest-timeout mock --extra-index-url https://pypi.org/simple
+	mkdir -p tests/fixtures/images tests/fixtures/labels
+	@echo "Ambiente de testes preparado!"
+
+# Comandos para testes
+
+# Preparar ambiente para testes
+test-setup:
+	@echo "Preparando ambiente para testes..."
+	pip install pytest pytest-cov pytest-timeout mock
+	mkdir -p tests/fixtures/images tests/fixtures/labels
+	@echo "Ambiente de testes preparado!"
+
+# Executar todos os testes sem cobertura
+test:
+	@echo "Executando todos os testes (sem cobertura)..."
+	python -m pytest -p no:cov -v tests
+
+# Executar testes com relatório de cobertura HTML
+test-cov:
+	@echo "Executando testes com cobertura HTML..."
+	python -m pytest -p no:cov --cov=microdetect --cov-report=html tests
+	@echo "Relatório de cobertura gerado em htmlcov/index.html"
+
+# Executar testes com cobertura terminal
+test-term:
+	@echo "Executando testes com cobertura no terminal..."
+	python -m pytest -p no:cov --cov=microdetect --cov-report=term tests
+
+# Executar testes com cobertura XML (para CI)
+test-xml:
+	@echo "Executando testes com cobertura XML..."
+	python -m pytest -p no:cov --cov=microdetect --cov-report=xml tests
+	@echo "Relatório XML gerado em coverage.xml"
+
+# Executar um teste específico
+test-file:
+	@echo "Executando teste específico: $(FILE)"
+	python -m pytest -p no:cov -v $(FILE)
+
+# Executar testes com verbosidade
+test-verbose:
+	@echo "Executando testes com saída detalhada..."
+	python -m pytest -p no:cov -vv --no-header --no-summary -s tests
+
+# Executar verificação de estilo e linting
+test-lint:
+	@echo "Verificando estilo de código..."
+	flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+	black --check microdetect tests
+	isort --check-only --profile black microdetect tests
+
+# Limpar arquivos temporários de testes
+test-clean:
+	@echo "Limpando arquivos temporários de testes..."
+	rm -rf .pytest_cache htmlcov .coverage coverage.xml
+
+# Executar testes e gerar relatório de falhas em caso de erro
+test-report:
+	@echo "Executando testes com relatório detalhado de falhas..."
+	python -m pytest -p no:cov -v --showlocals tests || (echo "⚠️ TESTES FALHARAM - Veja o relatório acima para detalhes")
+
+# Ver pacotes instalados relacionados a testes
+test-info:
+	@echo "Pacotes pytest instalados:"
+	@pip list | grep pytest
+	@echo "\nConfigurações em pytest.ini:"
+	@if [ -f pytest.ini ]; then cat pytest.ini; else echo "Arquivo pytest.ini não encontrado"; fi
+
+# Executar todos os testes com PYTHONPATH definido e sem configurações do ini
+test-clean-run:
+	@echo "Executando testes em ambiente limpo..."
+	PYTHONPATH=. python -m pytest -p no:cov -v tests
+
+# Teste mais simples possível
+test-simple:
+	@echo "Executando teste simples..."
+	pytest tests
+
+# Renomear temporariamente pytest.ini e executar testes
+test-without-ini:
+	@echo "Executando testes sem o arquivo pytest.ini..."
+	@if [ -f pytest.ini ]; then mv pytest.ini pytest.ini.bak; fi
+	pytest --cov=microdetect --cov-report=term tests
+	@if [ -f pytest.ini.bak ]; then mv pytest.ini.bak pytest.ini; fi
+
 # Comando de ajuda
 help:
 	@echo "MicroDetect - Detecção de Microorganismos"
@@ -166,6 +257,18 @@ help:
 	@echo "  make clean          - Limpar dados augmentados"
 	@echo "  make clean-all      - Limpar todos os dados gerados"
 	@echo "  make update-deps    - Atualizar dependências"
+	@echo "  make test-setup     - Preparar ambiente para testes"
+	@echo "  make test           - Executar todos os testes"
+	@echo "  make test-cov       - Executar testes com relatório de cobertura"
+	@echo "  make test-file      - Executar teste específico (ex: make test-file FILE=tests/test_example.py)"
+	@echo "  make test-verbose   - Executar testes com saída detalhada"
+	@echo "  make test-lint      - Verificar estilo de código"
+	@echo "  make test-clean     - Limpar arquivos temporários de testes"
+	@echo "  make test-report    - Executar testes com relatório detalhado de falhas"
+	@echo "  make test-info      - Mostrar configuração de testes atual"
+	@echo "  make test-clean-run - Executar testes em ambiente limpo"
+	@echo "  make test-simple    - Executar teste simples"
+	@echo "  make test-without-ini - Executar testes sem pytest.ini"
 	@echo ""
 	@echo "Configuração (sobrescreva com make VAR=valor):"
 	@echo "  SOURCE_IMG_DIR = $(SOURCE_IMG_DIR)"
@@ -178,4 +281,4 @@ help:
 	@echo "  REPOSITORY = $(REPOSITORY) (para AWS CodeArtifact)"
 	@echo "  REGION = $(REGION) (região AWS)"
 
-.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate setup-aws check-update update pipeline clean clean-all update-deps help docs
+.PHONY: all setup install setup-win install-win create-dirs convert-tiff annotate visualize prepare-data augment train train-hyperparams evaluate setup-aws check-update update pipeline clean clean-all update-deps help docs test-setup test test-cov test-file test-verbose test-lint test-clean test-report test-info test-clean-run test-simple test-without-ini

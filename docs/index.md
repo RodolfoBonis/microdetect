@@ -1,78 +1,161 @@
-# Documentação do MicroDetect
+# MicroDetect Documentation
 
-Bem-vindo ao portal de documentação do MicroDetect. Este site fornece informações abrangentes sobre instalação, uso e desenvolvimento do pacote MicroDetect.
+Welcome to the MicroDetect documentation portal. Here you'll find comprehensive guides and information to help you get the most out of MicroDetect.
 
-## O que é o MicroDetect?
+## What is MicroDetect?
 
-MicroDetect é uma ferramenta completa para detecção e classificação de microorganismos em imagens de microscopia utilizando YOLOv8. Este projeto fornece uma pipeline completa desde a conversão de imagens, anotação manual com sistema de retomada, augmentação de dados, treinamento com checkpoints até avaliação de modelos.
+**MicroDetect** is a specialized toolkit for detecting and classifying microorganisms in microscopy images using the YOLOv8 object detection framework. It provides a complete workflow from image preparation to model evaluation, designed specifically for microscopy applications in microbiology, biotechnology, and related fields.
 
-## Começando
+## Key Features
 
-Se você é novo no MicroDetect, recomendamos começar com os seguintes guias:
+<div class="feature-grid">
+  <div class="feature-card">
+    <h3>🔍 Image Conversion</h3>
+    <p>Convert TIFF microscopy images to formats optimized for deep learning, with support for 16-bit to 8-bit normalization.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>🏷️ Smart Annotation</h3>
+    <p>User-friendly graphical interface for annotating microorganisms with resumable sessions and progress tracking.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>👁️ Visualization</h3>
+    <p>Tools to review and validate annotations with class filtering and batch processing capabilities.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>🔄 Data Augmentation</h3>
+    <p>Enhance your datasets with techniques like brightness adjustment, rotation, flipping, and noise addition.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>📊 Dataset Management</h3>
+    <p>Organize your data into train/validation/test splits with proper YOLO format configuration.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>🧠 Model Training</h3>
+    <p>Train YOLOv8 models with checkpoint support, early stopping, and hyperparameter optimization.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>📈 Evaluation</h3>
+    <p>Comprehensive evaluation metrics, confusion matrices, and visual reports for model assessment.</p>
+  </div>
+  
+  <div class="feature-card">
+    <h3>🔄 Automatic Updates</h3>
+    <p>Keep your toolkit up-to-date with seamless updates via AWS CodeArtifact integration.</p>
+  </div>
+</div>
 
-- [Guia de Instalação](installation_guide.md/?file=installation_guide.md) - Instruções para instalar o MicroDetect
-- [Tutorial de Início Rápido](troubleshooting.md/?file=troubleshooting.md) - Comece a usar o MicroDetect rapidamente
+## Getting Started
 
-## Principais Recursos
+If you're new to MicroDetect, we recommend starting with these guides:
 
-- **Conversão de Imagens**: Converte imagens TIFF para formatos adequados ao processamento
-- **Anotação Manual**: Interface gráfica para marcação de microorganismos com capacidade de retomada
-- **Visualização**: Visualiza anotações existentes em imagens
-- **Augmentação de Dados**: Melhora seu conjunto de dados com técnicas de augmentação
-- **Preparação de Dataset**: Divide e organiza dados para treinamento/validação/teste
-- **Treinamento de Modelos**: Treina modelos YOLOv8 personalizados com sistema de checkpoints
-- **Avaliação**: Avalia modelos com métricas detalhadas e relatórios visuais
-- **Atualizações Automáticas**: Verifica e instala atualizações a partir do AWS CodeArtifact
+- [Installation Guide](installation_guide.md) - Comprehensive installation instructions for different environments
+- [Quick Start Tutorial](troubleshooting.md) - Begin using MicroDetect with a simple example workflow
+- [Common Issues & Solutions](troubleshooting.md) - Solve common problems you might encounter
 
-## Estrutura da Documentação
+## Documentation Structure
 
-A documentação está organizada nas seguintes seções:
+### Core Workflow Sections
 
-### Começando
-Informações básicas para começar com o MicroDetect, incluindo instalação e solução de problemas.
+1. **Image Preparation**
+   - Converting microscopy images to suitable formats
+   - Preprocessing techniques for better detection
 
-### Atualizações
-Informações sobre o sistema de atualização, configuração do AWS CodeArtifact e modelo de releases.
+2. **Annotation**
+   - Manual annotation with the graphical interface
+   - Visualization and validation of annotations
 
-### Configuração
-Opções avançadas de configuração para personalizar o comportamento do MicroDetect.
+3. **Dataset Management**
+   - Creating train/validation/test splits
+   - Data augmentation for improved model performance
 
-### Desenvolvimento
-Guias para desenvolvedores que desejam contribuir com o projeto MicroDetect.
+4. **Training**
+   - Training YOLOv8 models with different configurations
+   - Resuming training from checkpoints
+   - Hyperparameter optimization
 
-## Interface de Linha de Comando
+5. **Evaluation**
+   - Assessing model performance with metrics
+   - Generating reports and visualizations
 
-O MicroDetect fornece uma interface de linha de comando abrangente. Aqui estão alguns comandos comuns:
+### Configuration & Customization
+
+- [Advanced Configuration](advanced_configuration.md) - Detailed options to customize MicroDetect
+- [AWS Integration](aws_codeartifact_setup.md) - Setting up AWS CodeArtifact for updates
+
+### Development & Contributing
+
+- [Development Guide](development_guide.md) - Information for developers who want to contribute
+- [Release & Update Model](update_and_release_model.md) - Understanding version management
+
+## Command Line Interface
+
+MicroDetect provides a comprehensive command-line interface:
 
 ```bash
-# Inicializar um novo projeto
+# Get help on available commands
+microdetect --help
+
+# Get help on a specific command
+microdetect annotate --help
+```
+
+### Core Commands
+
+```bash
+# Initialize a new project
 microdetect init
 
-# Converter imagens TIFF para PNG
-microdetect convert --input_dir data/raw_images --output_dir data/images
+# Convert images
+microdetect convert --input_dir [input] --output_dir [output]
 
-# Anotar imagens
-microdetect annotate --image_dir data/images --output_dir data/labels
+# Annotate images
+microdetect annotate --image_dir [images] --output_dir [labels]
 
-# Preparar dataset
-microdetect dataset --source_img_dir data/images --source_label_dir data/labels
+# Visualize annotations
+microdetect visualize --image_dir [images] --label_dir [labels]
 
-# Treinar modelo
-microdetect train --dataset_dir dataset --model_size s --epochs 100
+# Prepare dataset
+microdetect dataset --source_img_dir [images] --source_label_dir [labels]
 
-# Verificar atualizações
+# Augment data
+microdetect augment --image_dir [images] --label_dir [labels] --factor [number]
+
+# Train model
+microdetect train --dataset_dir [dataset] --model_size [s/m/l/x]
+
+# Evaluate model
+microdetect evaluate --model_path [model.pt] --dataset_dir [dataset]
+
+# Check for updates
 microdetect update --check-only
 
-# Mostrar esta documentação
+# View this documentation
 microdetect docs
 ```
 
-Para informações mais detalhadas sobre cada comando, consulte as respectivas páginas de documentação ou use a flag `--help` com qualquer comando.
+## System Requirements
 
-## Suporte
+- **Python:** 3.9 or newer
+- **RAM:** 4GB minimum (8GB+ recommended for training)
+- **GPU:** Optional but recommended for training (CUDA or Apple Silicon MPS supported)
+- **Storage:** 2GB minimum for installation and basic use
 
-Se você encontrar algum problema ou tiver dúvidas não abordadas na documentação, por favor:
+## Support
 
-1. Consulte o guia de [Solução de Problemas](troubleshooting.md/?file=troubleshooting.md)
-2. Abra uma issue no [GitHub](https://github.com/RodolfoBonis/microdetect/issues)
-3. Entre em contato conosco pelo e-mail dev@rodolfodebonis.com.br
+If you encounter issues or have questions not covered in this documentation:
+
+1. Check the [Troubleshooting Guide](troubleshooting.md)
+2. Search or open an issue on [GitHub](https://github.com/RodolfoBonis/microdetect/issues)
+3. Contact the development team at dev@rodolfodebonis.com.br
+
+---
+
+<div class="footer-note">
+  <p>MicroDetect is an open-source project developed to assist researchers and professionals in the field of microbiology and microscopy.</p>
+</div>

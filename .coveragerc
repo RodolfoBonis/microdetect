@@ -1,0 +1,54 @@
+[run]
+source = microdetect
+omit =
+    microdetect/__init__.py
+    microdetect/utils/colors.py
+    microdetect/utils/docs_server.py
+    */__pycache__/*
+    */test_*
+    */.pytest_cache/*
+    */.coverage
+    */venv/*
+    */.venv/*
+    */.env/*
+    */.git/*
+    */site-packages/*
+
+[report]
+exclude_lines =
+    # Skip any pragma comments
+    pragma: no cover
+
+    # Skip defensive assertion code
+    raise NotImplementedError
+
+    # Skip abstract methods
+    @abstractmethod
+
+    # Skip pass sections
+    pass
+
+    # Skip code that's only for specific Python versions
+    if sys.version_info
+
+    # Skip logger debug messages
+    logger\.debug
+
+    # Skip unit test code
+    def test_
+
+    # Skip __repr__ methods
+    def __repr__
+
+    # Skip exception handling that should never be executed
+    except ImportError:
+
+    # Skip main block
+    if __name__ == .__main__.:
+
+[html]
+directory = htmlcov
+title = MicroDetect Test Coverage Report
+
+[xml]
+output = coverage.xml

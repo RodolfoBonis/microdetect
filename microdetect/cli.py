@@ -17,11 +17,7 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import (
-    AWSSetupManager,
-    ColoredHelpFormatter,
-    ColoredVersionAction,
-)
+from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 
 # Configuração de logging
