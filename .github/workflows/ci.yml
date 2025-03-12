@@ -306,7 +306,7 @@ jobs:
       - name: Set job status
         id: status
         run: |
-          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.test.result }}" == "success" && "${{ needs.build.result }}" == "success" && "${{ needs.security.result }}" == "success" ]]; then
+          if [[ "${{ needs.lint.result }}" == "success" && "${{ needs.test.result }}" == "success" && "${{ needs.build.result }}" == "success" && "${{ needs.security.result }}" == "success" && "${{ needs.sonar_scan.result }}" == "success" ]]; then
             echo "status=success" >> $GITHUB_OUTPUT
           else
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -392,6 +392,7 @@ jobs:
             • Lint: ${{ needs.lint.result }}
             • Test: ${{ needs.test.result }}
             • Build: ${{ needs.build.result }}
+            • Sonar: ${{ needs.sonar_scan.result }}
             • Security: ${{ needs.security.result }}
             
             ⚠️ [View Error Logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
