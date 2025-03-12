@@ -169,6 +169,67 @@ def setup_docs_parser(subparsers):
     group.add_argument("--status", action="store_true", help="Verificar status do servidor em background")
 
 
+def setup_install_docs_parser(subparsers):
+    """Configurar o parser para o comando install-docs."""
+    parser = subparsers.add_parser("install-docs", help="Instala ou atualiza a documentação local")
+    parser.add_argument("--force", action="store_true", help="Força a reinstalação mesmo se a documentação já existir")
+    parser.add_argument("--no-interactive", dest="interactive", action="store_false", help="Modo não interativo")
+    return parser
+
+
+def handle_install_docs(args):
+    """
+    Manipula o comando de instalação de documentação.
+    Copia os arquivos da documentação para a pasta do usuário (.microdetect/docs).
+    """
+    import shutil
+    import sys
+    from pathlib import Path
+
+    # Diretório home do usuário
+    user_docs_dir = Path.home() / ".microdetect" / "docs"
+
+    # Criar os diretórios se não existirem
+    user_docs_dir.parent.mkdir(exist_ok=True)
+
+    # Se o diretório de documentação já existir, perguntar se deseja sobrescrever
+    if user_docs_dir.exists() and not args.force:
+        if args.interactive:
+            print(f"O diretório de documentação já existe em {user_docs_dir}.")
+            response = input("Deseja sobrescrever? [s/N]: ").strip().lower()
+            if response != "s" and response != "sim":
+                print("Instalação de documentação cancelada.")
+                return
+        else:
+            print(f"O diretório de documentação já existe em {user_docs_dir}. Use --force para sobrescrever.")
+            return
+
+    # Tentar encontrar os arquivos de documentação
+    from microdetect.utils.docs_server import find_docs_dir
+
+    source_docs_dir = find_docs_dir()
+
+    # Verificar se a fonte é um diretório temporário (o que significa que não encontrou docs)
+    if "microdetect_docs_" in str(source_docs_dir) and "temp" in str(source_docs_dir).lower():
+        print("Não foi possível encontrar a documentação original.")
+        print("Verifique se o pacote foi instalado corretamente com os arquivos de documentação.")
+        return
+
+    try:
+        # Remover diretório existente se necessário
+        if user_docs_dir.exists():
+            shutil.rmtree(user_docs_dir)
+
+        # Copiar os arquivos de documentação
+        shutil.copytree(source_docs_dir, user_docs_dir)
+
+        print(f"Documentação instalada com sucesso em {user_docs_dir}")
+        print("Use 'microdetect docs' para visualizar a documentação.")
+    except Exception as e:
+        print(f"Erro ao instalar a documentação: {str(e)}")
+        return
+
+
 def handle_docs(args):
     """Manipular comando de documentação."""
     try:
@@ -601,6 +662,7 @@ def main(args: Optional[List[str]] = None):
     setup_update_parser(subparsers)
     setup_aws_parser(subparsers)
     setup_docs_parser(subparsers)
+    setup_install_docs_parser(subparsers)
 
     # Adicionar versão e ajuda
     parser.add_argument(
@@ -643,6 +705,8 @@ def main(args: Optional[List[str]] = None):
             handle_setup_aws(parsed_args)
         elif parsed_args.command == "docs":
             handle_docs(parsed_args)
+        elif parsed_args.command == "install-docs":
+            handle_install_docs(parsed_args)
         else:
             parser.print_help()
             return
