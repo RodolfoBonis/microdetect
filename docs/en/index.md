@@ -55,8 +55,7 @@ Welcome to the MicroDetect documentation portal. Here you'll find comprehensive 
 If you're new to MicroDetect, we recommend starting with these guides:
 
 - [Installation Guide](installation_guide.md) - Comprehensive installation instructions for different environments
-- [Quick Start Tutorial](troubleshooting.md) - Begin using MicroDetect with a simple example workflow
-- [Common Issues & Solutions](troubleshooting.md) - Solve common problems you might encounter
+- [Troubleshooting](troubleshooting.md) - Solve common problems you might encounter
 
 ## Documentation Structure
 

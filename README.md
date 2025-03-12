@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/RodolfoBonis/microdetect)
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](docs/index.md)
+[![Documentation](https://img.shields.io/badge/docs-available-brightgreen.svg)](docs/en/index.md)
 
 *Read in [Português](README.pt.md)*
 
@@ -83,9 +83,9 @@ microdetect evaluate --model_path runs/train/yolov8_s_custom/weights/best.pt --d
 
 For detailed information, see our documentation:
 
-- [Installation Guide](docs/installation_guide.md) - Detailed installation instructions
+- [Installation Guide](docs/pt/installation_guide.md) - Detailed installation instructions
 - [Troubleshooting](docs/troubleshooting.md) - Solutions to common problems
-- [Advanced Configuration](docs/advanced_configuration.md) - Customize MicroDetect for your needs
+- [Advanced Configuration](docs/en/advanced_configuration.md) - Customize MicroDetect for your needs
 - [Development Guide](docs/development_guide.md) - Contribute to MicroDetect
 
 Browse all documentation with the built-in docs server:
