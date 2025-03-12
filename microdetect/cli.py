@@ -613,8 +613,10 @@ def main(args: Optional[List[str]] = None):
     if parsed_args.command not in ["update", "setup-aws"]:
         from microdetect.utils.updater import UpdateManager
 
+        # Verificar se há atualizações disponíveis
         update_result = UpdateManager.check_for_updates_before_command()
 
+        # Se uma atualização foi instalada, podemos encerrar
         if update_result:
             return
 

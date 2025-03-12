@@ -73,7 +73,7 @@ class UpdateManager:
                 "codeartifact",
                 "get-authorization-token",
                 "--domain",
-                os.environ.get("AWS_CODEARTIFACT_DOMAIN", "seu-dominio"),
+                domain,
                 "--query",
                 "authorizationToken",
                 "--output",
@@ -233,11 +233,14 @@ class UpdateManager:
             return True
 
         # Perguntar se o usuário deseja atualizar
+        do_update = True
         if not force:
             print(
                 f"{BRIGHT}{INFO}Nova versão disponível: {SUCCESS}{latest_version} {INFO}(atual: {WARNING}{current_version}{INFO}){RESET}"
             )
-            response = input(f"{INFO}Deseja atualizar? {BRIGHT}[s/N]: {RESET}").strip().lower()
+            # Use sys.stdin diretamente para evitar problemas em ambientes não interativos
+            print(f"{INFO}Deseja atualizar? {BRIGHT}[s/N]: {RESET}", end="", flush=True)
+            response = sys.stdin.readline().strip().lower()
             if response != "s" and response != "sim":
                 print(f"{WARNING}Atualização cancelada pelo usuário{RESET}")
                 return False
@@ -248,13 +251,26 @@ class UpdateManager:
             print(f"{ERROR}Falha ao obter token do AWS CodeArtifact{RESET}")
             return False
 
+        # Detectar ambiente conda
+        in_conda = os.environ.get("CONDA_PREFIX") is not None
+
         # Instalar versão mais recente
         print(f"{INFO}Atualizando MicroDetect para versão {SUCCESS}{latest_version}{INFO}...{RESET}")
 
-        cmd = [
-            sys.executable,
-            "-m",
-            "pip",
+        # Determinar comando pip correto para o ambiente
+        if in_conda:
+            print(f"{INFO}Detectado ambiente Conda. Usando pip específico do ambiente...{RESET}")
+            pip_cmd = [os.path.join(os.environ.get("CONDA_PREFIX"), "bin", "pip")]
+            if not os.path.exists(pip_cmd[0]):
+                # Windows
+                pip_cmd = [os.path.join(os.environ.get("CONDA_PREFIX"), "Scripts", "pip.exe")]
+                if not os.path.exists(pip_cmd[0]):
+                    # Fallback para pip normal
+                    pip_cmd = ["pip"]
+        else:
+            pip_cmd = [sys.executable, "-m", "pip"]
+
+        cmd = pip_cmd + [
             "install",
             "--upgrade",
             "microdetect",
@@ -272,20 +288,42 @@ class UpdateManager:
         env["TWINE_PASSWORD"] = token
 
         try:
-            process = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            # Usar um formato não interativo para evitar travamentos
+            process = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=1,  # Line buffered
+            )
 
             # Mostrar progresso em tempo real
-            for line in process.stdout:
-                print(line, end="")
+            while True:
+                output = process.stdout.readline()
+                if output == "" and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip())
 
-            process.wait()
+            # Coletar stderr se necessário
+            stderr = process.stderr.read()
 
-            if process.returncode == 0:
+            rc = process.poll()
+            if rc == 0:
                 print(f"{SUCCESS}{BRIGHT}MicroDetect atualizado com sucesso para versão {latest_version}{RESET}")
+
+                # Recomendação para ambientes conda
+                if in_conda:
+                    print(
+                        f"{INFO}Nota: Para ambientes Conda, pode ser necessário reiniciar seu terminal ou shell para ver a nova versão.{RESET}"
+                    )
+
                 return True
             else:
-                stderr = process.stderr.read()
-                print(f"{ERROR}Erro ao atualizar MicroDetect: {stderr}{RESET}")
+                print(f"{ERROR}Erro ao atualizar MicroDetect. Código de saída: {rc}{RESET}")
+                if stderr:
+                    print(f"{ERROR}Detalhes: {stderr}{RESET}")
                 return False
         except Exception as e:
             print(f"{ERROR}Erro durante a atualização: {str(e)}{RESET}")
@@ -318,6 +356,9 @@ class UpdateManager:
         """
         Verificar se há atualizações disponíveis e notificar o usuário.
         Esta função deve ser chamada antes da execução de qualquer comando.
+
+        Returns:
+            True se uma atualização foi realizada, False caso contrário
         """
         # Verificar se deve pular esta verificação (variável de ambiente)
         if os.environ.get("MICRODETECT_SKIP_UPDATE_CHECK") == "1":
@@ -350,12 +391,13 @@ class UpdateManager:
                     json.dump({"last_check_time": current_time}, f)
 
                 update_info = UpdateManager.check_for_updates()
-                if update_info.get("needs_update", False):
+                if "error" not in update_info and update_info.get("needs_update", False):
                     print(
                         f"\n{INFO}🔄 {BRIGHT}Nova versão do MicroDetect disponível: {SUCCESS}{update_info['latest']} "
                         f"{INFO}(atual: {WARNING}{update_info['current']}{INFO}){RESET}"
                     )
-                    return UpdateManager.update_package()
+                    print(f"{INFO}Para atualizar, execute: {BRIGHT}microdetect update{RESET}")
+                    return False  # Não atualiza automaticamente, apenas notifica
             except Exception as e:
                 logger.debug(f"Erro ao verificar atualizações: {str(e)}")
                 return False

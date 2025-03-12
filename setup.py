@@ -5,6 +5,7 @@ Configuração de instalação para o pacote MicroDetect.
 from setuptools import setup, find_packages
 import os
 import re
+import glob
 
 
 def get_version():
@@ -22,6 +23,10 @@ def read_requirements():
     with open('requirements.txt', 'r') as f:
         return [line.strip() for line in f if line.strip() and not line.startswith('#')]
 
+
+# Collect all documentation files
+doc_files = glob.glob('docs/*.md')
+doc_data_files = [('share/microdetect/docs', doc_files)]
 
 setup(
     name="microdetect",
@@ -54,7 +59,7 @@ setup(
     include_package_data=True,
     package_data={
         'microdetect': ['default_config.yaml'],
-        '': ['docs/*.md']
     },
+    data_files=doc_data_files,
     zip_safe=False,
 )
