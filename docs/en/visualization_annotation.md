@@ -15,6 +15,7 @@ This guide explains how to use MicroDetect's tools for annotating microorganism 
   - [Batch Visualization](#batch-visualization)
   - [Filtering by Class](#filtering-by-class)
   - [Customizing Visual Output](#customizing-visual-output)
+  - [Keyboard Shortcuts](#visualization-keyboard-shortcuts)
 - [Managing Annotation Data](#managing-annotation-data)
   - [YOLO Format](#yolo-format)
   - [Converting to Other Formats](#converting-to-other-formats)
@@ -32,6 +33,10 @@ MicroDetect provides specialized tools for annotating microorganisms in microsco
 1. Creating training datasets for machine learning models
 2. Validating detection results
 3. Analyzing the distribution of microorganisms
+
+The workflow typically involves two separate steps:
+- **Annotation**: Creating and editing bounding boxes around microorganisms
+- **Visualization**: Reviewing and examining the annotations
 
 ## Annotation Tool
 
@@ -145,6 +150,20 @@ color_map:
   "1": [0, 0, 255]                # RGB color for class 1
   "2": [255, 0, 0]                # RGB color for class 2
 ```
+
+### Visualization Keyboard Shortcuts
+
+The visualization tool supports the following keyboard shortcuts:
+
+| Key | Function |
+|-----|----------|
+| A | Previous image |
+| D | Next image |
+| P | Toggle pan mode |
+| R | Reset zoom and pan |
+| 0-9 | Toggle visibility of class |
+| S | Save current image |
+| Q | Quit visualization tool |
 
 ## Managing Annotation Data
 

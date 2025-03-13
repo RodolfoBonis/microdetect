@@ -7,7 +7,7 @@ import logging
 import os
 import sys
 from getpass import getpass
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple
 
 from microdetect import __version__
 from microdetect.annotation.annotator import ImageAnnotator
@@ -17,7 +17,13 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
+from microdetect.utils import (
+    AWSSetupManager,
+    ColoredHelpFormatter,
+    ColoredVersionAction,
+    convert_annotation,
+    get_logo_with_name_ascii,
+)
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
 
@@ -53,6 +59,12 @@ def setup_annotate_parser(subparsers):
     parser = subparsers.add_parser("annotate", help="Anotar imagens manualmente")
     parser.add_argument("--image_dir", required=True, help="Diretório com imagens para anotação")
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
+    parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
+    parser.add_argument("--auto_save", action="store_true", default=True, help="Ativar salvamento automático (padrão: True)")
+    parser.add_argument(
+        "--auto_save_interval", type=int, default=300, help="Intervalo em segundos entre salvamentos automáticos (padrão: 300)"
+    )
+    parser.add_argument("--resume", action="store_true", help="Retomar a partir da última imagem anotada")
 
 
 def setup_visualize_parser(subparsers):
@@ -68,6 +80,7 @@ def setup_visualize_parser(subparsers):
         "--filter_classes",
         help='Lista separada por vírgulas de IDs de classe para exibir (ex: "0,1")',
     )
+    parser.add_argument("--batch", action="store_true", help="Processar em lote sem interface interativa")
 
 
 def setup_augment_parser(subparsers):
@@ -175,6 +188,31 @@ def setup_install_docs_parser(subparsers):
     parser.add_argument("--force", action="store_true", help="Força a reinstalação mesmo se a documentação já existir")
     parser.add_argument("--no-interactive", dest="interactive", action="store_false", help="Modo não interativo")
     return parser
+
+
+def setup_format_convert_parser(subparsers):
+    """Configurar parser para comando de conversão entre formatos de anotação."""
+    parser = subparsers.add_parser("format-convert", help="Converter entre formatos de anotação")
+    parser.add_argument("--input_dir", required=True, help="Diretório contendo os arquivos de anotação a serem convertidos")
+    parser.add_argument("--image_dir", required=True, help="Diretório contendo as imagens correspondentes")
+    parser.add_argument("--output_dir", required=True, help="Diretório para salvar os arquivos convertidos")
+    parser.add_argument(
+        "--from_format", required=True, choices=["yolo", "pascal_voc", "coco", "csv"], help="Formato de origem das anotações"
+    )
+    parser.add_argument(
+        "--to_format",
+        required=True,
+        choices=["yolo", "pascal_voc", "coco", "csv"],
+        help="Formato de destino para as anotações",
+    )
+    parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
+
+
+def setup_backup_parser(subparsers):
+    """Configurar parser para comando de backup de anotações."""
+    parser = subparsers.add_parser("backup", help="Criar backup de anotações")
+    parser.add_argument("--label_dir", required=True, help="Diretório contendo os arquivos de anotação a serem copiados")
+    parser.add_argument("--output_dir", help="Diretório para salvar o backup (se omitido, cria um diretório com timestamp)")
 
 
 def handle_install_docs(args):
@@ -511,29 +549,62 @@ def handle_annotate(args):
     """Manipular comando de anotação."""
     logger.info(f"Iniciando anotação manual de imagens em {args.image_dir}")
 
-    annotator = ImageAnnotator()
-    total, annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
+    # Validar diretórios
+    if not os.path.isdir(args.image_dir):
+        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
+        sys.exit(1)
 
-    logger.info(f"Anotação concluída: {annotated}/{total} imagens anotadas")
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Processar classes se fornecidas
+    classes = None
+    if args.classes:
+        classes = args.classes.split(",")
+
+    # Criar anotador
+    annotator = ImageAnnotator(classes=classes, auto_save=args.auto_save, auto_save_interval=args.auto_save_interval)
+
+    # Executar anotação em lote
+    total_images, total_annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
+
+    # Exibir resumo
+    logger.info(f"Anotação concluída: {total_annotated}/{total_images} imagens")
 
 
 def handle_visualize(args):
     """Manipular comando de visualização."""
     logger.info(f"Iniciando visualização de anotações para imagens em {args.image_dir}")
 
+    # Validar diretórios
+    if not os.path.isdir(args.image_dir):
+        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
+        sys.exit(1)
+
+    if args.label_dir and not os.path.isdir(args.label_dir):
+        logger.error(f"Diretório de anotações não encontrado: {args.label_dir}")
+        sys.exit(1)
+
+    # Processar filtro de classes se fornecido
     filter_classes = None
     if args.filter_classes:
         filter_classes = set(args.filter_classes.split(","))
 
+    # Criar visualizador
     visualizer = AnnotationVisualizer()
 
-    if args.output_dir:
-        # Modo de salvamento batch
-        count = visualizer.save_annotated_images(args.image_dir, args.label_dir, args.output_dir, filter_classes)
-        logger.info(f"Visualização em batch concluída: {count} imagens anotadas salvas")
+    # Executar visualização
+    if args.batch or args.output_dir:
+        # Modo batch - salvar imagens
+        out_dir = args.output_dir or "annotated_images"
+        os.makedirs(out_dir, exist_ok=True)
+
+        saved_count = visualizer.save_annotated_images(args.image_dir, args.label_dir, out_dir, filter_classes)
+
+        logger.info(f"Visualização em lote concluída: {saved_count} imagens salvas em {out_dir}")
     else:
         # Modo interativo
-        visualizer.visualize_annotations(args.image_dir, args.label_dir, args.output_dir, filter_classes)
+        visualizer.visualize_annotations(args.image_dir, args.label_dir, None, filter_classes)
+
         logger.info("Visualização interativa concluída")
 
 
@@ -636,6 +707,110 @@ def handle_evaluate(args):
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
 
 
+def handle_format_convert(args):
+    """Manipular comando de conversão entre formatos de anotação."""
+    logger.info(f"Iniciando conversão de anotações de {args.from_format} para {args.to_format}")
+
+    # Validar diretórios
+    if not os.path.isdir(args.input_dir):
+        logger.error(f"Diretório de entrada não encontrado: {args.input_dir}")
+        sys.exit(1)
+
+    if not os.path.isdir(args.image_dir):
+        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
+        sys.exit(1)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Processar classes se fornecidas
+    class_map = None
+    if args.classes:
+        class_list = args.classes.split(",")
+        class_map = {}
+        for cls in class_list:
+            parts = cls.split("-", 1)
+            if len(parts) == 2:
+                class_map[parts[0]] = parts[1]
+
+    # Executar conversão
+    try:
+        if args.from_format == "yolo":
+            if args.to_format == "pascal_voc":
+                count = convert_annotation.yolo_to_pascal_voc(args.input_dir, args.image_dir, args.output_dir, class_map)
+                logger.info(f"Conversão concluída: {count} arquivos convertidos de YOLO para Pascal VOC")
+
+            elif args.to_format == "coco":
+                output_json = os.path.join(args.output_dir, "annotations.json")
+                coco_data = convert_annotation.yolo_to_coco(args.input_dir, args.image_dir, output_json, class_map)
+                logger.info(f"Conversão concluída: {len(coco_data['images'])} imagens convertidas de YOLO para COCO")
+
+            elif args.to_format == "csv":
+                output_csv = os.path.join(args.output_dir, "annotations.csv")
+                count = convert_annotation.yolo_to_csv(args.input_dir, args.image_dir, output_csv, class_map)
+                logger.info(f"Conversão concluída: {count} anotações convertidas de YOLO para CSV")
+
+        elif args.from_format == "pascal_voc":
+            if args.to_format == "yolo":
+                count = convert_annotation.pascal_voc_to_yolo(args.input_dir, args.image_dir, args.output_dir, class_map)
+                logger.info(f"Conversão concluída: {count} arquivos convertidos de Pascal VOC para YOLO")
+
+        elif args.from_format == "coco":
+            if args.to_format == "yolo":
+                # Procurar arquivo JSON no diretório de entrada
+                json_files = [f for f in os.listdir(args.input_dir) if f.endswith(".json")]
+                if not json_files:
+                    logger.error("Nenhum arquivo JSON encontrado no diretório de entrada")
+                    sys.exit(1)
+
+                json_file = os.path.join(args.input_dir, json_files[0])
+                count = convert_annotation.coco_to_yolo(json_file, args.output_dir, class_map)
+                logger.info(f"Conversão concluída: {count} imagens convertidas de COCO para YOLO")
+
+        elif args.from_format == "csv":
+            if args.to_format == "yolo":
+                # Procurar arquivo CSV no diretório de entrada
+                csv_files = [f for f in os.listdir(args.input_dir) if f.endswith(".csv")]
+                if not csv_files:
+                    logger.error("Nenhum arquivo CSV encontrado no diretório de entrada")
+                    sys.exit(1)
+
+                csv_file = os.path.join(args.input_dir, csv_files[0])
+                count = convert_annotation.csv_to_yolo(csv_file, args.output_dir, class_map)
+                logger.info(f"Conversão concluída: {count} imagens convertidas de CSV para YOLO")
+
+        else:
+            logger.error(f"Conversão de {args.from_format} para {args.to_format} não suportada")
+            sys.exit(1)
+    except Exception as e:
+        logger.error(f"Erro durante a conversão: {str(e)}")
+        sys.exit(1)
+
+
+def handle_backup(args):
+    """Manipular comando de backup de anotações."""
+    logger.info(f"Iniciando backup de anotações em {args.label_dir}")
+
+    # Validar diretório
+    if not os.path.isdir(args.label_dir):
+        logger.error(f"Diretório de anotações não encontrado: {args.label_dir}")
+        sys.exit(1)
+
+    # Criar anotador (apenas para usar a função de backup)
+    annotator = ImageAnnotator()
+
+    # Configurar diretório de saída se especificado
+    output_dir = args.output_dir
+
+    # Executar backup
+    backup_dir = annotator.backup_annotations(args.label_dir)
+
+    if backup_dir:
+        logger.info(f"Backup criado com sucesso em: {backup_dir}")
+    else:
+        logger.error("Falha ao criar backup")
+        sys.exit(1)
+
+
 def main(args: Optional[List[str]] = None):
     """
     Ponto de entrada principal para o CLI.
@@ -664,6 +839,8 @@ def main(args: Optional[List[str]] = None):
     setup_aws_parser(subparsers)
     setup_docs_parser(subparsers)
     setup_install_docs_parser(subparsers)
+    setup_format_convert_parser(subparsers)
+    setup_backup_parser(subparsers)
 
     # Adicionar versão e ajuda
     parser.add_argument(
@@ -708,6 +885,10 @@ def main(args: Optional[List[str]] = None):
             handle_docs(parsed_args)
         elif parsed_args.command == "install-docs":
             handle_install_docs(parsed_args)
+        elif parsed_args.command == "format-convert":
+            handle_format_convert(parsed_args)
+        elif parsed_args.command == "backup":
+            handle_backup(parsed_args)
         else:
             parser.print_help()
             return
