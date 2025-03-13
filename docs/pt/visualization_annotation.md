@@ -15,6 +15,7 @@ Este guia explica como usar as ferramentas do MicroDetect para anotar imagens de
   - [Visualização em Lote](#visualização-em-lote)
   - [Filtragem por Classe](#filtragem-por-classe)
   - [Personalizando a Saída Visual](#personalizando-a-saída-visual)
+  - [Atalhos de Teclado para Visualização](#atalhos-de-teclado-para-visualização)
 - [Gerenciando Dados de Anotação](#gerenciando-dados-de-anotação)
   - [Formato YOLO](#formato-yolo)
   - [Convertendo para Outros Formatos](#convertendo-para-outros-formatos)
@@ -32,6 +33,10 @@ O MicroDetect fornece ferramentas especializadas para anotar microorganismos em 
 1. Criar datasets de treinamento para modelos de aprendizado de máquina
 2. Validar resultados de detecção
 3. Analisar a distribuição de microorganismos
+
+O fluxo de trabalho geralmente envolve duas etapas separadas:
+- **Anotação**: Criação e edição de caixas delimitadoras ao redor dos microorganismos
+- **Visualização**: Revisão e exame das anotações
 
 ## Ferramenta de Anotação
 
@@ -145,6 +150,20 @@ color_map:
   "1": [0, 0, 255]                # Cor RGB para classe 1
   "2": [255, 0, 0]                # Cor RGB para classe 2
 ```
+
+### Atalhos de Teclado para Visualização
+
+A ferramenta de visualização suporta os seguintes atalhos de teclado:
+
+| Tecla | Função |
+|-------|----------|
+| A | Imagem anterior |
+| D | Próxima imagem |
+| P | Alternar modo navegação |
+| R | Resetar zoom e pan |
+| 0-9 | Alternar visibilidade da classe |
+| S | Salvar imagem atual |
+| Q | Sair da ferramenta de visualização |
 
 ## Gerenciando Dados de Anotação
 

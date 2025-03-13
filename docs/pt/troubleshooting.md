@@ -7,6 +7,7 @@ Este guia ajuda a resolver problemas comuns que você pode encontrar ao usar o M
 - [Problemas de Instalação](#problemas-de-instalação)
 - [Problemas de Conversão de Imagens](#problemas-de-conversão-de-imagens)
 - [Problemas de Anotação](#problemas-de-anotação)
+- [Problemas de Visualização](#problemas-de-visualização)
 - [Problemas de Dataset](#problemas-de-dataset)
 - [Problemas de Treinamento](#problemas-de-treinamento)
 - [Problemas de GPU](#problemas-de-gpu)
@@ -189,6 +190,67 @@ A interface trava ou fica lenta com imagens muito grandes.
    ```bash
    # Usando o ImageMagick
    mogrify -resize 1024x1024\> data/images/*.png
+   ```
+
+## Problemas de Visualização
+
+### Erro: Interface de Visualização não Abre
+
+**Sintomas:**
+Nenhuma janela aparece ou mensagem de erro sobre o display.
+
+**Soluções:**
+1. Instale o Tkinter:
+   ```bash
+   sudo apt-get install python3-tk
+   ```
+
+2. Verifique se você está em um ambiente com suporte a display:
+   ```bash
+   # Defina a variável de display se necessário
+   export DISPLAY=:0
+   ```
+
+### Erro: Anotações Não Visíveis
+
+**Sintomas:**
+As imagens são exibidas, mas as anotações não aparecem.
+
+**Soluções:**
+1. Verifique os caminhos dos arquivos de anotação:
+   ```bash
+   # Verifique se os arquivos de anotação existem
+   ls caminho/para/anotacoes/*.txt
+   ```
+
+2. Verifique o formato do arquivo de anotação:
+   ```bash
+   # Veja o conteúdo de um arquivo de anotação
+   cat caminho/para/anotacoes/nome_da_imagem.txt
+   # Deve conter linhas como: class_id center_x center_y width height
+   ```
+
+3. Use um diretório de anotação explícito:
+   ```bash
+   microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes
+   ```
+
+### Erro: Problemas de Desempenho com Imagens Grandes
+
+**Sintomas:**
+A visualização fica lenta ou trava com imagens grandes.
+
+**Soluções:**
+1. Use o modo em lote para grandes coleções:
+   ```bash
+   microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes --batch --output_dir caminho/para/saida
+   ```
+
+2. Redimensione as imagens apenas para visualização:
+   ```bash
+   # Em Python
+   from PIL import Image
+   Image.open('imagem_grande.jpg').resize((1024, 768)).save('imagem_redimensionada.jpg')
    ```
 
 ## Problemas de Dataset
@@ -386,104 +448,6 @@ ERROR: Failed to update to version X.Y.Z
    ```bash
    pip cache purge
    ```
-
-### Não é possível adicionar classes às bounding boxes
-
-**Sintomas:**
-- Você pode desenhar boxes, mas elas não têm classe associada
-- O menu de seleção de classe parece não funcionar
-
-**Soluções:**
-1. **Verifique a configuração de classes**:
-   ```bash
-   # Verifique se seu arquivo config.yaml está configurado corretamente
-   # As classes devem estar no formato "ID-nome" como:
-   classes:
-     - "0-levedura"
-     - "1-fungo"
-     - "2-micro-alga"
-   ```
-
-2. **Reinicie a aplicação**:
-   Saia completamente da aplicação e reinicie-a.
-
-3. **Verifique logs**:
-   Verifique os arquivos de log em `microdetect.log` para identificar erros.
-
-### Não consigo editar (mover/redimensionar) as boxes
-
-**Sintomas:**
-- Ao tentar selecionar uma box existente, nada acontece
-- O modo de edição não parece funcionar
-
-**Soluções:**
-1. **Ative o modo de edição**:
-   - Certifique-se de pressionar a tecla 'E' ou clicar no botão "Modo Edição" para ativar o modo de edição
-   - No modo de edição, você verá "MODO EDIÇÃO" na barra de status
-
-2. **Usando o modo de edição**:
-   - Clique em uma box para selecioná-la (ficará destacada em vermelho)
-   - Clique e arraste no centro da box para movê-la
-   - Clique e arraste nas alças (pequenos quadrados) nos cantos e laterais para redimensionar
-
-3. **Verifique a escala da imagem**:
-   - Se a imagem estiver muito ampliada ou reduzida, pode ser difícil selecionar boxes
-   - Use 'R' para resetar o zoom e tente novamente
-
-### As anotações não são salvas
-
-**Sintomas:**
-- Você faz alterações, clica em "Salvar" ou "Salvar e Sair", mas as mudanças não aparecem
-- Ao retornar à visualização, as anotações originais ainda estão lá
-
-**Soluções:**
-1. **Verifique permissões de diretório**:
-   ```bash
-   # Certifique-se de que você tem permissão de escrita no diretório
-   chmod -R u+w caminho/para/anotacoes
-   ```
-
-2. **Use caminhos absolutos**:
-   Em vez de caminhos relativos, tente especificar caminhos absolutos:
-   ```bash
-   microdetect visualize --image_dir /caminho/completo/para/imagens --label_dir /caminho/completo/para/anotacoes
-   ```
-
-3. **Salve manualmente**:
-   - Pressione 'S' para salvar suas alterações antes de sair
-   - Ou use a combinação 'X' para salvar e sair
-
-4. **Verifique backup**:
-   - O sistema mantém backups automáticos em uma pasta `backup_annotations_TIMESTAMP`
-   - Verifique se suas anotações estão sendo salvas lá
-
-### A aplicação trava durante a edição
-
-**Soluções:**
-1. **Trate imagens grandes**:
-   - Imagens muito grandes podem causar problemas de desempenho
-   - Considere redimensionar imagens muito grandes antes da anotação
-
-2. **Limpe arquivos temporários**:
-   - Procure e remova arquivos `.annotation_progress.json` em seu diretório de anotações
-
-3. **Modo simplificado**:
-   - Se estiver enfrentando travamentos, tente evitar zoom e pan excessivos
-
-## Comandos úteis para depuração
-
-```bash
-# Verificar quais anotações existem
-find caminho/para/anotacoes -name "*.txt" | wc -l
-
-# Verificar o conteúdo de uma anotação específica
-cat caminho/para/anotacoes/nome_da_imagem.txt
-
-# Limpar arquivos de progresso temporários
-find caminho/para/anotacoes -name ".annotation_progress.json" -delete
-```
-
-Se os problemas persistirem, por favor, relate-os com detalhes específicos sobre sua configuração e os passos exatos para reproduzir o problema.
 
 ## Erros Comuns e Soluções
 
