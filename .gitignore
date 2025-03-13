@@ -112,3 +112,4 @@ conda-meta/
 .coverage.*
 
 !tests/data/test_augmentation.py
+!docs/**/*_aug*.md

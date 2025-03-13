@@ -116,9 +116,6 @@ Se você é novo no MicroDetect, recomendamos começar com estes guias:
 
 2. **Análise de Erros**
    - [Guia de Análise de Erros](error_analysis.md) - Identificação e análise de erros de detecção
-   - [Análise de Falsos Positivos](error_analysis.md#falsos-positivos) - Compreendendo e reduzindo falsos positivos
-   - [Análise de Falsos Negativos](error_analysis.md#falsos-negativos) - Identificando detecções perdidas
-   - [Análise de Erros de Classificação](error_analysis.md#erros-de-classificação) - Analisando classificações incorretas
 
 3. **Visualização e Relatórios**
    - [Ferramentas de Visualização](visualization_tools.md) - Ferramentas para visualizar resultados e gerar relatórios
