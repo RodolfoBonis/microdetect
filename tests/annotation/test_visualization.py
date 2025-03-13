@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
+import tkinter as tk
 
 from microdetect.annotation.visualization import AnnotationVisualizer
 
@@ -124,25 +125,6 @@ class TestAnnotationVisualizer(unittest.TestCase):
         )
         self.assertIsNone(box_data)
 
-    def test_draw_annotation_box(self):
-        """
-        Testa o desenho de caixas de anotação.
-        """
-        # Preparar imagem e dados de caixa
-        img = np.ones((100, 100, 3), dtype=np.uint8) * 255
-        box_data = {
-            "class_id": "0",
-            "x1": 40, "y1": 40, "x2": 60, "y2": 60,
-            "color": (0, 255, 0),
-            "class_name": "0-levedura"
-        }
-
-        # Desenhar caixa
-        self.visualizer._draw_annotation_box(img, box_data, 0)
-
-        # Verificar se a caixa foi desenhada (algum pixel deve ser verde)
-        self.assertTrue(np.any(img[:, :, 1] == 255) and np.any(img[:, :, 0] == 0) and np.any(img[:, :, 2] == 0))
-
     @patch("cv2.imwrite")
     def test_save_annotated_images(self, mock_imwrite):
         """
@@ -176,26 +158,70 @@ class TestAnnotationVisualizer(unittest.TestCase):
         self.assertEqual(saved_count, 1)
         mock_imwrite.assert_called_once()
 
-    @patch("cv2.imshow")
-    @patch("cv2.waitKey")
-    @patch("cv2.destroyAllWindows")
-    def test_visualize_annotations(self, mock_destroy, mock_waitkey, mock_imshow):
+    @patch("tkinter.Tk")
+    @patch("PIL.ImageTk.PhotoImage")
+    def test_visualize_annotations_tkinter(self, mock_photo_image, mock_tk):
         """
-        Testa a visualização interativa de anotações.
+        Testa a visualização interativa de anotações usando Tkinter.
+        Este teste substitui o antigo teste que usava cv2.imshow.
         """
-        # Configurar mock para simular pressionar tecla 'q' (sair)
-        mock_waitkey.return_value = ord("q")
+        # Configurar mocks
+        mock_root = MagicMock()
+        mock_tk.return_value = mock_root
+        mock_root.winfo_screenwidth.return_value = 1920
+        mock_root.winfo_screenheight.return_value = 1080
 
-        # Testar visualização
+        # Simular fechamento imediato da janela
+        def destroy_window(*args, **kwargs):
+            self.visualizer.window_closed = True
+            return None
+
+        # Aplicar o comportamento simulado
+        mock_root.mainloop.side_effect = destroy_window
+
+        # Testar visualização em modo interativo
         self.visualizer.visualize_annotations(
             self.temp_dir.name,
             None  # Usar mesmo diretório das imagens
         )
 
-        # Verificar se os métodos foram chamados
-        mock_imshow.assert_called()
-        mock_waitkey.assert_called_once()
-        mock_destroy.assert_called_once()
+        # Verificar se o Tkinter foi inicializado e a janela principal criada
+        mock_tk.assert_called_once()
+        mock_root.mainloop.assert_called_once()
+
+        # Verificar se houve uma tentativa de criar uma imagem para exibição
+        mock_photo_image.assert_called()
+
+    def test_redraw_all_boxes(self):
+        """
+        Testa o redesenho de todas as caixas no canvas.
+        """
+        # Criar mock para o canvas
+        mock_canvas = MagicMock()
+
+        # Configurar visualizador para teste
+        self.visualizer.display_scale = 1.0
+        self.visualizer.scale_factor = 1.0
+
+        # Dados de teste
+        annotations = ["0 0.5 0.5 0.2 0.2", "1 0.7 0.7 0.1 0.1"]
+        w, h = 100, 100
+        class_visibility = {"0": True, "1": True, "2": True}
+
+        # Chamar o método
+        results = self.visualizer._redraw_all_boxes(mock_canvas, annotations, w, h, class_visibility)
+
+        # Verificar se o canvas foi manipulado
+        mock_canvas.delete.assert_called()
+        mock_canvas.create_rectangle.assert_called()
+        mock_canvas.create_text.assert_called()
+
+        # Verificar que o método retornou contagens corretas
+        self.assertIsNotNone(results)
+        total_visible, class_counts = results
+        self.assertEqual(total_visible, 2)
+        self.assertEqual(class_counts["0"], 1)
+        self.assertEqual(class_counts["1"], 1)
 
 
 if __name__ == "__main__":
