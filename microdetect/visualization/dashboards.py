@@ -29,12 +29,7 @@ class DashboardGenerator:
         self.output_dir = output_dir or "dashboards"
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def create_detection_dashboard(
-            self,
-            results_dir: str,
-            port: int = 8050,
-            open_browser: bool = True
-    ) -> int:
+    def create_detection_dashboard(self, results_dir: str, port: int = 8050, open_browser: bool = True) -> int:
         """
         Cria um dashboard interativo para explorar resultados de detecção.
 
@@ -48,15 +43,15 @@ class DashboardGenerator:
         """
         try:
             import dash
-            from dash import dcc, html
             import dash_bootstrap_components as dbc
+            from dash import dcc, html
             from dash.dependencies import Input, Output, State
         except ImportError:
             logger.error("Dash não encontrado. Instale com: pip install dash dash-bootstrap-components")
             return 0
 
         # Carregar dados de detecções
-        json_files = [f for f in os.listdir(results_dir) if f.endswith('.json')]
+        json_files = [f for f in os.listdir(results_dir) if f.endswith(".json")]
         if not json_files:
             logger.error(f"Nenhum arquivo JSON encontrado em: {results_dir}")
             return 0
@@ -73,7 +68,7 @@ class DashboardGenerator:
 
         # Carregar dados
         try:
-            with open(detection_file, 'r') as f:
+            with open(detection_file, "r") as f:
                 detection_data = json.load(f)
         except Exception as e:
             logger.error(f"Erro ao carregar dados: {str(e)}")
@@ -110,105 +105,118 @@ class DashboardGenerator:
         df = pd.DataFrame(rows)
 
         # Criar aplicação Dash
-        app = dash.Dash(
-            __name__,
-            external_stylesheets=[dbc.themes.FLATLY],
-            title="MicroDetect - Dashboard de Detecções"
-        )
+        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], title="MicroDetect - Dashboard de Detecções")
 
         # Obter classes únicas
         classes = sorted(df["class_name"].unique())
 
         # Layout do dashboard
-        app.layout = dbc.Container([
-            dbc.Row([
-                dbc.Col([
-                    html.H1("MicroDetect - Dashboard de Detecções", className="mb-4"),
-                    html.Hr(),
-                ], width=12)
-            ]),
-
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Estatísticas Gerais"),
-                        dbc.CardBody([
-                            html.H3(f"Total de Imagens: {len(images)}"),
-                            html.H3(f"Total de Detecções: {len(df)}"),
-                            html.H3(f"Número de Classes: {len(classes)}"),
-                            html.H4(f"Confiança Média: {df['confidence'].mean():.4f}")
-                        ])
-                    ], className="mb-4"),
-
-                    dbc.Card([
-                        dbc.CardHeader("Filtros"),
-                        dbc.CardBody([
-                            html.Label("Limiar de Confiança:"),
-                            dcc.Slider(
-                                id="confidence-slider",
-                                min=0,
-                                max=1,
-                                step=0.05,
-                                value=0.25,
-                                marks={i / 10: str(i / 10) for i in range(0, 11, 1)},
-                                className="mb-3"
-                            ),
-
-                            html.Label("Classes:"),
-                            dcc.Checklist(
-                                id="class-checklist",
-                                options=[{"label": c, "value": c} for c in classes],
-                                value=classes,
-                                inline=True,
-                                className="mb-3"
-                            ),
-
-                            html.Label("Imagem:"),
-                            dcc.Dropdown(
-                                id="image-dropdown",
-                                options=[{"label": img, "value": img} for img in images],
-                                value=images[0] if images else None,
-                                clearable=False,
-                                className="mb-3"
-                            ),
-
-                            dbc.Button(
-                                "Atualizar Visualização",
-                                id="update-button",
-                                color="primary",
-                                className="mt-2"
-                            )
-                        ])
-                    ], className="mb-4")
-                ], width=4),
-
-                dbc.Col([
-                    dbc.Tabs([
-                        dbc.Tab([
-                            dcc.Graph(id="detections-by-class")
-                        ], label="Detecções por Classe"),
-
-                        dbc.Tab([
-                            dcc.Graph(id="confidence-histogram")
-                        ], label="Histograma de Confiança"),
-
-                        dbc.Tab([
-                            dcc.Graph(id="size-scatter")
-                        ], label="Tamanho x Confiança")
-                    ]),
-
-                    html.Div(id="filtered-stats", className="mt-4")
-                ], width=8)
-            ]),
-
-            dbc.Row([
-                dbc.Col([
-                    html.H3("Detalhes da Imagem", className="mb-3"),
-                    html.Div(id="image-display"),
-                    html.Div(id="image-detections", className="mt-3")
-                ], width=12)
-            ])
-        ], fluid=True)
+        app.layout = dbc.Container(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.H1("MicroDetect - Dashboard de Detecções", className="mb-4"),
+                                html.Hr(),
+                            ],
+                            width=12,
+                        )
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader("Estatísticas Gerais"),
+                                        dbc.CardBody(
+                                            [
+                                                html.H3(f"Total de Imagens: {len(images)}"),
+                                                html.H3(f"Total de Detecções: {len(df)}"),
+                                                html.H3(f"Número de Classes: {len(classes)}"),
+                                                html.H4(f"Confiança Média: {df['confidence'].mean():.4f}"),
+                                            ]
+                                        ),
+                                    ],
+                                    className="mb-4",
+                                ),
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader("Filtros"),
+                                        dbc.CardBody(
+                                            [
+                                                html.Label("Limiar de Confiança:"),
+                                                dcc.Slider(
+                                                    id="confidence-slider",
+                                                    min=0,
+                                                    max=1,
+                                                    step=0.05,
+                                                    value=0.25,
+                                                    marks={i / 10: str(i / 10) for i in range(0, 11, 1)},
+                                                    className="mb-3",
+                                                ),
+                                                html.Label("Classes:"),
+                                                dcc.Checklist(
+                                                    id="class-checklist",
+                                                    options=[{"label": c, "value": c} for c in classes],
+                                                    value=classes,
+                                                    inline=True,
+                                                    className="mb-3",
+                                                ),
+                                                html.Label("Imagem:"),
+                                                dcc.Dropdown(
+                                                    id="image-dropdown",
+                                                    options=[{"label": img, "value": img} for img in images],
+                                                    value=images[0] if images else None,
+                                                    clearable=False,
+                                                    className="mb-3",
+                                                ),
+                                                dbc.Button(
+                                                    "Atualizar Visualização",
+                                                    id="update-button",
+                                                    color="primary",
+                                                    className="mt-2",
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                    className="mb-4",
+                                ),
+                            ],
+                            width=4,
+                        ),
+                        dbc.Col(
+                            [
+                                dbc.Tabs(
+                                    [
+                                        dbc.Tab([dcc.Graph(id="detections-by-class")], label="Detecções por Classe"),
+                                        dbc.Tab([dcc.Graph(id="confidence-histogram")], label="Histograma de Confiança"),
+                                        dbc.Tab([dcc.Graph(id="size-scatter")], label="Tamanho x Confiança"),
+                                    ]
+                                ),
+                                html.Div(id="filtered-stats", className="mt-4"),
+                            ],
+                            width=8,
+                        ),
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.H3("Detalhes da Imagem", className="mb-3"),
+                                html.Div(id="image-display"),
+                                html.Div(id="image-detections", className="mt-3"),
+                            ],
+                            width=12,
+                        )
+                    ]
+                ),
+            ],
+            fluid=True,
+        )
 
         # Callback para atualizar gráficos
         @app.callback(
@@ -217,24 +225,17 @@ class DashboardGenerator:
                 Output("confidence-histogram", "figure"),
                 Output("size-scatter", "figure"),
                 Output("filtered-stats", "children"),
-                Output("image-detections", "children")
+                Output("image-detections", "children"),
             ],
             [Input("update-button", "n_clicks")],
-            [
-                State("confidence-slider", "value"),
-                State("class-checklist", "value"),
-                State("image-dropdown", "value")
-            ]
+            [State("confidence-slider", "value"), State("class-checklist", "value"), State("image-dropdown", "value")],
         )
         def update_graphs(n_clicks, conf_threshold, selected_classes, selected_image):
             import plotly.express as px
             import plotly.graph_objects as go
 
             # Filtrar DataFrame
-            filtered_df = df[
-                (df["confidence"] >= conf_threshold) &
-                (df["class_name"].isin(selected_classes))
-                ]
+            filtered_df = df[(df["confidence"] >= conf_threshold) & (df["class_name"].isin(selected_classes))]
 
             # Gráfico 1: Detecções por Classe
             fig1 = px.bar(
@@ -243,7 +244,7 @@ class DashboardGenerator:
                 y="class_name",
                 color="index",
                 labels={"index": "Classe", "class_name": "Contagem"},
-                title="Número de Detecções por Classe"
+                title="Número de Detecções por Classe",
             )
 
             # Gráfico 2: Histograma de Confiança
@@ -253,7 +254,7 @@ class DashboardGenerator:
                 color="class_name",
                 nbins=20,
                 title="Distribuição de Confiança por Classe",
-                labels={"confidence": "Confiança", "count": "Contagem"}
+                labels={"confidence": "Confiança", "count": "Contagem"},
             )
 
             # Gráfico 3: Scatter Plot de Tamanho vs Confiança
@@ -266,38 +267,48 @@ class DashboardGenerator:
                     size="area",
                     hover_data=["image", "class_name"],
                     title="Relação entre Tamanho e Confiança",
-                    labels={"area": "Área", "confidence": "Confiança"}
+                    labels={"area": "Área", "confidence": "Confiança"},
                 )
             else:
                 fig3 = go.Figure()
                 fig3.update_layout(title="Dados de área não disponíveis")
 
             # Estatísticas filtradas
-            stats = dbc.Card([
-                dbc.CardHeader("Estatísticas Filtradas"),
-                dbc.CardBody([
-                    html.H4(f"Detecções: {len(filtered_df)}"),
-                    html.H4(f"Confiança Média: {filtered_df['confidence'].mean():.4f}")
-                ])
-            ])
+            stats = dbc.Card(
+                [
+                    dbc.CardHeader("Estatísticas Filtradas"),
+                    dbc.CardBody(
+                        [
+                            html.H4(f"Detecções: {len(filtered_df)}"),
+                            html.H4(f"Confiança Média: {filtered_df['confidence'].mean():.4f}"),
+                        ]
+                    ),
+                ]
+            )
 
             # Detalhes da imagem selecionada
             image_dets = filtered_df[filtered_df["image"] == selected_image]
 
-            image_table = dbc.Table.from_dataframe(
-                image_dets[["class_name", "confidence"]].round(4),
-                striped=True,
-                bordered=True,
-                hover=True,
-                responsive=True,
-                className="mt-3"
-            ) if not image_dets.empty else html.P("Nenhuma detecção para esta imagem com os filtros atuais.")
+            image_table = (
+                dbc.Table.from_dataframe(
+                    image_dets[["class_name", "confidence"]].round(4),
+                    striped=True,
+                    bordered=True,
+                    hover=True,
+                    responsive=True,
+                    className="mt-3",
+                )
+                if not image_dets.empty
+                else html.P("Nenhuma detecção para esta imagem com os filtros atuais.")
+            )
 
-            return fig1, fig2, fig3, stats, [
-                html.H4(f"Detecções em: {selected_image}"),
-                html.P(f"Total: {len(image_dets)} detecções"),
-                image_table
-            ]
+            return (
+                fig1,
+                fig2,
+                fig3,
+                stats,
+                [html.H4(f"Detecções em: {selected_image}"), html.P(f"Total: {len(image_dets)} detecções"), image_table],
+            )
 
         # Iniciar servidor
         def open_browser_tab():
@@ -311,10 +322,7 @@ class DashboardGenerator:
         return port
 
     def create_model_comparison_dashboard(
-            self,
-            comparison_results: Dict[str, Dict],
-            port: int = 8051,
-            open_browser: bool = True
+        self, comparison_results: Dict[str, Dict], port: int = 8051, open_browser: bool = True
     ) -> int:
         """
         Cria um dashboard interativo para comparar diferentes modelos.
@@ -329,8 +337,8 @@ class DashboardGenerator:
         """
         try:
             import dash
-            from dash import dcc, html
             import dash_bootstrap_components as dbc
+            from dash import dcc, html
             from dash.dependencies import Input, Output
         except ImportError:
             logger.error("Dash não encontrado. Instale com: pip install dash dash-bootstrap-components")
@@ -360,99 +368,108 @@ class DashboardGenerator:
         df = pd.DataFrame(rows)
 
         # Criar aplicação Dash
-        app = dash.Dash(
-            __name__,
-            external_stylesheets=[dbc.themes.FLATLY],
-            title="MicroDetect - Comparação de Modelos"
-        )
+        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], title="MicroDetect - Comparação de Modelos")
 
         # Layout do dashboard
-        app.layout = dbc.Container([
-            dbc.Row([
-                dbc.Col([
-                    html.H1("MicroDetect - Comparação de Modelos", className="mb-4"),
-                    html.Hr(),
-                ], width=12)
-            ]),
-
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader("Modelos Comparados"),
-                        dbc.CardBody([
-                            html.H4(f"Total de Modelos: {len(df)}"),
-                            dbc.ListGroup([
-                                dbc.ListGroupItem(
-                                    f"{row['model']} (Categoria: {row['category']})",
-                                    color=["primary", "success", "info", "warning", "danger"][i % 5]
-                                )
-                                for i, (_, row) in enumerate(df.iterrows())
-                            ])
-                        ])
-                    ], className="mb-4"),
-
-                    dbc.Card([
-                        dbc.CardHeader("Filtros"),
-                        dbc.CardBody([
-                            html.Label("Métrica para Visualização:"),
-                            dcc.Dropdown(
-                                id="metric-dropdown",
-                                options=[
-                                    {"label": "Precisão (mAP50)", "value": "mAP50"},
-                                    {"label": "Precisão (mAP50-95)", "value": "mAP50-95"},
-                                    {"label": "Recall", "value": "recall"},
-                                    {"label": "Precisão", "value": "precision"},
-                                    {"label": "F1-Score", "value": "f1-score"},
-                                    {"label": "FPS", "value": "fps"},
-                                    {"label": "Latência (ms)", "value": "latencia_ms"},
-                                ],
-                                value="mAP50",
-                                clearable=False,
-                                className="mb-3"
-                            ),
-
-                            html.Label("Visualização:"),
-                            dcc.RadioItems(
-                                id="chart-type",
-                                options=[
-                                    {"label": "Gráfico de Barras", "value": "bar"},
-                                    {"label": "Gráfico de Linha", "value": "line"},
-                                    {"label": "Gráfico de Radar", "value": "radar"},
-                                ],
-                                value="bar",
-                                inline=True,
-                                className="mb-3"
-                            )
-                        ])
-                    ], className="mb-4")
-                ], width=4),
-
-                dbc.Col([
-                    dbc.Tabs([
-                        dbc.Tab([
-                            dcc.Graph(id="metric-comparison")
-                        ], label="Comparação por Métrica"),
-
-                        dbc.Tab([
-                            dcc.Graph(id="tradeoff-plot")
-                        ], label="Precisão vs. Velocidade"),
-
-                        dbc.Tab([
-                            dcc.Graph(id="size-comparison")
-                        ], label="Tamanho de Modelo")
-                    ]),
-
-                    html.Div(id="comparison-stats", className="mt-4")
-                ], width=8)
-            ]),
-
-            dbc.Row([
-                dbc.Col([
-                    html.H3("Tabela Comparativa", className="mb-3"),
-                    html.Div(id="comparison-table")
-                ], width=12)
-            ])
-        ], fluid=True)
+        app.layout = dbc.Container(
+            [
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                html.H1("MicroDetect - Comparação de Modelos", className="mb-4"),
+                                html.Hr(),
+                            ],
+                            width=12,
+                        )
+                    ]
+                ),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            [
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader("Modelos Comparados"),
+                                        dbc.CardBody(
+                                            [
+                                                html.H4(f"Total de Modelos: {len(df)}"),
+                                                dbc.ListGroup(
+                                                    [
+                                                        dbc.ListGroupItem(
+                                                            f"{row['model']} (Categoria: {row['category']})",
+                                                            color=["primary", "success", "info", "warning", "danger"][i % 5],
+                                                        )
+                                                        for i, (_, row) in enumerate(df.iterrows())
+                                                    ]
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                    className="mb-4",
+                                ),
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader("Filtros"),
+                                        dbc.CardBody(
+                                            [
+                                                html.Label("Métrica para Visualização:"),
+                                                dcc.Dropdown(
+                                                    id="metric-dropdown",
+                                                    options=[
+                                                        {"label": "Precisão (mAP50)", "value": "mAP50"},
+                                                        {"label": "Precisão (mAP50-95)", "value": "mAP50-95"},
+                                                        {"label": "Recall", "value": "recall"},
+                                                        {"label": "Precisão", "value": "precision"},
+                                                        {"label": "F1-Score", "value": "f1-score"},
+                                                        {"label": "FPS", "value": "fps"},
+                                                        {"label": "Latência (ms)", "value": "latencia_ms"},
+                                                    ],
+                                                    value="mAP50",
+                                                    clearable=False,
+                                                    className="mb-3",
+                                                ),
+                                                html.Label("Visualização:"),
+                                                dcc.RadioItems(
+                                                    id="chart-type",
+                                                    options=[
+                                                        {"label": "Gráfico de Barras", "value": "bar"},
+                                                        {"label": "Gráfico de Linha", "value": "line"},
+                                                        {"label": "Gráfico de Radar", "value": "radar"},
+                                                    ],
+                                                    value="bar",
+                                                    inline=True,
+                                                    className="mb-3",
+                                                ),
+                                            ]
+                                        ),
+                                    ],
+                                    className="mb-4",
+                                ),
+                            ],
+                            width=4,
+                        ),
+                        dbc.Col(
+                            [
+                                dbc.Tabs(
+                                    [
+                                        dbc.Tab([dcc.Graph(id="metric-comparison")], label="Comparação por Métrica"),
+                                        dbc.Tab([dcc.Graph(id="tradeoff-plot")], label="Precisão vs. Velocidade"),
+                                        dbc.Tab([dcc.Graph(id="size-comparison")], label="Tamanho de Modelo"),
+                                    ]
+                                ),
+                                html.Div(id="comparison-stats", className="mt-4"),
+                            ],
+                            width=8,
+                        ),
+                    ]
+                ),
+                dbc.Row(
+                    [dbc.Col([html.H3("Tabela Comparativa", className="mb-3"), html.Div(id="comparison-table")], width=12)]
+                ),
+            ],
+            fluid=True,
+        )
 
         # Callback para atualizar gráficos
         @app.callback(
@@ -461,12 +478,9 @@ class DashboardGenerator:
                 Output("tradeoff-plot", "figure"),
                 Output("size-comparison", "figure"),
                 Output("comparison-stats", "children"),
-                Output("comparison-table", "children")
+                Output("comparison-table", "children"),
             ],
-            [
-                Input("metric-dropdown", "value"),
-                Input("chart-type", "value")
-            ]
+            [Input("metric-dropdown", "value"), Input("chart-type", "value")],
         )
         def update_graphs(selected_metric, chart_type):
             import plotly.express as px
@@ -480,7 +494,7 @@ class DashboardGenerator:
                     y=selected_metric,
                     color="category",
                     title=f"Comparação de {selected_metric}",
-                    labels={"model": "Modelo", selected_metric: selected_metric.upper()}
+                    labels={"model": "Modelo", selected_metric: selected_metric.upper()},
                 )
             elif chart_type == "line":
                 fig1 = px.line(
@@ -490,28 +504,22 @@ class DashboardGenerator:
                     color="category",
                     markers=True,
                     title=f"Comparação de {selected_metric}",
-                    labels={"model": "Modelo", selected_metric: selected_metric.upper()}
+                    labels={"model": "Modelo", selected_metric: selected_metric.upper()},
                 )
             else:  # radar
                 fig1 = go.Figure()
 
                 for category in df["category"].unique():
                     category_df = df[df["category"] == category]
-                    fig1.add_trace(go.Scatterpolar(
-                        r=category_df[selected_metric],
-                        theta=category_df["model"],
-                        fill="toself",
-                        name=category
-                    ))
+                    fig1.add_trace(
+                        go.Scatterpolar(
+                            r=category_df[selected_metric], theta=category_df["model"], fill="toself", name=category
+                        )
+                    )
 
                 fig1.update_layout(
-                    polar=dict(
-                        radialaxis=dict(
-                            visible=True,
-                            range=[0, max(df[selected_metric]) * 1.1]
-                        )
-                    ),
-                    title=f"Comparação de {selected_metric}"
+                    polar=dict(radialaxis=dict(visible=True, range=[0, max(df[selected_metric]) * 1.1])),
+                    title=f"Comparação de {selected_metric}",
                 )
 
             # Gráfico 2: Precisão vs. Velocidade
@@ -525,7 +533,7 @@ class DashboardGenerator:
                     hover_data=["model", "category"],
                     title="Trade-off: Precisão vs. Velocidade",
                     labels={"fps": "FPS", "mAP50": "mAP50"},
-                    text="model"
+                    text="model",
                 )
                 fig2.update_traces(textposition="top right")
             else:
@@ -539,20 +547,25 @@ class DashboardGenerator:
                 y="size_mb",
                 color="category",
                 title="Tamanho do Modelo (MB)",
-                labels={"model": "Modelo", "size_mb": "Tamanho (MB)"}
+                labels={"model": "Modelo", "size_mb": "Tamanho (MB)"},
             )
 
             # Estatísticas
-            stats = dbc.Card([
-                dbc.CardHeader("Estatísticas Comparativas"),
-                dbc.CardBody([
-                    html.H4(f"Melhor modelo para {selected_metric}: {df.loc[df[selected_metric].idxmax(), 'model']}"),
-                    html.H4(f"Valor: {df[selected_metric].max():.4f}"),
-                    html.H4(
-                        f"Modelo mais rápido: {df.loc[df['fps'].idxmax(), 'model'] if 'fps' in df.columns else 'N/A'}"),
-                    html.H4(f"FPS: {df['fps'].max():.1f if 'fps' in df.columns else 'N/A'}")
-                ])
-            ])
+            stats = dbc.Card(
+                [
+                    dbc.CardHeader("Estatísticas Comparativas"),
+                    dbc.CardBody(
+                        [
+                            html.H4(f"Melhor modelo para {selected_metric}: {df.loc[df[selected_metric].idxmax(), 'model']}"),
+                            html.H4(f"Valor: {df[selected_metric].max():.4f}"),
+                            html.H4(
+                                f"Modelo mais rápido: {df.loc[df['fps'].idxmax(), 'model'] if 'fps' in df.columns else 'N/A'}"
+                            ),
+                            html.H4(f"FPS: {df['fps'].max():.1f if 'fps' in df.columns else 'N/A'}"),
+                        ]
+                    ),
+                ]
+            )
 
             # Tabela comparativa
             display_cols = ["model", "category", "size_mb"]
@@ -560,12 +573,7 @@ class DashboardGenerator:
             display_cols.extend(metric_cols)
 
             table = dbc.Table.from_dataframe(
-                df[display_cols].round(4),
-                striped=True,
-                bordered=True,
-                hover=True,
-                responsive=True,
-                className="mt-3"
+                df[display_cols].round(4), striped=True, bordered=True, hover=True, responsive=True, className="mt-3"
             )
 
             return fig1, fig2, fig3, stats, table

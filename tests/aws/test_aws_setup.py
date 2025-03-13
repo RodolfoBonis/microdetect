@@ -1,4 +1,4 @@
-# tests/utils/test_aws_setup.py
+# tests/aws/test_aws_setup.py
 import os
 import tempfile
 from pathlib import Path
@@ -13,9 +13,9 @@ from microdetect.aws import AWSSetupManager
 @pytest.fixture
 def aws_mocks():
     """Create and start all required mocks."""
-    with patch("microdetect.utils.aws_setup.AWSSetupManager.check_aws_cli") as mock_check, patch(
-        "microdetect.utils.aws_setup.AWSSetupManager.run_command"
-    ) as mock_run, patch("microdetect.utils.aws_setup.sys.platform", "darwin"), patch(
+    with patch("microdetect.aws.aws_setup.AWSSetupManager.check_aws_cli") as mock_check, patch(
+        "microdetect.aws.aws_setup.AWSSetupManager.run_command"
+    ) as mock_run, patch("microdetect.aws.aws_setup.sys.platform", "darwin"), patch(
         "builtins.print"
     ):  # Suppress output
 
@@ -47,7 +47,7 @@ def temp_aws_config():
         yield temp_dir
 
 
-@patch("microdetect.utils.aws_setup.subprocess.run")
+@patch("microdetect.aws.aws_setup.subprocess.run")
 def test_run_command(mock_run):
     """Test the run_command utility method."""
     # Configure mock
@@ -66,7 +66,7 @@ def test_run_command(mock_run):
     assert result == "command output"
 
 
-@patch("microdetect.utils.aws_setup.subprocess.run")
+@patch("microdetect.aws.aws_setup.subprocess.run")
 def test_check_aws_cli_available(mock_run):
     """Test checking AWS CLI availability when it's installed."""
     # Configure mock to simulate AWS CLI being available
@@ -82,7 +82,7 @@ def test_check_aws_cli_available(mock_run):
     assert result is True
 
 
-@patch("microdetect.utils.aws_setup.subprocess.run")
+@patch("microdetect.aws.aws_setup.subprocess.run")
 def test_check_aws_cli_not_available(mock_run):
     """Test checking AWS CLI availability when it's not installed."""
     # Configure mock to simulate AWS CLI not being available
@@ -129,8 +129,8 @@ def test_configure_aws(mock_configparser, mock_open, mock_mkdir):
     assert os.environ.get("AWS_CODEARTIFACT_OWNER") == "123456789012"
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_test_codeartifact_login_success(mock_get_latest_version, mock_get_token):
     """Test successful CodeArtifact login test."""
     # Configure mocks
@@ -147,7 +147,7 @@ def test_test_codeartifact_login_success(mock_get_latest_version, mock_get_token
     assert mock_get_latest_version.call_count == 1
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.updater.updater.UpdateManager.get_aws_codeartifact_token")
 def test_test_codeartifact_login_failure(mock_get_token):
     """Test failed CodeArtifact login test."""
     # Configure mock to simulate failure

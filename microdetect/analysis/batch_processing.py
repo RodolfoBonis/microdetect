@@ -6,7 +6,7 @@ import concurrent.futures
 import json
 import logging
 import os
-from typing import Dict, List, Any, Callable
+from typing import Any, Callable, Dict, List
 
 from tqdm import tqdm
 from ultralytics import YOLO
@@ -29,18 +29,18 @@ class BatchProcessor:
         self.num_workers = num_workers
 
     def process_batch(
-            self,
-            model_path: str,
-            source_dir: str,
-            output_dir: str,
-            batch_size: int = 16,
-            conf_threshold: float = 0.25,
-            iou_threshold: float = 0.45,
-            image_size: int = 640,
-            save_txt: bool = False,
-            save_img: bool = True,
-            save_json: bool = True,
-            file_extensions: List[str] = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
+        self,
+        model_path: str,
+        source_dir: str,
+        output_dir: str,
+        batch_size: int = 16,
+        conf_threshold: float = 0.25,
+        iou_threshold: float = 0.45,
+        image_size: int = 640,
+        save_txt: bool = False,
+        save_img: bool = True,
+        save_json: bool = True,
+        file_extensions: List[str] = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"],
     ) -> Dict[str, Any]:
         """
         Processa um lote de imagens usando o modelo YOLO.
@@ -104,17 +104,12 @@ class BatchProcessor:
         error_count = 0
 
         # Criar batches
-        batches = [image_files[i:i + batch_size] for i in range(0, len(image_files), batch_size)]
+        batches = [image_files[i : i + batch_size] for i in range(0, len(image_files), batch_size)]
 
         for batch_idx, batch in enumerate(tqdm(batches, desc="Processando batches")):
             try:
                 # Executar detecção no batch
-                results = model(
-                    batch,
-                    conf=conf_threshold,
-                    iou=iou_threshold,
-                    imgsz=image_size
-                )
+                results = model(batch, conf=conf_threshold, iou=iou_threshold, imgsz=image_size)
 
                 # Processar resultados
                 for i, result in enumerate(results):
@@ -144,13 +139,15 @@ class BatchProcessor:
                             height = h / img_height
 
                             # Armazenar detecção
-                            detections.append({
-                                "bbox": [float(x1), float(y1), float(x2), float(y2)],
-                                "bbox_normalized": [center_x, center_y, width, height],
-                                "class": cls,
-                                "class_name": result.names[cls],
-                                "confidence": conf
-                            })
+                            detections.append(
+                                {
+                                    "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                                    "bbox_normalized": [center_x, center_y, width, height],
+                                    "class": cls,
+                                    "class_name": result.names[cls],
+                                    "confidence": conf,
+                                }
+                            )
 
                     # Guardar resultados
                     all_results[filename] = detections
@@ -189,17 +186,17 @@ class BatchProcessor:
             "errors": error_count,
             "total": len(image_files),
             "output_dir": output_dir,
-            "results": all_results if not save_json else json_path
+            "results": all_results if not save_json else json_path,
         }
 
     def process_parallel(
-            self,
-            model_path: str,
-            source_dir: str,
-            output_dir: str,
-            worker_function: Callable,
-            worker_args: Dict[str, Any],
-            file_extensions: List[str] = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
+        self,
+        model_path: str,
+        source_dir: str,
+        output_dir: str,
+        worker_function: Callable,
+        worker_args: Dict[str, Any],
+        file_extensions: List[str] = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"],
     ) -> Dict[str, Any]:
         """
         Processa imagens em paralelo usando uma função worker personalizada.
@@ -254,17 +251,13 @@ class BatchProcessor:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
             future_to_file = {
-                executor.submit(
-                    worker_function,
-                    model,
-                    image_path,
-                    output_dir,
-                    **worker_args
-                ): image_path for image_path in image_files
+                executor.submit(worker_function, model, image_path, output_dir, **worker_args): image_path
+                for image_path in image_files
             }
 
-            for future in tqdm(concurrent.futures.as_completed(future_to_file), total=len(image_files),
-                               desc="Processando imagens"):
+            for future in tqdm(
+                concurrent.futures.as_completed(future_to_file), total=len(image_files), desc="Processando imagens"
+            ):
                 file_path = future_to_file[future]
                 try:
                     result = future.result()
@@ -276,15 +269,12 @@ class BatchProcessor:
         # Salvar resultados
         json_path = os.path.join(output_dir, "parallel_processing_results.json")
         with open(json_path, "w") as f:
-            json.dump({
-                "results": results,
-                "errors": errors
-            }, f, indent=4)
+            json.dump({"results": results, "errors": errors}, f, indent=4)
 
         return {
             "processed": len(results),
             "errors": len(errors),
             "total": len(image_files),
             "output_dir": output_dir,
-            "results_file": json_path
+            "results_file": json_path,
         }

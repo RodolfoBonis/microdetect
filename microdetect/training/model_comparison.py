@@ -5,12 +5,12 @@ Módulo para comparação de modelos de diferentes tamanhos.
 import json
 import logging
 import os
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from microdetect.training import SpeedBenchmark, ModelEvaluator
+from microdetect.training import ModelEvaluator, SpeedBenchmark
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,7 @@ class ModelComparator:
         self.evaluator = ModelEvaluator(self.output_dir)
 
     def compare_models(
-            self,
-            model_paths: List[str],
-            data_yaml: str,
-            conf_threshold: float = 0.25,
-            iou_threshold: float = 0.7
+        self, model_paths: List[str], data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
     ) -> Dict[str, Any]:
         """
         Compara vários modelos usando o mesmo dataset e configurações.
@@ -58,18 +54,11 @@ class ModelComparator:
             logger.info(f"Avaliando modelo: {model_name}")
 
             # Avaliar o modelo
-            metrics = self.evaluator.evaluate_model(
-                model_path, data_yaml, conf_threshold, iou_threshold
-            )
+            metrics = self.evaluator.evaluate_model(model_path, data_yaml, conf_threshold, iou_threshold)
 
             # Executar benchmark de velocidade
             benchmark = SpeedBenchmark(model_path)
-            speed_results = benchmark.run(
-                batch_sizes=[1, 4, 8],
-                image_sizes=[640],
-                iterations=10,
-                warmup=2
-            )
+            speed_results = benchmark.run(batch_sizes=[1, 4, 8], image_sizes=[640], iterations=10, warmup=2)
 
             # Extrair tamanho do arquivo do modelo
             model_size_mb = os.path.getsize(model_path) / (1024 * 1024)
@@ -79,19 +68,19 @@ class ModelComparator:
 
             # Armazenar resultados
             results[model_name] = {
-                'tamanho': model_category,
-                'tamanho_arquivo': round(model_size_mb, 2),  # MB
-                'metricas': {
-                    'mAP50': metrics['metricas_gerais']['Precisão (mAP50)'],
-                    'mAP50-95': metrics['metricas_gerais']['Precisão (mAP50-95)'],
-                    'recall': metrics['metricas_gerais']['Recall'],
-                    'precision': metrics['metricas_gerais']['Precisão'],
-                    'f1-score': metrics['metricas_gerais']['F1-Score']
+                "tamanho": model_category,
+                "tamanho_arquivo": round(model_size_mb, 2),  # MB
+                "metricas": {
+                    "mAP50": metrics["metricas_gerais"]["Precisão (mAP50)"],
+                    "mAP50-95": metrics["metricas_gerais"]["Precisão (mAP50-95)"],
+                    "recall": metrics["metricas_gerais"]["Recall"],
+                    "precision": metrics["metricas_gerais"]["Precisão"],
+                    "f1-score": metrics["metricas_gerais"]["F1-Score"],
                 },
-                'velocidade': {
-                    'fps': speed_results['results'][0]['fps'],
-                    'latencia_ms': speed_results['results'][0]['avg_latency_ms']
-                }
+                "velocidade": {
+                    "fps": speed_results["results"][0]["fps"],
+                    "latencia_ms": speed_results["results"][0]["avg_latency_ms"],
+                },
             }
 
         # Gerar visualizações
@@ -142,50 +131,48 @@ class ModelComparator:
 
         # Extrair dados para os gráficos
         model_names = list(results.keys())
-        map50_values = [results[model]['metricas']['mAP50'] for model in model_names]
-        fps_values = [results[model]['velocidade']['fps'] for model in model_names]
-        size_values = [results[model]['tamanho_arquivo'] for model in model_names]
+        map50_values = [results[model]["metricas"]["mAP50"] for model in model_names]
+        fps_values = [results[model]["velocidade"]["fps"] for model in model_names]
+        size_values = [results[model]["tamanho_arquivo"] for model in model_names]
 
         # 1. Gráfico de precisão (mAP50)
         plt.figure(figsize=(10, 6))
-        bars = plt.bar(model_names, map50_values, color='skyblue')
-        plt.title('Comparação de Precisão (mAP50)')
-        plt.xlabel('Modelo')
-        plt.ylabel('mAP50')
+        bars = plt.bar(model_names, map50_values, color="skyblue")
+        plt.title("Comparação de Precisão (mAP50)")
+        plt.xlabel("Modelo")
+        plt.ylabel("mAP50")
         plt.ylim(0, 1)
         plt.xticks(rotation=45)
 
         # Adicionar valores nas barras
         for bar in bars:
             height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width() / 2., height + 0.01,
-                     f'{height:.3f}', ha='center', va='bottom')
+            plt.text(bar.get_x() + bar.get_width() / 2.0, height + 0.01, f"{height:.3f}", ha="center", va="bottom")
 
-        accuracy_path = os.path.join(self.output_dir, 'accuracy_comparison.png')
+        accuracy_path = os.path.join(self.output_dir, "accuracy_comparison.png")
         plt.tight_layout()
         plt.savefig(accuracy_path)
         plt.close()
-        visualization_paths['accuracy'] = accuracy_path
+        visualization_paths["accuracy"] = accuracy_path
 
         # 2. Gráfico de velocidade (FPS)
         plt.figure(figsize=(10, 6))
-        bars = plt.bar(model_names, fps_values, color='lightgreen')
-        plt.title('Comparação de Velocidade (FPS)')
-        plt.xlabel('Modelo')
-        plt.ylabel('Frames Por Segundo')
+        bars = plt.bar(model_names, fps_values, color="lightgreen")
+        plt.title("Comparação de Velocidade (FPS)")
+        plt.xlabel("Modelo")
+        plt.ylabel("Frames Por Segundo")
         plt.xticks(rotation=45)
 
         # Adicionar valores nas barras
         for bar in bars:
             height = bar.get_height()
-            plt.text(bar.get_x() + bar.get_width() / 2., height + 0.5,
-                     f'{height:.1f}', ha='center', va='bottom')
+            plt.text(bar.get_x() + bar.get_width() / 2.0, height + 0.5, f"{height:.1f}", ha="center", va="bottom")
 
-        speed_path = os.path.join(self.output_dir, 'speed_comparison.png')
+        speed_path = os.path.join(self.output_dir, "speed_comparison.png")
         plt.tight_layout()
         plt.savefig(speed_path)
         plt.close()
-        visualization_paths['speed'] = speed_path
+        visualization_paths["speed"] = speed_path
 
         # 3. Gráfico de trade-off: Precisão vs. Velocidade
         plt.figure(figsize=(10, 8))
@@ -193,19 +180,18 @@ class ModelComparator:
 
         # Adicionar rótulos dos modelos
         for i, model in enumerate(model_names):
-            plt.annotate(model, (fps_values[i], map50_values[i]),
-                         xytext=(5, 5), textcoords='offset points')
+            plt.annotate(model, (fps_values[i], map50_values[i]), xytext=(5, 5), textcoords="offset points")
 
-        plt.title('Trade-off: Precisão vs. Velocidade')
-        plt.xlabel('Velocidade (FPS)')
-        plt.ylabel('Precisão (mAP50)')
+        plt.title("Trade-off: Precisão vs. Velocidade")
+        plt.xlabel("Velocidade (FPS)")
+        plt.ylabel("Precisão (mAP50)")
         plt.grid(True, alpha=0.3)
 
-        tradeoff_path = os.path.join(self.output_dir, 'accuracy_vs_speed.png')
+        tradeoff_path = os.path.join(self.output_dir, "accuracy_vs_speed.png")
         plt.tight_layout()
         plt.savefig(tradeoff_path)
         plt.close()
-        visualization_paths['tradeoff'] = tradeoff_path
+        visualization_paths["tradeoff"] = tradeoff_path
 
         return visualization_paths
 
@@ -220,29 +206,29 @@ class ModelComparator:
             Caminho para o arquivo JSON gerado
         """
         # Salvar como JSON
-        json_path = os.path.join(self.output_dir, 'model_comparison_results.json')
-        with open(json_path, 'w') as f:
+        json_path = os.path.join(self.output_dir, "model_comparison_results.json")
+        with open(json_path, "w") as f:
             json.dump(results, f, indent=4)
 
         # Converter para formato tabular e salvar como CSV
         rows = []
         for model_name, model_data in results.items():
             row = {
-                'modelo': model_name,
-                'categoria': model_data['tamanho'],
-                'tamanho_mb': model_data['tamanho_arquivo'],
-                'map50': model_data['metricas']['mAP50'],
-                'map50_95': model_data['metricas']['mAP50-95'],
-                'recall': model_data['metricas']['recall'],
-                'precision': model_data['metricas']['precision'],
-                'f1_score': model_data['metricas']['f1-score'],
-                'fps': model_data['velocidade']['fps'],
-                'latencia_ms': model_data['velocidade']['latencia_ms']
+                "modelo": model_name,
+                "categoria": model_data["tamanho"],
+                "tamanho_mb": model_data["tamanho_arquivo"],
+                "map50": model_data["metricas"]["mAP50"],
+                "map50_95": model_data["metricas"]["mAP50-95"],
+                "recall": model_data["metricas"]["recall"],
+                "precision": model_data["metricas"]["precision"],
+                "f1_score": model_data["metricas"]["f1-score"],
+                "fps": model_data["velocidade"]["fps"],
+                "latencia_ms": model_data["velocidade"]["latencia_ms"],
             }
             rows.append(row)
 
         df = pd.DataFrame(rows)
-        csv_path = os.path.join(self.output_dir, 'model_comparison_results.csv')
+        csv_path = os.path.join(self.output_dir, "model_comparison_results.csv")
         df.to_csv(csv_path, index=False)
 
         return json_path

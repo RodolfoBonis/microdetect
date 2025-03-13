@@ -6,7 +6,7 @@ import csv
 import logging
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 import jinja2
 import pandas as pd
@@ -30,12 +30,12 @@ class ReportGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_pdf_report(
-            self,
-            metrics: Dict[str, Any],
-            model_path: str,
-            output_file: Optional[str] = None,
-            include_images: List[str] = None,
-            template_path: Optional[str] = None
+        self,
+        metrics: Dict[str, Any],
+        model_path: str,
+        output_file: Optional[str] = None,
+        include_images: List[str] = None,
+        template_path: Optional[str] = None,
     ) -> str:
         """
         Gera um relatório PDF detalhado com métricas de avaliação.
@@ -72,7 +72,7 @@ class ReportGenerator:
             "date": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "general_metrics": metrics.get("metricas_gerais", {}),
             "class_metrics": metrics.get("metricas_por_classe", []),
-            "images": include_images or []
+            "images": include_images or [],
         }
 
         # Carregar template
@@ -239,11 +239,7 @@ class ReportGenerator:
             logger.error(f"Erro ao gerar PDF: {str(e)}")
             return html_path  # Retorna o caminho HTML como fallback
 
-    def generate_csv_report(
-            self,
-            metrics: Dict[str, Any],
-            output_file: Optional[str] = None
-    ) -> str:
+    def generate_csv_report(self, metrics: Dict[str, Any], output_file: Optional[str] = None) -> str:
         """
         Gera um relatório CSV com métricas de avaliação.
 
@@ -282,22 +278,20 @@ class ReportGenerator:
                 writer.writerow(["Classe", "Precisão (AP50)", "Recall", "Precisão", "F1-Score"])
 
                 for metric in class_metrics:
-                    writer.writerow([
-                        metric["Classe"],
-                        f"{metric['Precisão (AP50)']:.4f}",
-                        f"{metric['Recall']:.4f}",
-                        f"{metric['Precisão']:.4f}",
-                        f"{metric['F1-Score']:.4f}"
-                    ])
+                    writer.writerow(
+                        [
+                            metric["Classe"],
+                            f"{metric['Precisão (AP50)']:.4f}",
+                            f"{metric['Recall']:.4f}",
+                            f"{metric['Precisão']:.4f}",
+                            f"{metric['F1-Score']:.4f}",
+                        ]
+                    )
 
         logger.info(f"Relatório CSV gerado: {output_file}")
         return output_file
 
-    def export_detections_to_csv(
-            self,
-            detections: Dict[str, List[Dict[str, Any]]],
-            output_file: Optional[str] = None
-    ) -> str:
+    def export_detections_to_csv(self, detections: Dict[str, List[Dict[str, Any]]], output_file: Optional[str] = None) -> str:
         """
         Exporta resultados de detecção para CSV.
 
@@ -328,7 +322,7 @@ class ReportGenerator:
                     "x1": det.get("bbox", [0, 0, 0, 0])[0],
                     "y1": det.get("bbox", [0, 0, 0, 0])[1],
                     "x2": det.get("bbox", [0, 0, 0, 0])[2],
-                    "y2": det.get("bbox", [0, 0, 0, 0])[3]
+                    "y2": det.get("bbox", [0, 0, 0, 0])[3],
                 }
                 rows.append(row)
 
@@ -339,11 +333,7 @@ class ReportGenerator:
         logger.info(f"Detecções exportadas para CSV: {output_file}")
         return output_file
 
-    def export_to_yolo_format(
-            self,
-            detections: Dict[str, List[Dict[str, Any]]],
-            output_dir: Optional[str] = None
-    ) -> str:
+    def export_to_yolo_format(self, detections: Dict[str, List[Dict[str, Any]]], output_dir: Optional[str] = None) -> str:
         """
         Exporta resultados de detecção para o formato YOLO (arquivos .txt).
 
@@ -390,8 +380,7 @@ class ReportGenerator:
                             else:
                                 # Valores absolutos, converter para normalizados
                                 # Assume-se que a imagem tenha dimensões 1.0 x 1.0
-                                logger.warning(
-                                    f"Usando dimensões padrão para {image_name}. Resultados podem ser imprecisos.")
+                                logger.warning(f"Usando dimensões padrão para {image_name}. Resultados podem ser imprecisos.")
                                 center_x = (x1 + x2) / 2 / 1.0
                                 center_y = (y1 + y2) / 2 / 1.0
                                 width = (x2 - x1) / 1.0

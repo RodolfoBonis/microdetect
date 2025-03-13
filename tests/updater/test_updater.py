@@ -1,4 +1,4 @@
-# tests/utils/test_updater.py
+# tests/updater/test_updater.py
 import json
 import os
 from unittest.mock import patch
@@ -7,7 +7,7 @@ from microdetect.updater.updater import UpdateManager
 from tests.utils.version_helper import mock_microdetect_version
 
 
-@patch("microdetect.utils.updater.subprocess.check_output")
+@patch("microdetect.updater.updater.subprocess.check_output")
 def test_get_aws_codeartifact_token_success(mock_check_output):
     """Test successful retrieval of AWS CodeArtifact token."""
     # Configure mocks
@@ -31,7 +31,7 @@ def test_get_aws_codeartifact_token_success(mock_check_output):
     del os.environ["AWS_CODEARTIFACT_REPOSITORY"]
 
 
-@patch("microdetect.utils.updater.subprocess.check_output")
+@patch("microdetect.updater.updater.subprocess.check_output")
 def test_get_aws_codeartifact_token_failure(mock_check_output):
     """Test failure in retrieving AWS CodeArtifact token."""
     # Configure mock to raise an exception
@@ -46,8 +46,8 @@ def test_get_aws_codeartifact_token_failure(mock_check_output):
     assert endpoint == ""
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
-@patch("microdetect.utils.updater.subprocess.check_output")
+@patch("microdetect.updater.updater.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.updater.updater.subprocess.check_output")
 def test_get_latest_version_success(mock_check_output, mock_get_token):
     """Test successful retrieval of the latest version."""
     # Configure mocks
@@ -62,7 +62,7 @@ def test_get_latest_version_success(mock_check_output, mock_get_token):
     assert version == "1.2.3"
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_aws_codeartifact_token")
+@patch("microdetect.updater.updater.UpdateManager.get_aws_codeartifact_token")
 def test_get_latest_version_token_failure(mock_get_token):
     """Test failure in retrieving the latest version due to token failure."""
     # Configure mock to simulate token failure
@@ -96,7 +96,7 @@ def test_compare_versions():
     assert UpdateManager.compare_versions("1.0.0", "1.0") is False
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates(mock_get_latest_version):
     """Test the check_for_updates method."""
     # Configure mock
@@ -122,7 +122,7 @@ def test_check_for_updates(mock_get_latest_version):
     assert update_info["needs_update"] is True
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_no_update_needed(mock_get_latest_version):
     """Test the check_for_updates method when no update is needed."""
     # Configure mock
@@ -143,7 +143,7 @@ def test_check_for_updates_no_update_needed(mock_get_latest_version):
     assert update_info["needs_update"] is False
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_error(mock_get_latest_version):
     """Test the check_for_updates method when an error occurs."""
     # Configure mock to simulate failure
@@ -181,8 +181,8 @@ def test_check_for_updates_before_command():
     del os.environ["MICRODETECT_SKIP_UPDATE_CHECK"]
 
 
-@patch("microdetect.utils.updater.json.dump")
-@patch("microdetect.utils.updater.UpdateManager.check_for_updates")
+@patch("microdetect.updater.updater.json.dump")
+@patch("microdetect.updater.updater.UpdateManager.check_for_updates")
 def test_check_for_updates_before_command_with_cache(mock_check_for_updates, mock_json_dump, tmp_path, monkeypatch):
     """Test using the update check cache."""
     # Configure mock
@@ -211,7 +211,7 @@ def test_check_for_updates_before_command_with_cache(mock_check_for_updates, moc
     assert result is False
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_with_helper(mock_get_latest_version):
     """Test the check_for_updates method using the version helper."""
     # Configure mock
@@ -231,7 +231,7 @@ def test_check_for_updates_with_helper(mock_get_latest_version):
     assert update_info["needs_update"] is True
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_no_update_needed_with_helper(mock_get_latest_version):
     """Test the check_for_updates method when no update is needed."""
     # Configure mock
@@ -246,7 +246,7 @@ def test_check_for_updates_no_update_needed_with_helper(mock_get_latest_version)
     assert update_info["needs_update"] is False
 
 
-@patch("microdetect.utils.updater.UpdateManager.get_latest_version")
+@patch("microdetect.updater.updater.UpdateManager.get_latest_version")
 def test_check_for_updates_error_with_helper(mock_get_latest_version):
     """Test the check_for_updates method when an error occurs."""
     # Configure mock to simulate failure

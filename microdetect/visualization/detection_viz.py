@@ -4,7 +4,7 @@ Módulo para visualização de detecções em imagens.
 
 import logging
 import os
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -36,14 +36,14 @@ class DetectionVisualizer:
         }
 
     def generate_detection_overlay(
-            self,
-            image_path: str,
-            detections: List[Dict[str, Any]],
-            output_path: Optional[str] = None,
-            conf_threshold: float = 0.25,
-            show_labels: bool = True,
-            line_thickness: int = 2,
-            font_scale: float = 0.5
+        self,
+        image_path: str,
+        detections: List[Dict[str, Any]],
+        output_path: Optional[str] = None,
+        conf_threshold: float = 0.25,
+        show_labels: bool = True,
+        line_thickness: int = 2,
+        font_scale: float = 0.5,
     ) -> np.ndarray:
         """
         Gera uma imagem com sobreposição de caixas delimitadoras para detecções.
@@ -72,13 +72,13 @@ class DetectionVisualizer:
         # Desenhar cada detecção
         for detection in detections:
             # Verificar confiança
-            confidence = detection.get('conf', 0)
+            confidence = detection.get("conf", 0)
             if confidence < conf_threshold:
                 continue
 
             # Extrair informações
-            bbox = detection.get('bbox', [0, 0, 0, 0])  # [x, y, width, height]
-            class_id = detection.get('class', 0)
+            bbox = detection.get("bbox", [0, 0, 0, 0])  # [x, y, width, height]
+            class_id = detection.get("class", 0)
 
             # Converter para formato [x1, y1, x2, y2] se necessário
             if len(bbox) == 4 and isinstance(bbox[0], float) and bbox[0] <= 1.0:
@@ -114,7 +114,7 @@ class DetectionVisualizer:
                     (x1, y1 - label_height - baseline - 5),
                     (x1 + label_width, y1),
                     color,
-                    -1  # -1 para preencher
+                    -1,  # -1 para preencher
                 )
 
                 # Desenhar texto
@@ -125,7 +125,7 @@ class DetectionVisualizer:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     font_scale,
                     (255, 255, 255),  # Branco
-                    line_thickness - 1
+                    line_thickness - 1,
                 )
 
         # Salvar imagem resultante
@@ -137,11 +137,7 @@ class DetectionVisualizer:
         return output_image
 
     def visualize_interactive(
-            self,
-            model_path: str,
-            image_dir: str,
-            conf_threshold: float = 0.25,
-            iou_threshold: float = 0.45
+        self, model_path: str, image_dir: str, conf_threshold: float = 0.25, iou_threshold: float = 0.45
     ) -> None:
         """
         Mostra uma interface interativa para visualizar detecções.
@@ -162,8 +158,7 @@ class DetectionVisualizer:
         model = YOLO(model_path)
 
         # Listar imagens no diretório
-        image_files = [f for f in os.listdir(image_dir)
-                       if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        image_files = [f for f in os.listdir(image_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp"))]
 
         if not image_files:
             logger.error(f"Nenhuma imagem encontrada em: {image_dir}")
@@ -198,41 +193,22 @@ class DetectionVisualizer:
                     x1, y1, x2, y2 = box.xyxy.cpu().numpy()[0]
 
                     detection = {
-                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                        'class': int(box.cls.cpu().numpy()[0]),
-                        'conf': float(box.conf.cpu().numpy()[0]),
-                        'name': results.names[int(box.cls.cpu().numpy()[0])]
+                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                        "class": int(box.cls.cpu().numpy()[0]),
+                        "conf": float(box.conf.cpu().numpy()[0]),
+                        "name": results.names[int(box.cls.cpu().numpy()[0])],
                     }
                     detections.append(detection)
 
             # Gerar imagem com overlays
             overlay_image = self.generate_detection_overlay(
-                image_path,
-                detections,
-                conf_threshold=0,  # Já filtramos pelo conf_threshold no modelo
-                show_labels=True
+                image_path, detections, conf_threshold=0, show_labels=True  # Já filtramos pelo conf_threshold no modelo
             )
 
             # Adicionar informações na imagem
             info_text = f"Imagem: {image_files[current_idx]} | Confiança: {current_conf:.2f} | {len(detections)} detecções"
-            cv2.putText(
-                overlay_image,
-                info_text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 0, 0),
-                2
-            )
-            cv2.putText(
-                overlay_image,
-                info_text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255, 255, 255),
-                1
-            )
+            cv2.putText(overlay_image, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            cv2.putText(overlay_image, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 1)
 
             # Mostrar imagem
             cv2.imshow("MicroDetect - Visualização de Detecções", overlay_image)
@@ -240,28 +216,28 @@ class DetectionVisualizer:
             # Processar teclas
             key = cv2.waitKey(0) & 0xFF
 
-            if key == ord('q'):
+            if key == ord("q"):
                 break
-            elif key == ord('n'):
+            elif key == ord("n"):
                 current_idx = (current_idx + 1) % len(image_files)
-            elif key == ord('p'):
+            elif key == ord("p"):
                 current_idx = (current_idx - 1) % len(image_files)
-            elif key == ord('+') or key == ord('='):
+            elif key == ord("+") or key == ord("="):
                 current_conf = min(current_conf + 0.05, 1.0)
-            elif key == ord('-') or key == ord('_'):
+            elif key == ord("-") or key == ord("_"):
                 current_conf = max(current_conf - 0.05, 0.05)
 
         cv2.destroyAllWindows()
         logger.info("Visualização interativa encerrada")
 
     def batch_visualization(
-            self,
-            model_path: str,
-            image_dir: str,
-            output_dir: str,
-            conf_threshold: float = 0.25,
-            iou_threshold: float = 0.45,
-            image_size: int = 640
+        self,
+        model_path: str,
+        image_dir: str,
+        output_dir: str,
+        conf_threshold: float = 0.25,
+        iou_threshold: float = 0.45,
+        image_size: int = 640,
     ) -> Dict[str, List[Dict]]:
         """
         Processa um lote de imagens e salva as visualizações com detecções.
@@ -281,8 +257,7 @@ class DetectionVisualizer:
         model = YOLO(model_path)
 
         # Listar imagens no diretório
-        image_files = [f for f in os.listdir(image_dir)
-                       if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+        image_files = [f for f in os.listdir(image_dir) if f.lower().endswith((".jpg", ".jpeg", ".png", ".bmp"))]
 
         if not image_files:
             logger.error(f"Nenhuma imagem encontrada em: {image_dir}")
@@ -318,10 +293,10 @@ class DetectionVisualizer:
                     x1, y1, x2, y2 = box.xyxy.cpu().numpy()[0]
 
                     detection = {
-                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                        'class': int(box.cls.cpu().numpy()[0]),
-                        'conf': float(box.conf.cpu().numpy()[0]),
-                        'name': results.names[int(box.cls.cpu().numpy()[0])]
+                        "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                        "class": int(box.cls.cpu().numpy()[0]),
+                        "conf": float(box.conf.cpu().numpy()[0]),
+                        "name": results.names[int(box.cls.cpu().numpy()[0])],
                     }
                     detections.append(detection)
 

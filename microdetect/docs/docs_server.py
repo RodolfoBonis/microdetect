@@ -3,14 +3,14 @@ Módulo para servir documentação como uma página web com menu lateral organiz
 """
 
 import http.server
+import re
 import socketserver
 import sys
 import threading
 import time
 import webbrowser
-import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, urlparse
 
 # Importar as constantes de cores do módulo existente
@@ -45,8 +45,9 @@ DEFAULT_LANGUAGE = "en"
 class DocPage:
     """Representa uma página de documentação com metadados."""
 
-    def __init__(self, path: Path, title: str = None, order: int = 999,
-                 category: str = None, subcategory: str = None, icon: str = None):
+    def __init__(
+        self, path: Path, title: str = None, order: int = 999, category: str = None, subcategory: str = None, icon: str = None
+    ):
         self.path = path
         self.title = title or self._extract_title()
         self.name = path.name
@@ -111,12 +112,7 @@ class DocPage:
 
     def get_metadata(self) -> Dict[str, Any]:
         """Extrai metadados do conteúdo Markdown."""
-        metadata = {
-            "order": self.order,
-            "category": self.category,
-            "subcategory": self.subcategory,
-            "icon": self.icon
-        }
+        metadata = {"order": self.order, "category": self.category, "subcategory": self.subcategory, "icon": self.icon}
 
         try:
             with open(self.path, "r", encoding="utf-8") as f:
@@ -275,7 +271,9 @@ def find_docs_dir() -> Path:
     return temp_docs
 
 
-def organize_documentation(docs_dir: Path, language: str = DEFAULT_LANGUAGE) -> Tuple[Dict[str, Dict[str, List[DocPage]]], Dict[str, DocPage]]:
+def organize_documentation(
+    docs_dir: Path, language: str = DEFAULT_LANGUAGE
+) -> Tuple[Dict[str, Dict[str, List[DocPage]]], Dict[str, DocPage]]:
     """
     Organiza a documentação em uma estrutura hierárquica para facilitar a navegação.
 
@@ -301,42 +299,58 @@ def organize_documentation(docs_dir: Path, language: str = DEFAULT_LANGUAGE) -> 
     if language == "en":
         predefined_categories = {
             "Getting Started": {"order": 10, "icon": "🚀", "subcategories": {}},
-            "Core Workflow": {"order": 20, "icon": "⚙️", "subcategories": {
-                "Image Preparation": {"order": 10, "icon": "🖼️"},
-                "Annotation": {"order": 20, "icon": "🏷️"},
-                "Dataset Management": {"order": 30, "icon": "📊"},
-                "Training": {"order": 40, "icon": "🧠"},
-                "Evaluation": {"order": 50, "icon": "📈"}
-            }},
-            "Advanced Analysis": {"order": 30, "icon": "🔬", "subcategories": {
-                "Model Evaluation": {"order": 10, "icon": "📊"},
-                "Error Analysis": {"order": 20, "icon": "🔍"},
-                "Visualization": {"order": 30, "icon": "📊"},
-                "Statistical Analysis": {"order": 40, "icon": "📉"},
-                "Batch Processing": {"order": 50, "icon": "🔄"}
-            }},
+            "Core Workflow": {
+                "order": 20,
+                "icon": "⚙️",
+                "subcategories": {
+                    "Image Preparation": {"order": 10, "icon": "🖼️"},
+                    "Annotation": {"order": 20, "icon": "🏷️"},
+                    "Dataset Management": {"order": 30, "icon": "📊"},
+                    "Training": {"order": 40, "icon": "🧠"},
+                    "Evaluation": {"order": 50, "icon": "📈"},
+                },
+            },
+            "Advanced Analysis": {
+                "order": 30,
+                "icon": "🔬",
+                "subcategories": {
+                    "Model Evaluation": {"order": 10, "icon": "📊"},
+                    "Error Analysis": {"order": 20, "icon": "🔍"},
+                    "Visualization": {"order": 30, "icon": "📊"},
+                    "Statistical Analysis": {"order": 40, "icon": "📉"},
+                    "Batch Processing": {"order": 50, "icon": "🔄"},
+                },
+            },
             "Configuration": {"order": 40, "icon": "⚙️", "subcategories": {}},
-            "Development": {"order": 50, "icon": "👨‍💻", "subcategories": {}}
+            "Development": {"order": 50, "icon": "👨‍💻", "subcategories": {}},
         }
     else:  # Portuguese
         predefined_categories = {
             "Primeiros Passos": {"order": 10, "icon": "🚀", "subcategories": {}},
-            "Fluxo de Trabalho": {"order": 20, "icon": "⚙️", "subcategories": {
-                "Preparação de Imagens": {"order": 10, "icon": "🖼️"},
-                "Anotação": {"order": 20, "icon": "🏷️"},
-                "Gerenciamento de Dataset": {"order": 30, "icon": "📊"},
-                "Treinamento": {"order": 40, "icon": "🧠"},
-                "Avaliação": {"order": 50, "icon": "📈"}
-            }},
-            "Análise Avançada": {"order": 30, "icon": "🔬", "subcategories": {
-                "Avaliação de Modelos": {"order": 10, "icon": "📊"},
-                "Análise de Erros": {"order": 20, "icon": "🔍"},
-                "Visualização": {"order": 30, "icon": "📊"},
-                "Análise Estatística": {"order": 40, "icon": "📉"},
-                "Processamento em Lote": {"order": 50, "icon": "🔄"}
-            }},
+            "Fluxo de Trabalho": {
+                "order": 20,
+                "icon": "⚙️",
+                "subcategories": {
+                    "Preparação de Imagens": {"order": 10, "icon": "🖼️"},
+                    "Anotação": {"order": 20, "icon": "🏷️"},
+                    "Gerenciamento de Dataset": {"order": 30, "icon": "📊"},
+                    "Treinamento": {"order": 40, "icon": "🧠"},
+                    "Avaliação": {"order": 50, "icon": "📈"},
+                },
+            },
+            "Análise Avançada": {
+                "order": 30,
+                "icon": "🔬",
+                "subcategories": {
+                    "Avaliação de Modelos": {"order": 10, "icon": "📊"},
+                    "Análise de Erros": {"order": 20, "icon": "🔍"},
+                    "Visualização": {"order": 30, "icon": "📊"},
+                    "Análise Estatística": {"order": 40, "icon": "📉"},
+                    "Processamento em Lote": {"order": 50, "icon": "🔄"},
+                },
+            },
             "Configuração": {"order": 40, "icon": "⚙️", "subcategories": {}},
-            "Desenvolvimento": {"order": 50, "icon": "👨‍💻", "subcategories": {}}
+            "Desenvolvimento": {"order": 50, "icon": "👨‍💻", "subcategories": {}},
         }
 
     # Mapeamento de palavras-chave para categorias e subcategorias
@@ -396,19 +410,17 @@ def organize_documentation(docs_dir: Path, language: str = DEFAULT_LANGUAGE) -> 
             "development": ("Desenvolvimento", None),
             "contributing": ("Desenvolvimento", None),
             "architecture": ("Desenvolvimento", None),
-        }
+        },
     }
 
     # Preparar estrutura de resultado
-    result = {category: {"order": info["order"], "icon": info["icon"], "subcategories": {}}
-              for category, info in predefined_categories.items()}
+    result = {
+        category: {"order": info["order"], "icon": info["icon"], "subcategories": {}}
+        for category, info in predefined_categories.items()
+    }
     for category, info in predefined_categories.items():
         for subcategory, subinfo in info["subcategories"].items():
-            result[category]["subcategories"][subcategory] = {
-                "order": subinfo["order"],
-                "icon": subinfo["icon"],
-                "pages": []
-            }
+            result[category]["subcategories"][subcategory] = {"order": subinfo["order"], "icon": subinfo["icon"], "pages": []}
         # Também adicionamos uma lista de páginas diretamente na categoria
         result[category]["pages"] = []
 
@@ -485,7 +497,9 @@ def organize_documentation(docs_dir: Path, language: str = DEFAULT_LANGUAGE) -> 
 
     # Remover categorias e subcategorias vazias
     for category in list(result.keys()):
-        if not result[category]["pages"] and not any(subcategory_info["pages"] for subcategory_info in result[category]["subcategories"].values()):
+        if not result[category]["pages"] and not any(
+            subcategory_info["pages"] for subcategory_info in result[category]["subcategories"].values()
+        ):
             del result[category]
         else:
             # Remover subcategorias vazias
@@ -1477,8 +1491,6 @@ def create_html_page(
     sidebar_html.append(language_selector_html)
     sidebar_html.append("  </div>")
 
-
-
     # Determinar qual categoria e subcategoria estão ativas
     active_category = None
     active_subcategory = None
@@ -1498,7 +1510,7 @@ def create_html_page(
         sidebar_html.append(f'      <span class="category-icon">{category_info["icon"]}</span>')
         sidebar_html.append(f'      <div class="category-title">{category}</div>')
         sidebar_html.append(f'      <span class="category-toggle">▶</span>')
-        sidebar_html.append(f'    </div>')
+        sidebar_html.append(f"    </div>")
 
         # Expandir por padrão se a categoria estiver ativa
         expanded_class = "expanded" if category_active else ""
@@ -1513,7 +1525,7 @@ def create_html_page(
                     f'        <li><a class="sidebar-link {active_class}" href="/?file={doc_page.name}&lang={current_language}">'
                     f'<span class="link-icon">{doc_page.icon}</span>{doc_page.title}</a></li>'
                 )
-            sidebar_html.append(f'      </ul>')
+            sidebar_html.append(f"      </ul>")
 
         # Adicionar subcategorias
         for subcategory, subcategory_info in category_info["subcategories"].items():
@@ -1525,7 +1537,7 @@ def create_html_page(
             sidebar_html.append(f'          <span class="subcategory-icon">{subcategory_info["icon"]}</span>')
             sidebar_html.append(f'          <div class="subcategory-title">{subcategory}</div>')
             sidebar_html.append(f'          <span class="subcategory-toggle">▶</span>')
-            sidebar_html.append(f'        </div>')
+            sidebar_html.append(f"        </div>")
 
             # Expandir por padrão se a subcategoria estiver ativa
             expanded_class = "expanded" if subcategory_active else ""
@@ -1539,13 +1551,13 @@ def create_html_page(
                     f'            <li><a class="sidebar-link {active_class}" href="/?file={doc_page.name}&lang={current_language}">'
                     f'<span class="link-icon">{doc_page.icon}</span>{doc_page.title}</a></li>'
                 )
-            sidebar_html.append(f'          </ul>')
+            sidebar_html.append(f"          </ul>")
 
-            sidebar_html.append(f'        </div>')
-            sidebar_html.append(f'      </div>')
+            sidebar_html.append(f"        </div>")
+            sidebar_html.append(f"      </div>")
 
-        sidebar_html.append(f'    </div>')
-        sidebar_html.append(f'  </div>')
+        sidebar_html.append(f"    </div>")
+        sidebar_html.append(f"  </div>")
 
     sidebar_html.append("</div>")
 
@@ -1569,7 +1581,9 @@ def create_html_page(
         else:
             home_text = "Home"
 
-        breadcrumbs.append(f'<div class="breadcrumb-item"><a href="/?file=index.md&lang={current_language}">{home_text}</a></div>')
+        breadcrumbs.append(
+            f'<div class="breadcrumb-item"><a href="/?file=index.md&lang={current_language}">{home_text}</a></div>'
+        )
 
         # Categoria
         if active_doc.category:
@@ -1582,7 +1596,7 @@ def create_html_page(
         # Página atual
         breadcrumbs.append(f'<div class="breadcrumb-item active">{active_doc.title}</div>')
 
-        breadcrumbs.append('</div>')
+        breadcrumbs.append("</div>")
         breadcrumbs_html = "\n".join(breadcrumbs)
 
     # Personalizar a página inicial

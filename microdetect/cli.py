@@ -18,11 +18,11 @@ from microdetect.aws import AWSSetupManager
 from microdetect.data.augmentation import DataAugmenter
 from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
+from microdetect.docs import DEFAULT_LANGUAGE, LANGUAGES
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
 from microdetect.utils import ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
-from microdetect.docs import DEFAULT_LANGUAGE, LANGUAGES
 
 # Configuração de logging
 logging.basicConfig(
@@ -35,6 +35,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
 
 def setup_convert_parser(subparsers):
     """Configurar parser para comando de conversão de imagens."""
@@ -49,11 +50,13 @@ def setup_convert_parser(subparsers):
     )
     parser.add_argument("--format", default="tiff-to-png", help="Formato de conversão (ex: tiff-to-png)")
 
+
 def setup_annotate_parser(subparsers):
     """Configurar parser para comando de anotação."""
     parser = subparsers.add_parser("annotate", help="Anotar imagens manualmente")
     parser.add_argument("--image_dir", required=True, help="Diretório com imagens para anotação")
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
+
 
 def setup_visualize_parser(subparsers):
     """Configurar parser para comando de visualização."""
@@ -69,6 +72,7 @@ def setup_visualize_parser(subparsers):
         help='Lista separada por vírgulas de IDs de classe para exibir (ex: "0,1")',
     )
 
+
 def setup_augment_parser(subparsers):
     """Configurar parser para comando de augmentação."""
     parser = subparsers.add_parser("augment", help="Aplicar augmentação em imagens e anotações")
@@ -77,6 +81,7 @@ def setup_augment_parser(subparsers):
     parser.add_argument("--output_image_dir", help="Diretório para salvar imagens aumentadas")
     parser.add_argument("--output_label_dir", help="Diretório para salvar anotações aumentadas")
     parser.add_argument("--factor", type=int, help="Fator de augmentação")
+
 
 def setup_dataset_parser(subparsers):
     """Configurar parser para comando de preparação de dataset."""
@@ -87,6 +92,7 @@ def setup_dataset_parser(subparsers):
     parser.add_argument("--train_ratio", type=float, help="Proporção para treinamento")
     parser.add_argument("--val_ratio", type=float, help="Proporção para validação")
     parser.add_argument("--test_ratio", type=float, help="Proporção para teste")
+
 
 def setup_train_parser(subparsers):
     """Configurar parser para comando de treinamento."""
@@ -109,6 +115,7 @@ def setup_train_parser(subparsers):
         help="Buscar melhores hiperparâmetros",
     )
 
+
 def setup_evaluate_parser(subparsers):
     """Configurar parser para comando de avaliação."""
     parser = subparsers.add_parser("evaluate", help="Avaliar modelo treinado")
@@ -117,6 +124,7 @@ def setup_evaluate_parser(subparsers):
     parser.add_argument("--data_yaml", help="Caminho para arquivo data.yaml")
     parser.add_argument("--output_dir", help="Diretório para relatórios")
     parser.add_argument("--confusion_matrix", action="store_true", help="Gerar matriz de confusão")
+
 
 def setup_init_parser(subparsers):
     """Configurar parser para comando de inicialização."""
@@ -129,11 +137,13 @@ def setup_init_parser(subparsers):
         help="Diretório para inicializar (padrão: diretório atual)",
     )
 
+
 def setup_update_parser(subparsers):
     """Configurar parser para comando de atualização."""
     parser = subparsers.add_parser("update", help="Verificar e instalar atualizações")
     parser.add_argument("--force", action="store_true", help="Forçar atualização sem confirmação")
     parser.add_argument("--check-only", action="store_true", help="Apenas verificar se há atualizações")
+
 
 def setup_aws_parser(subparsers):
     """Configurar parser para comando de configuração AWS."""
@@ -144,6 +154,7 @@ def setup_aws_parser(subparsers):
     parser.add_argument("--region", help="Região AWS (padrão: us-east-1)")
     parser.add_argument("--configure-aws", action="store_true", help="Configurar credenciais AWS")
     parser.add_argument("--test", action="store_true", help="Testar conexão com AWS CodeArtifact")
+
 
 def setup_docs_parser(subparsers):
     """Configurar parser para comando de documentação."""
@@ -160,12 +171,14 @@ def setup_docs_parser(subparsers):
     group.add_argument("--stop", action="store_true", help="Parar servidor em execução em background")
     group.add_argument("--status", action="store_true", help="Verificar status do servidor em background")
 
+
 def setup_install_docs_parser(subparsers):
     """Configurar o parser para o comando install-docs."""
     parser = subparsers.add_parser("install-docs", help="Instala ou atualiza a documentação local")
     parser.add_argument("--force", action="store_true", help="Força a reinstalação mesmo se a documentação já existir")
     parser.add_argument("--no-interactive", dest="interactive", action="store_false", help="Modo não interativo")
     return parser
+
 
 def setup_model_comparison_parser(subparsers):
     """Configurar parser para comando de comparação de modelos."""
@@ -176,6 +189,7 @@ def setup_model_comparison_parser(subparsers):
     parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança para detecções")
     parser.add_argument("--iou_threshold", type=float, default=0.7, help="Limiar de IoU para supressão não-máxima")
     parser.add_argument("--dashboard", action="store_true", help="Gerar dashboard interativo")
+
 
 def setup_batch_detect_parser(subparsers):
     """Configurar parser para comando de detecção em lote."""
@@ -189,12 +203,14 @@ def setup_batch_detect_parser(subparsers):
     parser.add_argument("--save_json", action="store_true", help="Salvar resultados em JSON")
     parser.add_argument("--save_img", action="store_true", help="Salvar imagens com detecções")
 
+
 def setup_visualize_detections_parser(subparsers):
     """Configurar parser para comando de visualização de detecções."""
     parser = subparsers.add_parser("visualize_detections", help="Visualizar detecções interativamente")
     parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
     parser.add_argument("--source", required=True, help="Diretório com imagens para visualizar")
     parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança inicial")
+
 
 def setup_analyze_errors_parser(subparsers):
     """Configurar parser para comando de análise de erros."""
@@ -203,8 +219,13 @@ def setup_analyze_errors_parser(subparsers):
     parser.add_argument("--data_yaml", required=True, help="Caminho para o arquivo data.yaml")
     parser.add_argument("--dataset_dir", required=True, help="Diretório do dataset")
     parser.add_argument("--output_dir", help="Diretório para salvar análises")
-    parser.add_argument("--error_type", choices=["all", "false_positives", "false_negatives", "classification_errors", "localization_errors"],
-                        default="all", help="Tipo de erro para analisar")
+    parser.add_argument(
+        "--error_type",
+        choices=["all", "false_positives", "false_negatives", "classification_errors", "localization_errors"],
+        default="all",
+        help="Tipo de erro para analisar",
+    )
+
 
 def setup_generate_report_parser(subparsers):
     """Configurar parser para comando de geração de relatórios."""
@@ -212,7 +233,10 @@ def setup_generate_report_parser(subparsers):
     parser.add_argument("--results_dir", required=True, help="Diretório com resultados de avaliação")
     parser.add_argument("--output_file", help="Caminho para o arquivo de saída")
     parser.add_argument("--format", choices=["pdf", "csv", "json"], default="pdf", help="Formato do relatório")
-    parser.add_argument("--include_images", help="Lista de caminhos de imagens para incluir no relatório, separados por vírgula")
+    parser.add_argument(
+        "--include_images", help="Lista de caminhos de imagens para incluir no relatório, separados por vírgula"
+    )
+
 
 def setup_dashboard_parser(subparsers):
     """Configurar parser para comando de dashboard."""
@@ -220,6 +244,7 @@ def setup_dashboard_parser(subparsers):
     parser.add_argument("--results_dir", required=True, help="Diretório com resultados de detecção")
     parser.add_argument("--port", type=int, default=8050, help="Porta para o servidor web")
     parser.add_argument("--no_browser", action="store_true", help="Não abrir navegador automaticamente")
+
 
 def handle_install_docs(args):
     """
@@ -271,6 +296,7 @@ def handle_install_docs(args):
     except Exception as e:
         print(f"Erro ao instalar a documentação: {str(e)}")
         return
+
 
 def handle_docs(args):
     """Manipular comando de documentação."""
@@ -326,6 +352,7 @@ def handle_docs(args):
     except Exception as e:
         logger.error(f"Erro ao iniciar o servidor de documentação: {str(e)}")
 
+
 def handle_setup_aws(args):
     """Manipular comando de configuração AWS."""
     # Verificar e instalar AWS CLI se necessário
@@ -379,6 +406,7 @@ def handle_setup_aws(args):
     print(f"{INFO}Todas as vezes que executar comandos microdetect, o sistema verificará{RESET}")
     print(f"{INFO}automaticamente se há atualizações disponíveis.{RESET}")
 
+
 def handle_update(args):
     """Manipular comando de atualização."""
     from microdetect.updater import UpdateManager
@@ -402,6 +430,7 @@ def handle_update(args):
             print(f"{SUCCESS}MicroDetect já está na versão mais recente {BRIGHT}({current_version}){RESET}")
     else:
         UpdateManager.update_package(args.force)
+
 
 def handle_init(args):
     """
@@ -516,6 +545,7 @@ Ou use o Makefile para passos automáticos (se disponível).
 """
     )
 
+
 def handle_convert(args):
     """Manipular comando de conversão de imagens."""
     logger.info(f"Iniciando conversão de imagens de {args.input_dir} para {args.output_dir}")
@@ -544,6 +574,7 @@ def handle_convert(args):
             + (f" e mais {len(error_messages) - 5} erros" if len(error_messages) > 5 else "")
         )
 
+
 def handle_annotate(args):
     """Manipular comando de anotação."""
     logger.info(f"Iniciando anotação manual de imagens em {args.image_dir}")
@@ -552,6 +583,7 @@ def handle_annotate(args):
     total, annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
 
     logger.info(f"Anotação concluída: {annotated}/{total} imagens anotadas")
+
 
 def handle_visualize(args):
     """Manipular comando de visualização."""
@@ -572,6 +604,7 @@ def handle_visualize(args):
         visualizer.visualize_annotations(args.image_dir, args.label_dir, args.output_dir, filter_classes)
         logger.info("Visualização interativa concluída")
 
+
 def handle_augment(args):
     """Manipular comando de augmentação."""
     logger.info(f"Iniciando augmentação de imagens em {args.image_dir}")
@@ -586,6 +619,7 @@ def handle_augment(args):
     )
 
     logger.info(f"Augmentação concluída: {augmented} novas imagens geradas a partir de {original} originais")
+
 
 def handle_dataset(args):
     """Manipular comando de preparação de dataset."""
@@ -605,6 +639,7 @@ def handle_dataset(args):
         f" {split_counts.get('test', 0)} teste"
     )
     logger.info(f"Arquivo de configuração criado: {yaml_path}")
+
 
 def handle_train(args):
     """Manipular comando de treinamento."""
@@ -638,6 +673,7 @@ def handle_train(args):
 
     logger.info("Treinamento concluído")
 
+
 def handle_evaluate(args):
     """Manipular comando de avaliação."""
     logger.info(f"Iniciando avaliação do modelo {args.model_path}")
@@ -667,12 +703,13 @@ def handle_evaluate(args):
     logger.info(f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}")
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
 
+
 def handle_model_comparison(args):
     """Manipular comando de comparação de modelos."""
     logger.info(f"Iniciando comparação de modelos: {args.model_paths}")
 
     # Separar lista de modelos
-    model_paths = args.model_paths.split(',')
+    model_paths = args.model_paths.split(",")
 
     # Validar que os modelos existem
     for model_path in model_paths:
@@ -686,8 +723,7 @@ def handle_model_comparison(args):
         return
 
     # Criar diretório de saída se fornecido
-    output_dir = args.output_dir or os.path.join("reports", "model_comparison",
-                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+    output_dir = args.output_dir or os.path.join("reports", "model_comparison", datetime.now().strftime("%Y%m%d_%H%M%S"))
     os.makedirs(output_dir, exist_ok=True)
 
     try:
@@ -701,7 +737,7 @@ def handle_model_comparison(args):
             model_paths=model_paths,
             data_yaml=args.data_yaml,
             conf_threshold=args.conf_threshold,
-            iou_threshold=args.iou_threshold
+            iou_threshold=args.iou_threshold,
         )
 
         # Gerar dashboard interativo se solicitado
@@ -718,6 +754,7 @@ def handle_model_comparison(args):
     except Exception as e:
         logger.error(f"Erro durante a comparação de modelos: {str(e)}")
 
+
 def handle_batch_detect(args):
     """Manipular comando de detecção em lote."""
     logger.info(f"Iniciando processamento em lote com modelo: {args.model_path}")
@@ -733,8 +770,7 @@ def handle_batch_detect(args):
         return
 
     # Definir diretório de saída
-    output_dir = args.output_dir or os.path.join("runs", "detect",
-                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+    output_dir = args.output_dir or os.path.join("runs", "detect", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
     try:
         # Instanciar processador em lote
@@ -751,7 +787,7 @@ def handle_batch_detect(args):
             conf_threshold=args.conf_threshold,
             save_txt=args.save_txt,
             save_img=args.save_img,
-            save_json=args.save_json
+            save_json=args.save_json,
         )
 
         logger.info(f"Processamento em lote concluído: {results['processed']}/{results['total']} imagens processadas")
@@ -759,6 +795,7 @@ def handle_batch_detect(args):
 
     except Exception as e:
         logger.error(f"Erro durante o processamento em lote: {str(e)}")
+
 
 def handle_visualize_detections(args):
     """Manipular comando de visualização interativa de detecções."""
@@ -781,16 +818,13 @@ def handle_visualize_detections(args):
         visualizer = DetectionVisualizer()
 
         # Iniciar visualização interativa
-        visualizer.visualize_interactive(
-            model_path=args.model_path,
-            image_dir=args.source,
-            conf_threshold=args.conf_threshold
-        )
+        visualizer.visualize_interactive(model_path=args.model_path, image_dir=args.source, conf_threshold=args.conf_threshold)
 
         logger.info("Visualização interativa finalizada")
 
     except Exception as e:
         logger.error(f"Erro durante a visualização interativa: {str(e)}")
+
 
 def handle_analyze_errors(args):
     """Manipular comando de análise de erros."""
@@ -812,8 +846,7 @@ def handle_analyze_errors(args):
         return
 
     # Definir diretório de saída
-    output_dir = args.output_dir or os.path.join("reports", "error_analysis",
-                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+    output_dir = args.output_dir or os.path.join("reports", "error_analysis", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
     try:
         # Instanciar analisador de erros
@@ -827,7 +860,7 @@ def handle_analyze_errors(args):
             data_yaml=args.data_yaml,
             dataset_dir=args.dataset_dir,
             error_type=args.error_type,
-            output_dir=output_dir
+            output_dir=output_dir,
         )
 
         # Exibir resultados
@@ -838,6 +871,7 @@ def handle_analyze_errors(args):
 
     except Exception as e:
         logger.error(f"Erro durante a análise de erros: {str(e)}")
+
 
 def handle_generate_report(args):
     """Manipular comando de geração de relatórios."""
@@ -864,7 +898,7 @@ def handle_generate_report(args):
         # Preparar lista de imagens para incluir no relatório
         include_images = []
         if args.include_images:
-            include_images = args.include_images.split(',')
+            include_images = args.include_images.split(",")
             # Verificar se as imagens existem
             for img_path in include_images:
                 if not os.path.exists(img_path):
@@ -881,7 +915,7 @@ def handle_generate_report(args):
             logger.error("Arquivo de métricas não encontrado no diretório de resultados")
             return
 
-        with open(metrics_file, 'r') as f:
+        with open(metrics_file, "r") as f:
             metrics = json.load(f)
 
         # Determinar caminho do modelo (pode estar no arquivo JSON)
@@ -892,19 +926,13 @@ def handle_generate_report(args):
 
         if args.format == "pdf":
             report_path = generator.generate_pdf_report(
-                metrics=metrics,
-                model_path=model_path,
-                output_file=args.output_file,
-                include_images=include_images
+                metrics=metrics, model_path=model_path, output_file=args.output_file, include_images=include_images
             )
         elif args.format == "csv":
-            report_path = generator.generate_csv_report(
-                metrics=metrics,
-                output_file=args.output_file
-            )
+            report_path = generator.generate_csv_report(metrics=metrics, output_file=args.output_file)
         else:  # json
             # Copiar o arquivo JSON existente com eventuais modificações
-            with open(args.output_file, 'w') as f:
+            with open(args.output_file, "w") as f:
                 json.dump(metrics, f, indent=4)
             report_path = args.output_file
 
@@ -912,6 +940,7 @@ def handle_generate_report(args):
 
     except Exception as e:
         logger.error(f"Erro durante a geração do relatório: {str(e)}")
+
 
 def handle_dashboard(args):
     """Manipular comando de dashboard interativo."""
@@ -923,7 +952,7 @@ def handle_dashboard(args):
         return
 
     # Verificar se há arquivos JSON no diretório
-    json_files = [f for f in os.listdir(args.results_dir) if f.endswith('.json')]
+    json_files = [f for f in os.listdir(args.results_dir) if f.endswith(".json")]
     if not json_files:
         logger.error(f"Nenhum arquivo JSON encontrado em: {args.results_dir}")
         return
@@ -936,9 +965,7 @@ def handle_dashboard(args):
 
         # Iniciar o dashboard
         port = generator.create_detection_dashboard(
-            results_dir=args.results_dir,
-            port=args.port,
-            open_browser=not args.no_browser
+            results_dir=args.results_dir, port=args.port, open_browser=not args.no_browser
         )
 
         logger.info(f"Dashboard iniciado em: http://localhost:{port}")
@@ -949,12 +976,14 @@ def handle_dashboard(args):
         try:
             # Aguardar indefinidamente (até Ctrl+C)
             import signal
+
             signal.pause()
         except (KeyboardInterrupt, SystemExit):
             logger.info("Dashboard encerrado pelo usuário")
 
     except Exception as e:
         logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
+
 
 def main(args: Optional[List[str]] = None):
     """

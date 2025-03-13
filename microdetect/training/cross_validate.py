@@ -15,6 +15,7 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+
 class CrossValidator:
     """
     Classe para realizar validação cruzada com modelos YOLO.
@@ -27,7 +28,7 @@ class CrossValidator:
         model_size: str = "m",
         epochs: int = 100,
         folds: int = 5,
-        seed: int = 42
+        seed: int = 42,
     ):
         """
         Inicializa o validador cruzado.
@@ -69,7 +70,7 @@ class CrossValidator:
             return []
 
         # Listar todos os arquivos
-        image_files = [f for f in os.listdir(images_dir) if f.endswith(('.jpg', '.jpeg', '.png'))]
+        image_files = [f for f in os.listdir(images_dir) if f.endswith((".jpg", ".jpeg", ".png"))]
 
         if not image_files:
             logger.error(f"Nenhuma imagem encontrada em {images_dir}")
@@ -81,12 +82,12 @@ class CrossValidator:
 
         # Dividir em folds
         fold_size = len(image_files) // self.folds
-        folds = [image_files[i:i + fold_size] for i in range(0, len(image_files), fold_size)]
+        folds = [image_files[i : i + fold_size] for i in range(0, len(image_files), fold_size)]
 
         # Ajustar o último fold se necessário
         if len(folds) > self.folds:
-            folds[self.folds-1].extend(folds[self.folds:])
-            folds = folds[:self.folds]
+            folds[self.folds - 1].extend(folds[self.folds :])
+            folds = folds[: self.folds]
 
         # Executar treinamento e validação para cada fold
         self.results = []
@@ -114,50 +115,39 @@ class CrossValidator:
             # Copiar arquivos para os diretórios correspondentes
             for f in train_files:
                 base_name = os.path.splitext(f)[0]
-                shutil.copy(
-                    os.path.join(images_dir, f),
-                    os.path.join(train_dir, "images", f)
-                )
+                shutil.copy(os.path.join(images_dir, f), os.path.join(train_dir, "images", f))
                 label_file = f"{base_name}.txt"
                 if os.path.exists(os.path.join(labels_dir, label_file)):
-                    shutil.copy(
-                        os.path.join(labels_dir, label_file),
-                        os.path.join(train_dir, "labels", label_file)
-                    )
+                    shutil.copy(os.path.join(labels_dir, label_file), os.path.join(train_dir, "labels", label_file))
 
             for f in val_files:
                 base_name = os.path.splitext(f)[0]
-                shutil.copy(
-                    os.path.join(images_dir, f),
-                    os.path.join(val_dir, "images", f)
-                )
+                shutil.copy(os.path.join(images_dir, f), os.path.join(val_dir, "images", f))
                 label_file = f"{base_name}.txt"
                 if os.path.exists(os.path.join(labels_dir, label_file)):
-                    shutil.copy(
-                        os.path.join(labels_dir, label_file),
-                        os.path.join(val_dir, "labels", label_file)
-                    )
+                    shutil.copy(os.path.join(labels_dir, label_file), os.path.join(val_dir, "labels", label_file))
 
             # Criar arquivo data.yaml para este fold
             yaml_path = os.path.join(fold_dir, "data.yaml")
 
             with open(yaml_path, "w") as f:
-                yaml.dump({
-                    "path": fold_dir,
-                    "train": "train/images",
-                    "val": "val/images",
-                    "nc": 3,  # Número de classes, pode precisar ser ajustado
-                    "names": ["0-levedura", "1-fungo", "2-micro-alga"]  # Nomes das classes
-                }, f)
+                yaml.dump(
+                    {
+                        "path": fold_dir,
+                        "train": "train/images",
+                        "val": "val/images",
+                        "nc": 3,  # Número de classes, pode precisar ser ajustado
+                        "names": ["0-levedura", "1-fungo", "2-micro-alga"],  # Nomes das classes
+                    },
+                    f,
+                )
 
             # Treinar o modelo para este fold
             try:
                 from microdetect.training.train import YOLOTrainer
 
                 trainer = YOLOTrainer(
-                    model_size=self.model_size,
-                    epochs=self.epochs,
-                    output_dir=os.path.join(fold_dir, "runs")
+                    model_size=self.model_size, epochs=self.epochs, output_dir=os.path.join(fold_dir, "runs")
                 )
 
                 results = trainer.train(yaml_path)
@@ -170,13 +160,15 @@ class CrossValidator:
                     metrics = evaluator.evaluate_model(best_model_path, yaml_path)
 
                     # Registrar resultados deste fold
-                    self.results.append({
-                        "fold": fold_idx + 1,
-                        "train_files": len(train_files),
-                        "val_files": len(val_files),
-                        "model_path": best_model_path,
-                        "metrics": metrics
-                    })
+                    self.results.append(
+                        {
+                            "fold": fold_idx + 1,
+                            "train_files": len(train_files),
+                            "val_files": len(val_files),
+                            "model_path": best_model_path,
+                            "metrics": metrics,
+                        }
+                    )
                 else:
                     logger.error(f"Modelo não encontrado após treinamento: {best_model_path}")
 
@@ -217,19 +209,17 @@ class CrossValidator:
                     "folds": self.folds,
                     "model_size": self.model_size,
                     "epochs": self.epochs,
-                    "seed": self.seed
+                    "seed": self.seed,
                 },
                 "average_metrics": {
                     "map50": float(avg_map50),
                     "map50_95": float(avg_map),
                     "recall": float(avg_recall),
                     "precision": float(avg_precision),
-                    "f1_score": float(avg_f1)
+                    "f1_score": float(avg_f1),
                 },
-                "std_metrics": {
-                    "map50": float(std_map50)
-                },
-                "fold_results": self.results
+                "std_metrics": {"map50": float(std_map50)},
+                "fold_results": self.results,
             }
 
             # Salvar relatório
@@ -270,23 +260,23 @@ class CrossValidator:
             width = 0.2
             ind = np.arange(len(folds))
 
-            plt.bar(ind - width*1.5, map50, width, label='mAP50')
-            plt.bar(ind - width/2, recall, width, label='Recall')
-            plt.bar(ind + width/2, precision, width, label='Precision')
-            plt.bar(ind + width*1.5, f1, width, label='F1-Score')
+            plt.bar(ind - width * 1.5, map50, width, label="mAP50")
+            plt.bar(ind - width / 2, recall, width, label="Recall")
+            plt.bar(ind + width / 2, precision, width, label="Precision")
+            plt.bar(ind + width * 1.5, f1, width, label="F1-Score")
 
-            plt.xlabel('Fold')
-            plt.ylabel('Valor')
-            plt.title('Métricas por Fold na Validação Cruzada')
-            plt.xticks(ind, [f'Fold {i}' for i in folds])
+            plt.xlabel("Fold")
+            plt.ylabel("Valor")
+            plt.title("Métricas por Fold na Validação Cruzada")
+            plt.xticks(ind, [f"Fold {i}" for i in folds])
             plt.ylim(0, 1.1)
-            plt.legend(loc='lower right')
-            plt.grid(axis='y', linestyle='--', alpha=0.7)
+            plt.legend(loc="lower right")
+            plt.grid(axis="y", linestyle="--", alpha=0.7)
 
             # Adicionar média como linha horizontal
             avg_map50 = np.mean(map50)
-            plt.axhline(y=avg_map50, color='r', linestyle='-', alpha=0.5)
-            plt.text(len(folds)-1, avg_map50+0.02, f'Média mAP50: {avg_map50:.3f}', color='r')
+            plt.axhline(y=avg_map50, color="r", linestyle="-", alpha=0.5)
+            plt.text(len(folds) - 1, avg_map50 + 0.02, f"Média mAP50: {avg_map50:.3f}", color="r")
 
             # Salvar figura
             plot_path = os.path.join(self.output_dir, "cross_validation_plot.png")

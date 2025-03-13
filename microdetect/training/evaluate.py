@@ -35,11 +35,7 @@ class ModelEvaluator:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def evaluate_model(
-        self,
-        model_path: str,
-        data_yaml: str,
-        conf_threshold: float = 0.25,
-        iou_threshold: float = 0.7
+        self, model_path: str, data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
     ) -> Dict[str, Any]:
         """
         Avalia o modelo treinado e gera métricas detalhadas.
@@ -68,11 +64,7 @@ class ModelEvaluator:
         logger.info(f"Avaliando modelo no conjunto de teste com conf={conf_threshold}, iou={iou_threshold}...")
 
         try:
-            results = model.val(
-                data=data_yaml,
-                conf=conf_threshold,
-                iou=iou_threshold
-            )
+            results = model.val(data=data_yaml, conf=conf_threshold, iou=iou_threshold)
             logger.info("Avaliação concluída")
         except Exception as e:
             logger.error(f"Erro durante avaliação: {str(e)}")
@@ -386,7 +378,7 @@ class ModelEvaluator:
         data_yaml: str,
         metric: str = "F1-Score",
         conf_range: Tuple[float, float, float] = (0.1, 0.9, 0.1),
-        iou_range: Tuple[float, float, float] = (0.5, 0.85, 0.05)
+        iou_range: Tuple[float, float, float] = (0.5, 0.85, 0.05),
     ) -> Dict[str, Any]:
         """
         Busca os limiares ótimos de confiança e IoU para maximizar uma métrica específica.
@@ -437,12 +429,14 @@ class ModelEvaluator:
                         logger.warning(f"Métrica {metric} não encontrada, usando mAP50")
                         score = metrics["metricas_gerais"]["Precisão (mAP50)"]
 
-                    all_results.append({
-                        "conf_threshold": conf,
-                        "iou_threshold": iou,
-                        "score": score,
-                        **{k: v for k, v in metrics["metricas_gerais"].items()}
-                    })
+                    all_results.append(
+                        {
+                            "conf_threshold": conf,
+                            "iou_threshold": iou,
+                            "score": score,
+                            **{k: v for k, v in metrics["metricas_gerais"].items()},
+                        }
+                    )
 
                     if score > best_score:
                         best_score = score
@@ -476,7 +470,7 @@ class ModelEvaluator:
             "best_score": best_score,
             "best_metrics": best_metrics,
             "results_csv": results_path,
-            "surface_plot": surface_plot_path
+            "surface_plot": surface_plot_path,
         }
 
     def _plot_threshold_surface(self, results: List[Dict[str, Any]], metric: str, save_path: str) -> None:
@@ -494,38 +488,34 @@ class ModelEvaluator:
 
             # Criar figura 3D
             fig = plt.figure(figsize=(12, 10))
-            ax = fig.add_subplot(111, projection='3d')
+            ax = fig.add_subplot(111, projection="3d")
 
             # Pivot da tabela para formato adequado
-            pivot = df.pivot_table(
-                index='conf_threshold',
-                columns='iou_threshold',
-                values='score'
-            )
+            pivot = df.pivot_table(index="conf_threshold", columns="iou_threshold", values="score")
 
             # Preparar dados para o gráfico
             X, Y = np.meshgrid(pivot.columns, pivot.index)
             Z = pivot.values
 
             # Plotar superfície
-            surf = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.8)
+            surf = ax.plot_surface(X, Y, Z, cmap="viridis", alpha=0.8)
 
             # Adicionar barra de cores
             fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
 
             # Configurar rótulos
-            ax.set_xlabel('IoU Threshold')
-            ax.set_ylabel('Confidence Threshold')
+            ax.set_xlabel("IoU Threshold")
+            ax.set_ylabel("Confidence Threshold")
             ax.set_zlabel(metric)
-            ax.set_title(f'Optimization Surface for {metric}')
+            ax.set_title(f"Optimization Surface for {metric}")
 
             # Encontrar e marcar o ponto máximo
-            max_idx = df['score'].idxmax()
-            max_conf = df.loc[max_idx, 'conf_threshold']
-            max_iou = df.loc[max_idx, 'iou_threshold']
-            max_score = df.loc[max_idx, 'score']
+            max_idx = df["score"].idxmax()
+            max_conf = df.loc[max_idx, "conf_threshold"]
+            max_iou = df.loc[max_idx, "iou_threshold"]
+            max_score = df.loc[max_idx, "score"]
 
-            ax.scatter([max_iou], [max_conf], [max_score], color='red', s=100, label=f'Max: {max_score:.4f}')
+            ax.scatter([max_iou], [max_conf], [max_score], color="red", s=100, label=f"Max: {max_score:.4f}")
             ax.legend()
 
             # Salvar figura
@@ -545,7 +535,7 @@ class ModelEvaluator:
         error_type: str = "all",  # "false_positives", "false_negatives", "classification_errors", "all"
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.5,
-        max_samples: int = 20
+        max_samples: int = 20,
     ) -> Dict[str, Any]:
         """
         Analisa e visualiza erros de detecção específicos.
@@ -609,7 +599,7 @@ class ModelEvaluator:
             # com as anotações reais das imagens de teste
 
             # Exemplo simplificado:
-            if hasattr(result, 'boxes'):
+            if hasattr(result, "boxes"):
                 # Contar detecções de baixa confiança como potenciais FPs
                 boxes = result.boxes
                 if len(boxes) > 0:
@@ -619,18 +609,18 @@ class ModelEvaluator:
         # Gerar relatório de erros
         report_path = os.path.join(output_dir, "error_analysis_report.json")
         with open(report_path, "w") as f:
-            json.dump({
-                "model": os.path.basename(model_path),
-                "error_counts": error_counts,
-                "conf_threshold": conf_threshold,
-                "iou_threshold": iou_threshold,
-                "timestamp": datetime.now().isoformat()
-            }, f, indent=4)
+            json.dump(
+                {
+                    "model": os.path.basename(model_path),
+                    "error_counts": error_counts,
+                    "conf_threshold": conf_threshold,
+                    "iou_threshold": iou_threshold,
+                    "timestamp": datetime.now().isoformat(),
+                },
+                f,
+                indent=4,
+            )
 
         logger.info(f"Análise de erros concluída, resultados salvos em: {output_dir}")
 
-        return {
-            "error_counts": error_counts,
-            "report_path": report_path,
-            "output_dir": output_dir
-        }
+        return {"error_counts": error_counts, "report_path": report_path, "output_dir": output_dir}

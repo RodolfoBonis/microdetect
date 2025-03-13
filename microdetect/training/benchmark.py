@@ -16,6 +16,7 @@ from ultralytics import YOLO
 
 logger = logging.getLogger(__name__)
 
+
 class SpeedBenchmark:
     """
     Classe para realizar benchmarks de velocidade de inferência em modelos.
@@ -38,7 +39,7 @@ class SpeedBenchmark:
         batch_sizes: List[int] = [1, 2, 4, 8, 16],
         image_sizes: List[int] = [640, 960, 1280],
         iterations: int = 50,
-        warmup: int = 10
+        warmup: int = 10,
     ) -> Dict[str, Any]:
         """
         Executa benchmark de velocidade para diferentes tamanhos de batch e imagem.
@@ -69,9 +70,7 @@ class SpeedBenchmark:
                     logger.info(f"Testando: batch_size={batch_size}, img_size={img_size}")
 
                     # Criar dados sintéticos para o teste
-                    dummy_input = np.random.randint(0, 255,
-                                                   (batch_size, img_size, img_size, 3),
-                                                   dtype=np.uint8)
+                    dummy_input = np.random.randint(0, 255, (batch_size, img_size, img_size, 3), dtype=np.uint8)
 
                     # Warmup para estabilizar a execução
                     for _ in range(warmup):
@@ -97,25 +96,23 @@ class SpeedBenchmark:
                     fps = 1000 / avg_latency * batch_size
 
                     # Registrar resultados
-                    self.results.append({
-                        "batch_size": batch_size,
-                        "image_size": img_size,
-                        "avg_latency_ms": avg_latency,
-                        "std_latency_ms": std_latency,
-                        "min_latency_ms": min_latency,
-                        "max_latency_ms": max_latency,
-                        "p95_latency_ms": p95_latency,
-                        "fps": fps,
-                        "samples_per_second": batch_size * fps
-                    })
+                    self.results.append(
+                        {
+                            "batch_size": batch_size,
+                            "image_size": img_size,
+                            "avg_latency_ms": avg_latency,
+                            "std_latency_ms": std_latency,
+                            "min_latency_ms": min_latency,
+                            "max_latency_ms": max_latency,
+                            "p95_latency_ms": p95_latency,
+                            "fps": fps,
+                            "samples_per_second": batch_size * fps,
+                        }
+                    )
 
                     logger.info(f"Resultado: Latência={avg_latency:.2f}ms, FPS={fps:.2f}, Amostras/seg={batch_size * fps:.2f}")
 
-            return {
-                "model": os.path.basename(self.model_path),
-                "device": self.device or "auto",
-                "results": self.results
-            }
+            return {"model": os.path.basename(self.model_path), "device": self.device or "auto", "results": self.results}
 
         except Exception as e:
             logger.error(f"Erro durante benchmark: {str(e)}")
@@ -163,12 +160,7 @@ class SpeedBenchmark:
             # Primeiro gráfico: FPS vs Tamanho do Batch para diferentes tamanhos de imagem
             for img_size in df["image_size"].unique():
                 subset = df[df["image_size"] == img_size]
-                axs[0].plot(
-                    subset["batch_size"],
-                    subset["fps"],
-                    marker="o",
-                    label=f"Imagem {img_size}x{img_size}"
-                )
+                axs[0].plot(subset["batch_size"], subset["fps"], marker="o", label=f"Imagem {img_size}x{img_size}")
 
             axs[0].set_xlabel("Tamanho do Batch")
             axs[0].set_ylabel("FPS")
@@ -179,12 +171,7 @@ class SpeedBenchmark:
             # Segundo gráfico: Amostras/segundo vs Tamanho da Imagem para diferentes tamanhos de batch
             for batch in df["batch_size"].unique():
                 subset = df[df["batch_size"] == batch]
-                axs[1].plot(
-                    subset["image_size"],
-                    subset["samples_per_second"],
-                    marker="o",
-                    label=f"Batch {batch}"
-                )
+                axs[1].plot(subset["image_size"], subset["samples_per_second"], marker="o", label=f"Batch {batch}")
 
             axs[1].set_xlabel("Tamanho da Imagem")
             axs[1].set_ylabel("Amostras/segundo")
@@ -209,6 +196,7 @@ class SpeedBenchmark:
         except Exception as e:
             logger.error(f"Erro ao plotar resultados: {str(e)}")
             return None
+
 
 class ResourceMonitor:
     """
@@ -259,7 +247,7 @@ class ResourceMonitor:
         self.running = False
 
         if self.monitoring_thread:
-            self.monitoring_thread.join(timeout=2*self.interval)
+            self.monitoring_thread.join(timeout=2 * self.interval)
 
         logger.info("Monitoramento de recursos finalizado")
 
@@ -287,7 +275,7 @@ class ResourceMonitor:
                 "gpu_percent_avg": float(gpu_avg),
                 "gpu_percent_max": float(gpu_max),
                 "gpu_memory_used_avg": float(gpu_mem_avg),
-                "gpu_memory_used_max": float(gpu_mem_max)
+                "gpu_memory_used_max": float(gpu_mem_max),
             }
 
         return {
@@ -297,7 +285,7 @@ class ResourceMonitor:
             "cpu_percent_max": float(cpu_max),
             "memory_percent_avg": float(mem_avg),
             "memory_percent_max": float(mem_max),
-            **gpu_stats
+            **gpu_stats,
         }
 
     def _monitor_resources(self):
@@ -307,6 +295,7 @@ class ResourceMonitor:
         # Tentar importar módulo para GPU (opcional)
         try:
             import torch
+
             has_cuda = torch.cuda.is_available()
         except ImportError:
             has_cuda = False
@@ -320,7 +309,7 @@ class ResourceMonitor:
                 "timestamp": time.time() - self.start_time,
                 "cpu_percent": cpu_percent,
                 "memory_percent": memory.percent,
-                "memory_used": memory.used
+                "memory_used": memory.used,
             }
 
             # Adicionar estatísticas de GPU, se disponíveis
@@ -330,11 +319,13 @@ class ResourceMonitor:
                     gpu_mem_reserved = torch.cuda.memory_reserved()
                     gpu_max_mem = torch.cuda.get_device_properties(0).total_memory
 
-                    measurement.update({
-                        "gpu_memory_used": gpu_mem_alloc,
-                        "gpu_memory_reserved": gpu_mem_reserved,
-                        "gpu_memory_percent": 100 * gpu_mem_alloc / gpu_max_mem
-                    })
+                    measurement.update(
+                        {
+                            "gpu_memory_used": gpu_mem_alloc,
+                            "gpu_memory_reserved": gpu_mem_reserved,
+                            "gpu_memory_percent": 100 * gpu_mem_alloc / gpu_max_mem,
+                        }
+                    )
                 except Exception:
                     pass
 
