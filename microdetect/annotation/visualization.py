@@ -14,6 +14,17 @@ from microdetect.utils.config import config
 
 logger = logging.getLogger(__name__)
 
+# Constantes
+DEFAULT_COLORS = {
+    "0": (0, 255, 0),  # Verde para levedura
+    "1": (0, 0, 255),  # Vermelho para fungo
+    "2": (255, 0, 0),  # Azul para micro-alga
+}
+
+DEFAULT_BOX_THICKNESS = 2
+DEFAULT_TEXT_SIZE = 0.5
+DEFAULT_TEXT_THICKNESS = 1
+
 
 class AnnotationVisualizer:
     """
@@ -45,13 +56,112 @@ class AnnotationVisualizer:
             self.class_map = class_map
 
         # Usar color_map da configuração ou o padrão
-        self.color_map = color_map or config.get(
-            "color_map",
-            {
-                "0": (0, 255, 0),  # Verde para levedura
-                "1": (0, 0, 255),  # Vermelho para fungo
-                "2": (255, 0, 0),  # Azul para micro-alga
-            },
+        self.color_map = color_map or config.get("color_map", DEFAULT_COLORS)
+
+        # Carregar configurações de visualização
+        annotation_config = config.get("annotation", {})
+        self.box_thickness = annotation_config.get("box_thickness", DEFAULT_BOX_THICKNESS)
+        self.text_size = annotation_config.get("text_size", DEFAULT_TEXT_SIZE)
+        self.text_thickness = annotation_config.get("text_thickness", DEFAULT_TEXT_THICKNESS)
+
+    def _load_image(self, img_path: str) -> Optional[np.ndarray]:
+        """
+        Carrega uma imagem com tratamento de erro adequado.
+
+        Args:
+            img_path: Caminho para a imagem
+
+        Returns:
+            Imagem carregada ou None em caso de erro
+        """
+        img = cv2.imread(img_path)
+        if img is None:
+            logger.error(f"Erro: Não foi possível carregar a imagem {img_path}")
+            return None
+        return img
+
+    def _process_annotation_line(
+        self,
+        ann: str,
+        w: int,
+        h: int,
+        class_visibility: Dict[str, bool]
+    ) -> Optional[Dict]:
+        """
+        Processa uma linha de anotação e retorna dados da bounding box.
+
+        Args:
+            ann: Linha de anotação no formato YOLO
+            w: Largura da imagem
+            h: Altura da imagem
+            class_visibility: Dicionário de visibilidade de classes
+
+        Returns:
+            Dicionário com informações da bounding box ou None se a anotação for inválida
+        """
+        parts = ann.strip().split()
+        if len(parts) != 5:  # Formato YOLO: classe x_center y_center width height
+            return None
+
+        cls, x_center, y_center, box_w, box_h = parts
+
+        # Pular se a classe for filtrada
+        if not class_visibility.get(cls, True):
+            return None
+
+        # Converter coordenadas normalizadas para valores de pixel
+        x_center = float(x_center) * w
+        y_center = float(y_center) * h
+        box_w = float(box_w) * w
+        box_h = float(box_h) * h
+
+        # Calcular pontos de canto
+        x1 = int(x_center - box_w / 2)
+        y1 = int(y_center - box_h / 2)
+        x2 = int(x_center + box_w / 2)
+        y2 = int(y_center + box_h / 2)
+
+        # Obter nome da classe para exibição
+        class_name = self.class_map.get(cls, f"Classe {cls}")
+
+        return {
+            'class_id': cls,
+            'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
+            'color': self.color_map.get(cls, (0, 255, 0)),
+            'class_name': class_name
+        }
+
+    def _draw_annotation_box(
+        self,
+        img: np.ndarray,
+        box_data: Dict,
+        box_idx: int
+    ) -> None:
+        """
+        Desenha uma caixa de anotação e texto na imagem.
+
+        Args:
+            img: Imagem onde desenhar
+            box_data: Dados da bounding box
+            box_idx: Índice da caixa para identificação
+        """
+        x1, y1, x2, y2 = box_data['x1'], box_data['y1'], box_data['x2'], box_data['y2']
+        color = box_data['color']
+        class_name = box_data['class_name']
+
+        # Desenhar retângulo
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, self.box_thickness)
+
+        # Adicionar nome da classe e número de identificação
+        cv2.putText(
+            img,
+            f"{class_name} #{box_idx + 1}",
+            (x1, y1 - 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            self.text_size,
+            color,
+            self.text_thickness,
+            cv2.LINE_AA,
         )
 
     def visualize_annotations(
@@ -71,7 +181,8 @@ class AnnotationVisualizer:
             filter_classes: Conjunto de IDs de classe para exibir (se None, mostra todas as classes)
         """
         # Obter todos os arquivos de imagem
-        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) + glob.glob(os.path.join(image_dir, "*.png")))
+        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) +
+                             glob.glob(os.path.join(image_dir, "*.png")))
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -93,9 +204,8 @@ class AnnotationVisualizer:
 
         while True:
             img_path = image_files[current_idx]
-            img = cv2.imread(img_path)
+            img = self._load_image(img_path)
             if img is None:
-                logger.error(f"Erro: Não foi possível carregar a imagem {img_path}")
                 current_idx = (current_idx + 1) % total_images
                 continue
 
@@ -121,108 +231,22 @@ class AnnotationVisualizer:
                 # Desenhar cada anotação
                 box_idx = 0
                 for ann in annotations:
-                    parts = ann.strip().split()
-                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
-                        cls, x_center, y_center, box_w, box_h = parts
+                    box_data = self._process_annotation_line(ann, w, h, class_visibility)
+                    if box_data is None:
+                        continue
 
-                        # Pular se a classe for filtrada
-                        if not class_visibility.get(cls, True):
-                            continue
+                    # Atualizar contagens de classe
+                    cls = box_data['class_id']
+                    class_counts[cls] = class_counts.get(cls, 0) + 1
+                    total_visible += 1
 
-                        # Atualizar contagens de classe
-                        class_counts[cls] = class_counts.get(cls, 0) + 1
-                        total_visible += 1
-
-                        # Converter coordenadas normalizadas para valores de pixel
-                        x_center = float(x_center) * w
-                        y_center = float(y_center) * h
-                        box_w = float(box_w) * w
-                        box_h = float(box_h) * h
-
-                        # Calcular pontos de canto
-                        x1 = int(x_center - box_w / 2)
-                        y1 = int(y_center - box_h / 2)
-                        x2 = int(x_center + box_w / 2)
-                        y2 = int(y_center + box_h / 2)
-
-                        # Obter cor da classe (diferente para cada classe)
-                        color = self.color_map.get(cls, (0, 255, 0))
-
-                        # Desenhar retângulo
-                        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-
-                        # Obter nome da classe para exibição
-                        class_name = self.class_map.get(cls, f"Classe {cls}")
-
-                        # Adicionar nome da classe e número de identificação
-                        cv2.putText(
-                            img,
-                            f"{class_name} #{box_idx + 1}",
-                            (x1, y1 - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5,
-                            color,
-                            1,
-                            cv2.LINE_AA,
-                        )
-
-                        box_idx += 1
+                    # Desenhar a caixa
+                    self._draw_annotation_box(img, box_data, box_idx)
+                    box_idx += 1
 
             # Adicionar informações de contagem e navegação
-            y_offset = 30
-            cv2.putText(
-                img,
-                f"Total visível: {total_visible}",
-                (10, y_offset),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-
-            y_offset += 30
-
-            # Mostrar contagem para cada classe
-            for cls_id, cls_name in self.class_map.items():
-                count = class_counts.get(cls_id, 0)
-                visibility = "✓" if class_visibility.get(cls_id, True) else "✗"
-                color = (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
-
-                cv2.putText(
-                    img,
-                    f"{visibility} {cls_name}: {count}",
-                    (10, y_offset),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    color,
-                    2,
-                    cv2.LINE_AA,
-                )
-                y_offset += 30
-
-            cv2.putText(
-                img,
-                f"Imagem: {current_idx + 1}/{total_images} - {os.path.basename(img_path)}",
-                (10, y_offset),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
-
-            y_offset += 30
-            cv2.putText(
-                img,
-                "Controles: 'n'=próx, 'p'=ant, 'q'=sair, '0'-'9'=alternar classe",
-                (10, y_offset),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 255, 0),
-                2,
-                cv2.LINE_AA,
-            )
+            self._add_info_overlay(img, total_visible, class_counts, class_visibility,
+                                  current_idx, total_images, os.path.basename(img_path))
 
             # Salvar se diretório de saída especificado
             if output_dir and save_current:
@@ -246,9 +270,9 @@ class AnnotationVisualizer:
 
             if key == ord("q"):  # Sair
                 break
-            elif key == ord("n"):  # Próxima imagem
+            elif key == ord("n") or key == ord("d"):  # Próxima imagem
                 current_idx = (current_idx + 1) % total_images
-            elif key == ord("p"):  # Imagem anterior
+            elif key == ord("p") or key == ord("a"):  # Imagem anterior
                 current_idx = (current_idx - 1) % total_images
             elif key == ord("s"):  # Salvar imagem atual
                 save_current = True
@@ -262,6 +286,83 @@ class AnnotationVisualizer:
 
         cv2.destroyAllWindows()
         logger.info("Visualização de anotações encerrada")
+
+    def _add_info_overlay(
+        self,
+        img: np.ndarray,
+        total_visible: int,
+        class_counts: Dict[str, int],
+        class_visibility: Dict[str, bool],
+        current_idx: int,
+        total_images: int,
+        filename: str
+    ) -> None:
+        """
+        Adiciona sobreposição de informações à imagem.
+
+        Args:
+            img: Imagem onde adicionar as informações
+            total_visible: Total de anotações visíveis
+            class_counts: Contagem de cada classe
+            class_visibility: Visibilidade de cada classe
+            current_idx: Índice da imagem atual
+            total_images: Total de imagens
+            filename: Nome do arquivo atual
+        """
+        y_offset = 30
+        cv2.putText(
+            img,
+            f"Total visível: {total_visible}",
+            (10, y_offset),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
+
+        y_offset += 30
+
+        # Mostrar contagem para cada classe
+        for cls_id, cls_name in self.class_map.items():
+            count = class_counts.get(cls_id, 0)
+            visibility = "✓" if class_visibility.get(cls_id, True) else "✗"
+            color = (0, 255, 0) if class_visibility.get(cls_id, True) else (0, 0, 255)
+
+            cv2.putText(
+                img,
+                f"{visibility} {cls_name}: {count}",
+                (10, y_offset),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+            y_offset += 30
+
+        cv2.putText(
+            img,
+            f"Imagem: {current_idx + 1}/{total_images} - {filename}",
+            (10, y_offset),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
+
+        y_offset += 30
+        cv2.putText(
+            img,
+            "Controles: 'n'/'d'=próx, 'p'/'a'=ant, 'q'=sair, '0'-'9'=alternar classe",
+            (10, y_offset),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
 
     def save_annotated_images(
         self,
@@ -285,7 +386,8 @@ class AnnotationVisualizer:
         os.makedirs(output_dir, exist_ok=True)
 
         # Obter todos os arquivos de imagem
-        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) + glob.glob(os.path.join(image_dir, "*.png")))
+        image_files = sorted(glob.glob(os.path.join(image_dir, "*.jpg")) +
+                             glob.glob(os.path.join(image_dir, "*.png")))
 
         if not image_files:
             logger.warning(f"Nenhum arquivo de imagem encontrado em {image_dir}")
@@ -302,9 +404,8 @@ class AnnotationVisualizer:
         print(f"Salvando {len(image_files)} imagens anotadas...")
 
         for img_path in image_files:
-            img = cv2.imread(img_path)
+            img = self._load_image(img_path)
             if img is None:
-                logger.error(f"Erro: Não foi possível carregar a imagem {img_path}")
                 continue
 
             h, w = img.shape[:2]
@@ -324,48 +425,13 @@ class AnnotationVisualizer:
                 # Desenhar cada anotação
                 box_idx = 0
                 for ann in annotations:
-                    parts = ann.strip().split()
-                    if len(parts) == 5:  # Formato YOLO: classe x_center y_center width height
-                        cls, x_center, y_center, box_w, box_h = parts
+                    box_data = self._process_annotation_line(ann, w, h, class_visibility)
+                    if box_data is None:
+                        continue
 
-                        # Pular se a classe for filtrada
-                        if not class_visibility.get(cls, True):
-                            continue
-
-                        # Converter coordenadas normalizadas para valores de pixel
-                        x_center = float(x_center) * w
-                        y_center = float(y_center) * h
-                        box_w = float(box_w) * w
-                        box_h = float(box_h) * h
-
-                        # Calcular pontos de canto
-                        x1 = int(x_center - box_w / 2)
-                        y1 = int(y_center - box_h / 2)
-                        x2 = int(x_center + box_w / 2)
-                        y2 = int(y_center + box_h / 2)
-
-                        # Obter cor da classe
-                        color = self.color_map.get(cls, (0, 255, 0))
-
-                        # Desenhar retângulo
-                        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-
-                        # Obter nome da classe para exibição
-                        class_name = self.class_map.get(cls, f"Classe {cls}")
-
-                        # Adicionar nome da classe e número de identificação
-                        cv2.putText(
-                            img,
-                            f"{class_name} #{box_idx + 1}",
-                            (x1, y1 - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5,
-                            color,
-                            1,
-                            cv2.LINE_AA,
-                        )
-
-                        box_idx += 1
+                    # Desenhar a caixa
+                    self._draw_annotation_box(img, box_data, box_idx)
+                    box_idx += 1
 
                 # Salvar imagem anotada
                 output_path = os.path.join(output_dir, f"annotated_{os.path.basename(img_path)}")
