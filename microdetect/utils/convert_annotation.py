@@ -12,12 +12,23 @@ import csv
 import glob
 import json
 import os
-import xml.dom.minidom as minidom
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Dict, Optional, Tuple
 
 import cv2
+# Bibliotecas seguras para processamento XML
+# defusedxml fornece proteção contra ataques como XXE (XML External Entity)
+import defusedxml.ElementTree as secure_ET
+from defusedxml.minidom import parseString as secure_parseString
+
+# Usando ElementTree padrão apenas para construção de XML, não para parsing de dados externos
+# Isso é seguro pois não estamos analisando conteúdo externo com estas funções
+import xml.etree.ElementTree as ET
+
+# Comentário sobre nossa abordagem de segurança:
+# 1. Usamos ET (ElementTree padrão) para CONSTRUIR XML
+# 2. Usamos secure_ET (defusedxml) para ANALISAR XML de fontes externas
+# 3. Evitamos vulnerabilidades como XXE attacks, billion laughs, quadratic blowup
 
 from microdetect.utils.config import config
 
@@ -228,8 +239,10 @@ def yolo_to_pascal_voc(yolo_dir: str, image_dir: str, output_dir: str, class_map
         tree = ET.ElementTree(annotation)
         xml_path = os.path.join(output_dir, f"{base_name}.xml")
 
-        # Formatar XML para legibilidade
-        xmlstr = minidom.parseString(ET.tostring(annotation)).toprettyxml(indent="    ")
+        # Converter para string usando ElementTree padrão e então analisar com defusedxml
+        xml_string = ET.tostring(annotation, encoding='utf-8')
+        # Usar defusedxml para analisar a string XML, garantindo segurança no parsing
+        xmlstr = secure_parseString(xml_string).toprettyxml(indent="    ")
         with open(xml_path, "w") as f:
             f.write(xmlstr)
 
@@ -270,9 +283,11 @@ def pascal_voc_to_yolo(xml_dir: str, image_dir: str, output_dir: str, class_map:
         base_name = os.path.splitext(os.path.basename(xml_file))[0]
 
         try:
-            # Ler arquivo XML
-            tree = ET.parse(xml_file)
-            root = tree.getroot()
+            # Ler arquivo XML usando defusedxml para segurança contra ataques
+            with open(xml_file, 'rb') as f:
+                xml_data = f.read()
+            # Analisar de forma segura o XML usando defusedxml
+            root = secure_ET.fromstring(xml_data)
 
             # Obter dimensões da imagem
             size_elem = root.find("size")
@@ -552,6 +567,8 @@ def coco_to_yolo(coco_json: str, output_dir: str, class_map: Optional[Dict[int, 
 
         processed_count += 1
 
+    print(f"Conversão concluída: {processed_count} imagens convertidas para YOLO")
+    return processed_count
     print(f"Conversão concluída: {processed_count} imagens convertidas para YOLO")
     return processed_count
 
