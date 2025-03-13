@@ -17,10 +17,15 @@ from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
+from microdetect.utils import (
+    AWSSetupManager,
+    ColoredHelpFormatter,
+    ColoredVersionAction,
+    convert_annotation,
+    get_logo_with_name_ascii,
+)
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
 from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
-from microdetect.utils import convert_annotation
 
 # Configuração de logging
 logging.basicConfig(
@@ -56,7 +61,9 @@ def setup_annotate_parser(subparsers):
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
     parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
     parser.add_argument("--auto_save", action="store_true", default=True, help="Ativar salvamento automático (padrão: True)")
-    parser.add_argument("--auto_save_interval", type=int, default=300, help="Intervalo em segundos entre salvamentos automáticos (padrão: 300)")
+    parser.add_argument(
+        "--auto_save_interval", type=int, default=300, help="Intervalo em segundos entre salvamentos automáticos (padrão: 300)"
+    )
     parser.add_argument("--resume", action="store_true", help="Retomar a partir da última imagem anotada")
 
 
@@ -190,16 +197,13 @@ def setup_format_convert_parser(subparsers):
     parser.add_argument("--image_dir", required=True, help="Diretório contendo as imagens correspondentes")
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar os arquivos convertidos")
     parser.add_argument(
-        "--from_format",
-        required=True,
-        choices=["yolo", "pascal_voc", "coco", "csv"],
-        help="Formato de origem das anotações"
+        "--from_format", required=True, choices=["yolo", "pascal_voc", "coco", "csv"], help="Formato de origem das anotações"
     )
     parser.add_argument(
         "--to_format",
         required=True,
         choices=["yolo", "pascal_voc", "coco", "csv"],
-        help="Formato de destino para as anotações"
+        help="Formato de destino para as anotações",
     )
     parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
 
@@ -558,17 +562,10 @@ def handle_annotate(args):
         classes = args.classes.split(",")
 
     # Criar anotador
-    annotator = ImageAnnotator(
-        classes=classes,
-        auto_save=args.auto_save,
-        auto_save_interval=args.auto_save_interval
-    )
+    annotator = ImageAnnotator(classes=classes, auto_save=args.auto_save, auto_save_interval=args.auto_save_interval)
 
     # Executar anotação em lote
-    total_images, total_annotated = annotator.batch_annotate(
-        args.image_dir,
-        args.output_dir
-    )
+    total_images, total_annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
 
     # Exibir resumo
     logger.info(f"Anotação concluída: {total_annotated}/{total_images} imagens")
@@ -601,22 +598,12 @@ def handle_visualize(args):
         out_dir = args.output_dir or "annotated_images"
         os.makedirs(out_dir, exist_ok=True)
 
-        saved_count = visualizer.save_annotated_images(
-            args.image_dir,
-            args.label_dir,
-            out_dir,
-            filter_classes
-        )
+        saved_count = visualizer.save_annotated_images(args.image_dir, args.label_dir, out_dir, filter_classes)
 
         logger.info(f"Visualização em lote concluída: {saved_count} imagens salvas em {out_dir}")
     else:
         # Modo interativo
-        visualizer.visualize_annotations(
-            args.image_dir,
-            args.label_dir,
-            None,
-            filter_classes
-        )
+        visualizer.visualize_annotations(args.image_dir, args.label_dir, None, filter_classes)
 
         logger.info("Visualização interativa concluída")
 
@@ -749,74 +736,46 @@ def handle_format_convert(args):
     try:
         if args.from_format == "yolo":
             if args.to_format == "pascal_voc":
-                count = convert_annotation.yolo_to_pascal_voc(
-                    args.input_dir,
-                    args.image_dir,
-                    args.output_dir,
-                    class_map
-                )
+                count = convert_annotation.yolo_to_pascal_voc(args.input_dir, args.image_dir, args.output_dir, class_map)
                 logger.info(f"Conversão concluída: {count} arquivos convertidos de YOLO para Pascal VOC")
 
             elif args.to_format == "coco":
                 output_json = os.path.join(args.output_dir, "annotations.json")
-                coco_data = convert_annotation.yolo_to_coco(
-                    args.input_dir,
-                    args.image_dir,
-                    output_json,
-                    class_map
-                )
+                coco_data = convert_annotation.yolo_to_coco(args.input_dir, args.image_dir, output_json, class_map)
                 logger.info(f"Conversão concluída: {len(coco_data['images'])} imagens convertidas de YOLO para COCO")
 
             elif args.to_format == "csv":
                 output_csv = os.path.join(args.output_dir, "annotations.csv")
-                count = convert_annotation.yolo_to_csv(
-                    args.input_dir,
-                    args.image_dir,
-                    output_csv,
-                    class_map
-                )
+                count = convert_annotation.yolo_to_csv(args.input_dir, args.image_dir, output_csv, class_map)
                 logger.info(f"Conversão concluída: {count} anotações convertidas de YOLO para CSV")
 
         elif args.from_format == "pascal_voc":
             if args.to_format == "yolo":
-                count = convert_annotation.pascal_voc_to_yolo(
-                    args.input_dir,
-                    args.image_dir,
-                    args.output_dir,
-                    class_map
-                )
+                count = convert_annotation.pascal_voc_to_yolo(args.input_dir, args.image_dir, args.output_dir, class_map)
                 logger.info(f"Conversão concluída: {count} arquivos convertidos de Pascal VOC para YOLO")
 
         elif args.from_format == "coco":
             if args.to_format == "yolo":
                 # Procurar arquivo JSON no diretório de entrada
-                json_files = [f for f in os.listdir(args.input_dir) if f.endswith('.json')]
+                json_files = [f for f in os.listdir(args.input_dir) if f.endswith(".json")]
                 if not json_files:
                     logger.error("Nenhum arquivo JSON encontrado no diretório de entrada")
                     sys.exit(1)
 
                 json_file = os.path.join(args.input_dir, json_files[0])
-                count = convert_annotation.coco_to_yolo(
-                    json_file,
-                    args.output_dir,
-                    class_map
-                )
+                count = convert_annotation.coco_to_yolo(json_file, args.output_dir, class_map)
                 logger.info(f"Conversão concluída: {count} imagens convertidas de COCO para YOLO")
 
         elif args.from_format == "csv":
             if args.to_format == "yolo":
                 # Procurar arquivo CSV no diretório de entrada
-                csv_files = [f for f in os.listdir(args.input_dir) if f.endswith('.csv')]
+                csv_files = [f for f in os.listdir(args.input_dir) if f.endswith(".csv")]
                 if not csv_files:
                     logger.error("Nenhum arquivo CSV encontrado no diretório de entrada")
                     sys.exit(1)
 
                 csv_file = os.path.join(args.input_dir, csv_files[0])
-                count = convert_annotation.csv_to_yolo(
-                    csv_file,
-                    args.output_dir,
-                    class_map
-                )
+                count = convert_annotation.csv_to_yolo(csv_file, args.output_dir, class_map)
                 logger.info(f"Conversão concluída: {count} imagens convertidas de CSV para YOLO")
 
         else:

@@ -13,14 +13,14 @@ import cv2
 import numpy as np
 
 from microdetect.utils import (
-    yolo_to_pascal_voc,
-    pascal_voc_to_yolo,
-    yolo_to_coco,
+    absolute_to_yolo_coords,
     coco_to_yolo,
-    yolo_to_csv,
     csv_to_yolo,
+    pascal_voc_to_yolo,
     yolo_to_absolute_coords,
-    absolute_to_yolo_coords
+    yolo_to_coco,
+    yolo_to_csv,
+    yolo_to_pascal_voc,
 )
 
 
@@ -61,17 +61,9 @@ class TestConvertAnnotations(unittest.TestCase):
             f.write(self.yolo_annotation)
 
         # Mapeamento de classes
-        self.class_map = {
-            "0": "levedura",
-            "1": "fungo",
-            "2": "micro-alga"
-        }
+        self.class_map = {"0": "levedura", "1": "fungo", "2": "micro-alga"}
 
-        self.class_map_inverse = {
-            "levedura": "0",
-            "fungo": "1",
-            "micro-alga": "2"
-        }
+        self.class_map_inverse = {"levedura": "0", "fungo": "1", "micro-alga": "2"}
 
     def tearDown(self):
         """
@@ -87,9 +79,7 @@ class TestConvertAnnotations(unittest.TestCase):
         yolo_box = (0.5, 0.5, 0.2, 0.2)
         img_width, img_height = 100, 100
 
-        x1, y1, x2, y2 = yolo_to_absolute_coords(
-            yolo_box, img_width, img_height
-        )
+        x1, y1, x2, y2 = yolo_to_absolute_coords(yolo_box, img_width, img_height)
 
         self.assertEqual(x1, 40)
         self.assertEqual(y1, 40)
@@ -104,9 +94,7 @@ class TestConvertAnnotations(unittest.TestCase):
         box = (40, 40, 60, 60)
         img_width, img_height = 100, 100
 
-        center_x, center_y, width, height = absolute_to_yolo_coords(
-            box, img_width, img_height
-        )
+        center_x, center_y, width, height = absolute_to_yolo_coords(box, img_width, img_height)
 
         self.assertAlmostEqual(center_x, 0.5)
         self.assertAlmostEqual(center_y, 0.5)
@@ -119,12 +107,7 @@ class TestConvertAnnotations(unittest.TestCase):
         """
         output_dir = os.path.join(self.temp_dir.name, "output_voc")
 
-        count = yolo_to_pascal_voc(
-            self.yolo_dir,
-            self.img_dir,
-            output_dir,
-            self.class_map
-        )
+        count = yolo_to_pascal_voc(self.yolo_dir, self.img_dir, output_dir, self.class_map)
 
         # Verificar número de conversões
         self.assertEqual(count, 1)
@@ -202,12 +185,7 @@ class TestConvertAnnotations(unittest.TestCase):
         # Converter para YOLO
         output_dir = os.path.join(self.temp_dir.name, "output_yolo")
 
-        count = pascal_voc_to_yolo(
-            self.voc_dir,
-            self.img_dir,
-            output_dir,
-            self.class_map_inverse
-        )
+        count = pascal_voc_to_yolo(self.voc_dir, self.img_dir, output_dir, self.class_map_inverse)
 
         # Verificar número de conversões
         self.assertEqual(count, 1)
@@ -236,12 +214,7 @@ class TestConvertAnnotations(unittest.TestCase):
         """
         output_json = os.path.join(self.temp_dir.name, "output.json")
 
-        coco_data = yolo_to_coco(
-            self.yolo_dir,
-            self.img_dir,
-            output_json,
-            self.class_map
-        )
+        coco_data = yolo_to_coco(self.yolo_dir, self.img_dir, output_json, self.class_map)
 
         # Verificar arquivo JSON
         self.assertTrue(os.path.exists(output_json))
@@ -268,14 +241,7 @@ class TestConvertAnnotations(unittest.TestCase):
         """
         # Criar arquivo COCO
         coco_data = {
-            "images": [
-                {
-                    "id": 1,
-                    "file_name": "test_image.jpg",
-                    "width": 100,
-                    "height": 100
-                }
-            ],
+            "images": [{"id": 1, "file_name": "test_image.jpg", "width": 100, "height": 100}],
             "annotations": [
                 {
                     "id": 1,
@@ -284,7 +250,7 @@ class TestConvertAnnotations(unittest.TestCase):
                     "bbox": [40, 40, 20, 20],
                     "area": 400,
                     "segmentation": [],
-                    "iscrowd": 0
+                    "iscrowd": 0,
                 },
                 {
                     "id": 2,
@@ -293,14 +259,14 @@ class TestConvertAnnotations(unittest.TestCase):
                     "bbox": [65, 65, 10, 10],
                     "area": 100,
                     "segmentation": [],
-                    "iscrowd": 0
-                }
+                    "iscrowd": 0,
+                },
             ],
             "categories": [
                 {"id": 1, "name": "levedura", "supercategory": "microorganism"},
                 {"id": 2, "name": "fungo", "supercategory": "microorganism"},
-                {"id": 3, "name": "micro-alga", "supercategory": "microorganism"}
-            ]
+                {"id": 3, "name": "micro-alga", "supercategory": "microorganism"},
+            ],
         }
 
         coco_path = os.path.join(self.coco_dir, "annotations.json")
@@ -311,17 +277,9 @@ class TestConvertAnnotations(unittest.TestCase):
         output_dir = os.path.join(self.temp_dir.name, "output_yolo_from_coco")
 
         # Criar mapeamento de categorias COCO para YOLO
-        coco_class_map = {
-            1: "0",  # COCO id -> YOLO id
-            2: "1",
-            3: "2"
-        }
+        coco_class_map = {1: "0", 2: "1", 3: "2"}  # COCO id -> YOLO id
 
-        count = coco_to_yolo(
-            coco_path,
-            output_dir,
-            coco_class_map
-        )
+        count = coco_to_yolo(coco_path, output_dir, coco_class_map)
 
         # Verificar número de conversões
         self.assertEqual(count, 1)
@@ -350,12 +308,7 @@ class TestConvertAnnotations(unittest.TestCase):
         """
         output_csv = os.path.join(self.temp_dir.name, "output.csv")
 
-        count = yolo_to_csv(
-            self.yolo_dir,
-            self.img_dir,
-            output_csv,
-            self.class_map
-        )
+        count = yolo_to_csv(self.yolo_dir, self.img_dir, output_csv, self.class_map)
 
         # Verificar arquivo CSV
         self.assertTrue(os.path.exists(output_csv))
@@ -367,10 +320,7 @@ class TestConvertAnnotations(unittest.TestCase):
             rows = list(reader)
 
         # Verificar cabeçalho
-        expected_header = [
-            "filename", "width", "height", "class", "class_id",
-            "xmin", "ymin", "xmax", "ymax"
-        ]
+        expected_header = ["filename", "width", "height", "class", "class_id", "xmin", "ymin", "xmax", "ymax"]
         self.assertEqual(header, expected_header)
 
         # Verificar anotações
@@ -393,25 +343,14 @@ class TestConvertAnnotations(unittest.TestCase):
         csv_path = os.path.join(self.csv_dir, "annotations.csv")
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "filename", "width", "height", "class", "class_id",
-                "xmin", "ymin", "xmax", "ymax"
-            ])
-            writer.writerow([
-                "test_image.jpg", 100, 100, "levedura", "0", 40, 40, 60, 60
-            ])
-            writer.writerow([
-                "test_image.jpg", 100, 100, "fungo", "1", 65, 65, 75, 75
-            ])
+            writer.writerow(["filename", "width", "height", "class", "class_id", "xmin", "ymin", "xmax", "ymax"])
+            writer.writerow(["test_image.jpg", 100, 100, "levedura", "0", 40, 40, 60, 60])
+            writer.writerow(["test_image.jpg", 100, 100, "fungo", "1", 65, 65, 75, 75])
 
         # Converter para YOLO
         output_dir = os.path.join(self.temp_dir.name, "output_yolo_from_csv")
 
-        count = csv_to_yolo(
-            csv_path,
-            output_dir,
-            self.class_map_inverse
-        )
+        count = csv_to_yolo(csv_path, output_dir, self.class_map_inverse)
 
         # Verificar número de conversões
         self.assertEqual(count, 1)

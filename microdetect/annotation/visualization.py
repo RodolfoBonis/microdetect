@@ -37,7 +37,7 @@ KEYBOARD_SHORTCUTS = {
     "0-9": "Alternar visibilidade da classe",
     "s": "Salvar imagem atual",
     "q": "Sair",
-    "e": "Alternar modo de edição"
+    "e": "Alternar modo de edição",
 }
 
 
@@ -112,13 +112,7 @@ class AnnotationVisualizer:
             logger.error(f"Erro ao carregar imagem {img_path}: {str(e)}")
             return None
 
-    def _process_annotation_line(
-        self,
-        ann: str,
-        w: int,
-        h: int,
-        class_visibility: Dict[str, bool]
-    ) -> Optional[Dict]:
+    def _process_annotation_line(self, ann: str, w: int, h: int, class_visibility: Dict[str, bool]) -> Optional[Dict]:
         """
         Processa uma linha de anotação e retorna dados da bounding box.
 
@@ -157,10 +151,13 @@ class AnnotationVisualizer:
         class_name = self.class_map.get(cls, f"Classe {cls}")
 
         return {
-            'class_id': cls,
-            'x1': x1, 'y1': y1, 'x2': x2, 'y2': y2,
-            'color': self.color_map.get(cls, (0, 255, 0)),
-            'class_name': class_name
+            "class_id": cls,
+            "x1": x1,
+            "y1": y1,
+            "x2": x2,
+            "y2": y2,
+            "color": self.color_map.get(cls, (0, 255, 0)),
+            "class_name": class_name,
         }
 
     def _redraw_all_boxes(self, canvas, annotations, w, h, class_visibility):
@@ -192,38 +189,34 @@ class AnnotationVisualizer:
                 continue
 
             # Atualizar contagens
-            cls = box_data['class_id']
+            cls = box_data["class_id"]
             class_counts[cls] = class_counts.get(cls, 0) + 1
             total_visible += 1
 
             # Converter coordenadas absolutas da imagem para coordenadas do canvas
-            x1 = box_data['x1'] * self.display_scale * self.scale_factor
-            y1 = box_data['y1'] * self.display_scale * self.scale_factor
-            x2 = box_data['x2'] * self.display_scale * self.scale_factor
-            y2 = box_data['y2'] * self.display_scale * self.scale_factor
+            x1 = box_data["x1"] * self.display_scale * self.scale_factor
+            y1 = box_data["y1"] * self.display_scale * self.scale_factor
+            x2 = box_data["x2"] * self.display_scale * self.scale_factor
+            y2 = box_data["y2"] * self.display_scale * self.scale_factor
 
             # Determinar cor
-            color_rgb = box_data['color']
+            color_rgb = box_data["color"]
             # Converter BGR para cores Tkinter no formato #RRGGBB
             r, g, b = color_rgb
-            color_hex = f'#{r:02x}{g:02x}{b:02x}'
+            color_hex = f"#{r:02x}{g:02x}{b:02x}"
 
             # Desenhar retângulo
-            canvas.create_rectangle(
-                x1, y1, x2, y2,
-                outline=color_hex,
-                width=self.box_thickness,
-                tags="box"
-            )
+            canvas.create_rectangle(x1, y1, x2, y2, outline=color_hex, width=self.box_thickness, tags="box")
 
             # Desenhar rótulo
             canvas.create_text(
-                x1, y1 - 5,
+                x1,
+                y1 - 5,
                 text=f"{box_data['class_name']} #{box_idx + 1}",
                 anchor=tk.SW,
                 fill=color_hex,
                 font=("Arial", 10, "bold"),
-                tags="label"
+                tags="label",
             )
 
         return total_visible, class_counts
@@ -362,7 +355,7 @@ class AnnotationVisualizer:
             width=min(self.display_w, 800),
             height=min(self.display_h, 600),
             xscrollcommand=h_scrollbar.set,
-            yscrollcommand=v_scrollbar.set
+            yscrollcommand=v_scrollbar.set,
         )
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -410,7 +403,9 @@ class AnnotationVisualizer:
             try:
                 img_path = image_files[current_idx]
                 root.title(f"Visualização: {os.path.basename(img_path)}")
-                info_label.config(text=f"Imagem: {os.path.basename(img_path)} | Dimensões: {self.original_w}x{self.original_h}")
+                info_label.config(
+                    text=f"Imagem: {os.path.basename(img_path)} | Dimensões: {self.original_w}x{self.original_h}"
+                )
             except tk.TclError:
                 self.window_closed = True
                 return
@@ -465,23 +460,13 @@ class AnnotationVisualizer:
                 count = class_counts.get(cls_id, 0)
                 bg_color = "lightgreen" if class_visibility.get(cls_id, True) else "lightgray"
 
-                if not hasattr(root, 'class_labels'):
+                if not hasattr(root, "class_labels"):
                     root.class_labels = {}
 
                 if cls_id in root.class_labels:
-                    root.class_labels[cls_id].config(
-                        text=f"{cls_name}: {count}",
-                        bg=bg_color
-                    )
+                    root.class_labels[cls_id].config(text=f"{cls_name}: {count}", bg=bg_color)
                 else:
-                    label = tk.Label(
-                        control_frame,
-                        text=f"{cls_name}: {count}",
-                        padx=5,
-                        pady=2,
-                        bg=bg_color,
-                        relief=tk.GROOVE
-                    )
+                    label = tk.Label(control_frame, text=f"{cls_name}: {count}", padx=5, pady=2, bg=bg_color, relief=tk.GROOVE)
                     label.pack(side=tk.LEFT, padx=2)
                     root.class_labels[cls_id] = label
 
@@ -512,7 +497,7 @@ class AnnotationVisualizer:
             class_visibility[cls_id] = not class_visibility[cls_id]
 
             # Atualizar visual do label
-            if hasattr(root, 'class_labels') and cls_id in root.class_labels:
+            if hasattr(root, "class_labels") and cls_id in root.class_labels:
                 bg_color = "lightgreen" if class_visibility[cls_id] else "lightgray"
                 root.class_labels[cls_id].config(bg=bg_color)
 
@@ -533,9 +518,9 @@ class AnnotationVisualizer:
                     if box_data is None:
                         continue
 
-                    x1, y1, x2, y2 = box_data['x1'], box_data['y1'], box_data['x2'], box_data['y2']
-                    color = box_data['color']
-                    class_name = box_data['class_name']
+                    x1, y1, x2, y2 = box_data["x1"], box_data["y1"], box_data["x2"], box_data["y2"]
+                    color = box_data["color"]
+                    class_name = box_data["class_name"]
 
                     # Desenhar retângulo
                     cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, self.box_thickness)
@@ -561,7 +546,9 @@ class AnnotationVisualizer:
                 messagebox.showinfo("Salvo", f"Imagem salva como:\n{output_path}")
                 logger.info(f"Imagem anotada salva em {output_path}")
             else:
-                messagebox.showwarning("Aviso", "Nenhum diretório de saída especificado.\nDefina um diretório de saída para salvar as imagens.")
+                messagebox.showwarning(
+                    "Aviso", "Nenhum diretório de saída especificado.\nDefina um diretório de saída para salvar as imagens."
+                )
 
         def reset_zoom():
             """Reseta zoom e posição da visualização"""
@@ -613,8 +600,8 @@ class AnnotationVisualizer:
 
         # Bindings para interface
         canvas.bind("<MouseWheel>", zoom)  # Windows
-        canvas.bind("<Button-4>", zoom)    # Linux: scroll up
-        canvas.bind("<Button-5>", zoom)    # Linux: scroll down
+        canvas.bind("<Button-4>", zoom)  # Linux: scroll up
+        canvas.bind("<Button-5>", zoom)  # Linux: scroll down
 
         # Pan com botão do meio
         canvas.bind("<ButtonPress-2>", start_pan)
@@ -678,11 +665,12 @@ class AnnotationVisualizer:
 
         shortcuts_label = tk.Label(
             shortcuts_frame,
-            text="Atalhos: " + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()]) +
-                 "\nClique no nome da classe para alternar sua visibilidade. Use a roda do mouse para zoom.",
+            text="Atalhos: "
+            + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()])
+            + "\nClique no nome da classe para alternar sua visibilidade. Use a roda do mouse para zoom.",
             justify=tk.LEFT,
             anchor=tk.W,
-            wraplength=780
+            wraplength=780,
         )
         shortcuts_label.pack(fill=tk.X, padx=5)
 
@@ -773,9 +761,9 @@ class AnnotationVisualizer:
                         continue
 
                     # Extrair dados
-                    x1, y1, x2, y2 = box_data['x1'], box_data['y1'], box_data['x2'], box_data['y2']
-                    color = box_data['color']
-                    class_name = box_data['class_name']
+                    x1, y1, x2, y2 = box_data["x1"], box_data["y1"], box_data["x2"], box_data["y2"]
+                    color = box_data["color"]
+                    class_name = box_data["class_name"]
 
                     # Desenhar retângulo
                     cv2.rectangle(img, (x1, y1), (x2, y2), color, self.box_thickness)

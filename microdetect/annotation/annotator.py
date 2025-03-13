@@ -7,8 +7,8 @@ import logging
 import os
 import time
 import tkinter as tk
-from tkinter import messagebox  # Importação explícita do messagebox
 from datetime import datetime
+from tkinter import messagebox  # Importação explícita do messagebox
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -32,7 +32,7 @@ KEYBOARD_SHORTCUTS = {
     "p": "Ativar/desativar modo navegação",
     "x": "Salvar e sair",
     "Del": "Excluir seleção",
-    "Esc": "Cancelar seleção atual"
+    "Esc": "Cancelar seleção atual",
 }
 
 DEFAULT_AUTO_SAVE = True
@@ -44,10 +44,10 @@ HANDLE_NW = 1  # Noroeste (canto superior esquerdo)
 HANDLE_NE = 2  # Nordeste (canto superior direito)
 HANDLE_SE = 3  # Sudeste (canto inferior direito)
 HANDLE_SW = 4  # Sudoeste (canto inferior esquerdo)
-HANDLE_N = 5   # Norte (meio superior)
-HANDLE_E = 6   # Leste (meio direito)
-HANDLE_S = 7   # Sul (meio inferior)
-HANDLE_W = 8   # Oeste (meio esquerdo)
+HANDLE_N = 5  # Norte (meio superior)
+HANDLE_E = 6  # Leste (meio direito)
+HANDLE_S = 7  # Sul (meio inferior)
+HANDLE_W = 8  # Oeste (meio esquerdo)
 
 
 class ImageAnnotator:
@@ -59,7 +59,7 @@ class ImageAnnotator:
         self,
         classes: List[str] = None,
         auto_save: bool = DEFAULT_AUTO_SAVE,
-        auto_save_interval: int = DEFAULT_AUTO_SAVE_INTERVAL
+        auto_save_interval: int = DEFAULT_AUTO_SAVE_INTERVAL,
     ):
         """
         Inicializa o anotador de imagens.
@@ -93,9 +93,9 @@ class ImageAnnotator:
 
         # Novos atributos para histórico e redimensionamento
         self.action_history = []  # Lista para armazenar o histórico de ações
-        self.max_history = 50     # Limitar o tamanho do histórico
+        self.max_history = 50  # Limitar o tamanho do histórico
         self.resize_handle = HANDLE_NONE  # Para controlar qual alça de redimensionamento está ativa
-        self.handle_size = 6      # Tamanho das alças de redimensionamento
+        self.handle_size = 6  # Tamanho das alças de redimensionamento
         self.original_box_state = None  # Para armazenar estado original de uma caixa antes de mover/redimensionar
 
     def _load_image(self, image_path: str) -> Optional[Tuple[np.ndarray, int, int]]:
@@ -183,10 +183,7 @@ class ImageAnnotator:
         if len(self.action_history) >= self.max_history:
             self.action_history.pop(0)
 
-        self.action_history.append({
-            'type': action_type,
-            'data': data
-        })
+        self.action_history.append({"type": action_type, "data": data})
 
     def _detect_resize_handle(self, canvas_x, canvas_y, box_idx):
         """
@@ -282,20 +279,18 @@ class ImageAnnotator:
 
                 # Desenhar retângulo
                 self.canvas.create_rectangle(
-                    canvas_x1, canvas_y1, canvas_x2, canvas_y2,
-                    outline=outline_color,
-                    width=outline_width,
-                    tags="box"
+                    canvas_x1, canvas_y1, canvas_x2, canvas_y2, outline=outline_color, width=outline_width, tags="box"
                 )
 
                 # Desenhar rótulo
                 self.canvas.create_text(
-                    canvas_x1, canvas_y1 - 5,
+                    canvas_x1,
+                    canvas_y1 - 5,
                     text=f"{class_name} #{i + 1}",
                     anchor=tk.SW,
                     fill=outline_color,
                     font=("Arial", 10, "bold"),
-                    tags="label"
+                    tags="label",
                 )
 
                 # Se esta caixa estiver selecionada, adicionar alças de redimensionamento
@@ -310,53 +305,77 @@ class ImageAnnotator:
                     # Desenhar alças nos cantos
                     # NO (Noroeste)
                     self.canvas.create_rectangle(
-                        canvas_x1 - handle_size, canvas_y1 - handle_size,
-                        canvas_x1 + handle_size, canvas_y1 + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x1 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # NE (Nordeste)
                     self.canvas.create_rectangle(
-                        canvas_x2 - handle_size, canvas_y1 - handle_size,
-                        canvas_x2 + handle_size, canvas_y1 + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x2 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # SE (Sudeste)
                     self.canvas.create_rectangle(
-                        canvas_x2 - handle_size, canvas_y2 - handle_size,
-                        canvas_x2 + handle_size, canvas_y2 + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x2 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # SO (Sudoeste)
                     self.canvas.create_rectangle(
-                        canvas_x1 - handle_size, canvas_y2 - handle_size,
-                        canvas_x1 + handle_size, canvas_y2 + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x1 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
 
                     # Desenhar alças nos lados
                     # Norte
                     self.canvas.create_rectangle(
-                        mid_x - handle_size, canvas_y1 - handle_size,
-                        mid_x + handle_size, canvas_y1 + handle_size,
-                        fill=outline_color, tags="handle"
+                        mid_x - handle_size,
+                        canvas_y1 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # Leste
                     self.canvas.create_rectangle(
-                        canvas_x2 - handle_size, mid_y - handle_size,
-                        canvas_x2 + handle_size, mid_y + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x2 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x2 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # Sul
                     self.canvas.create_rectangle(
-                        mid_x - handle_size, canvas_y2 - handle_size,
-                        mid_x + handle_size, canvas_y2 + handle_size,
-                        fill=outline_color, tags="handle"
+                        mid_x - handle_size,
+                        canvas_y2 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
                     # Oeste
                     self.canvas.create_rectangle(
-                        canvas_x1 - handle_size, mid_y - handle_size,
-                        canvas_x1 + handle_size, mid_y + handle_size,
-                        fill=outline_color, tags="handle"
+                        canvas_x1 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x1 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
                     )
         except tk.TclError:
             self.window_closed = True
@@ -550,7 +569,7 @@ class ImageAnnotator:
             width=min(self.display_w, 800),
             height=min(self.display_h, 600),
             xscrollcommand=h_scrollbar.set,
-            yscrollcommand=v_scrollbar.set
+            yscrollcommand=v_scrollbar.set,
         )
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -772,9 +791,7 @@ class ImageAnnotator:
                 # Modo de desenho: criar ou atualizar o retângulo atual
                 if current_rect:
                     canvas.delete(current_rect)
-                current_rect = canvas.create_rectangle(
-                    start_x, start_y, canvas_x, canvas_y, outline="green", width=2
-                )
+                current_rect = canvas.create_rectangle(start_x, start_y, canvas_x, canvas_y, outline="green", width=2)
 
         def on_mouse_up(event):
             nonlocal start_x, start_y, current_rect, selected_box_idx
@@ -796,11 +813,9 @@ class ImageAnnotator:
                         if self.original_box_state:
                             # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
                             current_box = tuple(self.bounding_boxes[selected_box_idx])
-                            self._add_to_history('resize', {
-                                'index': selected_box_idx,
-                                'before': self.original_box_state,
-                                'after': current_box
-                            })
+                            self._add_to_history(
+                                "resize", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
+                            )
 
                         update_status(f"Caixa {selected_box_idx + 1} redimensionada")
                         self.resize_handle = HANDLE_NONE
@@ -809,11 +824,9 @@ class ImageAnnotator:
                         if self.original_box_state:
                             # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
                             current_box = tuple(self.bounding_boxes[selected_box_idx])
-                            self._add_to_history('move', {
-                                'index': selected_box_idx,
-                                'before': self.original_box_state,
-                                'after': current_box
-                            })
+                            self._add_to_history(
+                                "move", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
+                            )
 
                         update_status(f"Caixa {selected_box_idx + 1} reposicionada")
 
@@ -866,25 +879,25 @@ class ImageAnnotator:
 
             # Obter última ação
             last_action = self.action_history.pop()
-            action_type = last_action['type']
-            data = last_action['data']
+            action_type = last_action["type"]
+            data = last_action["data"]
 
             # Processar baseado no tipo de ação
-            if action_type == 'add':
+            if action_type == "add":
                 # Remover a caixa adicionada
-                if data['index'] < len(self.bounding_boxes):
-                    self.bounding_boxes.pop(data['index'])
+                if data["index"] < len(self.bounding_boxes):
+                    self.bounding_boxes.pop(data["index"])
                     update_status("Desfez: Adição de caixa")
 
-            elif action_type == 'move' or action_type == 'resize':
+            elif action_type == "move" or action_type == "resize":
                 # Restaurar caixa para posição original
-                if data['index'] < len(self.bounding_boxes):
-                    self.bounding_boxes[data['index']] = data['before']
+                if data["index"] < len(self.bounding_boxes):
+                    self.bounding_boxes[data["index"]] = data["before"]
                     update_status(f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa")
 
-            elif action_type == 'delete':
+            elif action_type == "delete":
                 # Restaurar caixa excluída
-                self.bounding_boxes.insert(data['index'], data['box'])
+                self.bounding_boxes.insert(data["index"], data["box"])
                 update_status("Desfez: Exclusão de caixa")
 
             # Redesenhar todas as caixas
@@ -899,10 +912,7 @@ class ImageAnnotator:
                 removed_box = self.bounding_boxes[-1]  # Já é uma tupla, não precisa de .copy()
                 removed_index = len(self.bounding_boxes) - 1
 
-                self._add_to_history('delete', {
-                    'index': removed_index,
-                    'box': removed_box
-                })
+                self._add_to_history("delete", {"index": removed_index, "box": removed_box})
 
                 self.bounding_boxes.pop()
                 self._redraw_all_boxes()
@@ -914,10 +924,7 @@ class ImageAnnotator:
 
             # Registrar todas as caixas no histórico antes de limpar
             for i, box in enumerate(self.bounding_boxes):
-                self._add_to_history('delete', {
-                    'index': i,
-                    'box': box
-                })
+                self._add_to_history("delete", {"index": i, "box": box})
 
             self.bounding_boxes.clear()
             self._redraw_all_boxes()
@@ -945,9 +952,7 @@ class ImageAnnotator:
             # Perguntar ao usuário se quer salvar antes de sair
             try:
                 if len(self.bounding_boxes) > 0:
-                    save_before_exit = messagebox.askyesno(
-                        "Sair", "Deseja salvar as anotações antes de sair?"
-                    )
+                    save_before_exit = messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?")
                     if save_before_exit:
                         save()  # Agora define self.user_cancelled = True e destroi a janela
                         return
@@ -1029,8 +1034,8 @@ class ImageAnnotator:
 
         # Bindings para zoom e pan
         canvas.bind("<MouseWheel>", zoom)  # Windows
-        canvas.bind("<Button-4>", zoom)    # Linux: scroll up
-        canvas.bind("<Button-5>", zoom)    # Linux: scroll down
+        canvas.bind("<Button-4>", zoom)  # Linux: scroll up
+        canvas.bind("<Button-5>", zoom)  # Linux: scroll down
 
         # Pan com botão do meio e direito
         canvas.bind("<ButtonPress-2>", start_pan)
@@ -1041,7 +1046,7 @@ class ImageAnnotator:
 
         # Suporte para trackpad em modo de navegação
         canvas.bind("<ButtonPress-1>", on_mouse_down)  # Também usado para pan quando self.pan_mode=True
-        canvas.bind("<B1-Motion>", on_mouse_move)     # Também usado para pan quando self.pan_mode=True
+        canvas.bind("<B1-Motion>", on_mouse_move)  # Também usado para pan quando self.pan_mode=True
         canvas.bind("<ButtonRelease-1>", on_mouse_up)
 
         # Trackpad com dois dedos (se suportado pelo sistema)
@@ -1080,11 +1085,12 @@ class ImageAnnotator:
 
         shortcuts_label = tk.Label(
             shortcuts_frame,
-            text="Atalhos: " + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()]) +
-                 "\nNo modo Edição: Arraste as alças para redimensionar caixas, clique e arraste no centro para mover",
+            text="Atalhos: "
+            + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()])
+            + "\nNo modo Edição: Arraste as alças para redimensionar caixas, clique e arraste no centro para mover",
             justify=tk.LEFT,
             anchor=tk.W,
-            wraplength=780
+            wraplength=780,
         )
         shortcuts_label.pack(fill=tk.X, padx=5)
 
@@ -1267,13 +1273,13 @@ class ImageAnnotator:
             self._save_progress(progress_path, img_path)
 
         # Exibir resumo final
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("RESUMO DA ANOTAÇÃO:")
         print(f"Total de imagens: {len(image_files)}")
         print(f"Imagens anotadas: {total_annotated + imagens_existentes}")
         print(f"Imagens anotadas nesta sessão: {total_annotated}")
         print(f"Imagens restantes: {len(image_files) - (total_annotated + imagens_existentes)}")
-        print("="*50)
+        print("=" * 50)
 
         return len(image_files), total_annotated + imagens_existentes
 
@@ -1309,10 +1315,10 @@ class ImageAnnotator:
         Returns:
             Caminho para o diretório de backup ou None se falhar
         """
-        import time
-        import shutil
-        import re
         import os
+        import re
+        import shutil
+        import time
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         parent_dir = os.path.dirname(f"{label_dir}/backups")
@@ -1352,7 +1358,8 @@ class ImageAnnotator:
                                 logger.info(f"Removido backup antigo: {os.path.basename(old_backup)}")
                             except Exception as e:
                                 logger.warning(
-                                    f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}")
+                                    f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}"
+                                )
 
                     return backup_dir
                 else:

@@ -13,8 +13,16 @@ import cv2
 import numpy as np
 
 from microdetect.annotation.annotator import (
-    ImageAnnotator, HANDLE_NONE, HANDLE_NW, HANDLE_NE, HANDLE_SE, HANDLE_SW,
-    HANDLE_N, HANDLE_E, HANDLE_S, HANDLE_W
+    HANDLE_E,
+    HANDLE_N,
+    HANDLE_NE,
+    HANDLE_NONE,
+    HANDLE_NW,
+    HANDLE_S,
+    HANDLE_SE,
+    HANDLE_SW,
+    HANDLE_W,
+    ImageAnnotator,
 )
 
 
@@ -31,11 +39,7 @@ class TestImageAnnotator(unittest.TestCase):
         self.classes = ["0-levedura", "1-fungo", "2-micro-alga"]
 
         # Criar anotador com auto-save reduzido para testes
-        self.annotator = ImageAnnotator(
-            classes=self.classes,
-            auto_save=True,
-            auto_save_interval=1  # 1 segundo para testes
-        )
+        self.annotator = ImageAnnotator(classes=self.classes, auto_save=True, auto_save_interval=1)  # 1 segundo para testes
 
         # Criar diretório temporário para testes
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -90,16 +94,12 @@ class TestImageAnnotator(unittest.TestCase):
         self.assertIsNone(annotator.original_box_state)
 
         # Verificar que start_x e start_y NÃO são atributos da classe
-        self.assertFalse(hasattr(annotator, 'start_x'))
-        self.assertFalse(hasattr(annotator, 'start_y'))
+        self.assertFalse(hasattr(annotator, "start_x"))
+        self.assertFalse(hasattr(annotator, "start_y"))
 
         # Testar inicialização com parâmetros personalizados
         custom_classes = ["0-bacteria", "1-virus"]
-        annotator = ImageAnnotator(
-            classes=custom_classes,
-            auto_save=False,
-            auto_save_interval=600
-        )
+        annotator = ImageAnnotator(classes=custom_classes, auto_save=False, auto_save_interval=600)
         self.assertListEqual(annotator.classes, custom_classes)
         self.assertFalse(annotator.auto_save)
         self.assertEqual(annotator.auto_save_interval, 600)
@@ -129,10 +129,7 @@ class TestImageAnnotator(unittest.TestCase):
         Testa o salvamento de anotações.
         """
         # Preparar dados para o teste
-        bounding_boxes = [
-            ("0", 10, 10, 30, 30),  # classe, x1, y1, x2, y2
-            ("1", 50, 50, 70, 70)
-        ]
+        bounding_boxes = [("0", 10, 10, 30, 30), ("1", 50, 50, 70, 70)]  # classe, x1, y1, x2, y2
         base_name = "test_image"
 
         # Configurar dimensões originais
@@ -140,11 +137,7 @@ class TestImageAnnotator(unittest.TestCase):
         self.annotator.original_h = 100
 
         # Salvar anotações
-        annotation_path = self.annotator._save_annotations(
-            bounding_boxes,
-            self.output_dir,
-            base_name
-        )
+        annotation_path = self.annotator._save_annotations(bounding_boxes, self.output_dir, base_name)
 
         # Verificar se o arquivo foi criado
         self.assertTrue(os.path.exists(annotation_path))
@@ -179,11 +172,7 @@ class TestImageAnnotator(unittest.TestCase):
         self.annotator.last_save_time = time.time() - 10
 
         # Auto-save deve ocorrer
-        result = self.annotator._check_auto_save(
-            bounding_boxes,
-            self.output_dir,
-            base_name
-        )
+        result = self.annotator._check_auto_save(bounding_boxes, self.output_dir, base_name)
 
         self.assertTrue(result)
 
@@ -195,11 +184,7 @@ class TestImageAnnotator(unittest.TestCase):
         self.annotator.last_save_time = time.time()
 
         # Auto-save não deve ocorrer
-        result = self.annotator._check_auto_save(
-            bounding_boxes,
-            self.output_dir,
-            base_name
-        )
+        result = self.annotator._check_auto_save(bounding_boxes, self.output_dir, base_name)
 
         self.assertFalse(result)
 
@@ -208,11 +193,7 @@ class TestImageAnnotator(unittest.TestCase):
 
         # Auto-save não deve ocorrer mesmo com tempo expirado
         self.annotator.last_save_time = time.time() - 10
-        result = self.annotator._check_auto_save(
-            bounding_boxes,
-            self.output_dir,
-            base_name
-        )
+        result = self.annotator._check_auto_save(bounding_boxes, self.output_dir, base_name)
 
         self.assertFalse(result)
 
@@ -238,9 +219,9 @@ class TestImageAnnotator(unittest.TestCase):
         """
         Testa a criação de backup de anotações e a limitação para 5 backups.
         """
+        import os
         import re
         import time
-        import os
 
         # Criar arquivos de anotação de teste
         annotation1 = os.path.join(self.output_dir, "test1.txt")
@@ -359,7 +340,7 @@ class TestImageAnnotator(unittest.TestCase):
         # Vamos substituir o método annotate_image por uma versão simplificada
         # que apenas chama _save_annotations diretamente
 
-        with patch.object(self.annotator, '_save_annotations') as mock_save:
+        with patch.object(self.annotator, "_save_annotations") as mock_save:
             # Configurar o mock para retornar um caminho válido
             mock_save.return_value = os.path.join(self.output_dir, "test_image.txt")
 
@@ -410,10 +391,7 @@ class TestImageAnnotator(unittest.TestCase):
         mock_annotate.return_value = "annotation_path"
 
         # Executar anotação em lote
-        total_images, total_annotated = self.annotator.batch_annotate(
-            self.temp_dir.name,
-            self.output_dir
-        )
+        total_images, total_annotated = self.annotator.batch_annotate(self.temp_dir.name, self.output_dir)
 
         # Verificar resultados
         self.assertEqual(total_images, 2)
@@ -423,7 +401,6 @@ class TestImageAnnotator(unittest.TestCase):
         mock_backup.assert_called_once()
         self.assertEqual(mock_annotate.call_count, 2)
         self.assertEqual(mock_save_progress.call_count, 2)
-
 
     def test_batch_annotate_cancel(self):
         """
@@ -473,10 +450,7 @@ class TestImageAnnotator(unittest.TestCase):
             self.annotator.user_cancelled = False
 
             # Executar anotação em lote
-            total_images, total_annotated = self.annotator.batch_annotate(
-                self.temp_dir.name,
-                self.output_dir
-            )
+            total_images, total_annotated = self.annotator.batch_annotate(self.temp_dir.name, self.output_dir)
 
             # Verificar que o método foi chamado uma vez
             self.assertEqual(call_count[0], 1)

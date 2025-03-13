@@ -4,12 +4,12 @@ Testes unitários para o módulo de visualização.
 
 import os
 import tempfile
+import tkinter as tk
 import unittest
 from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
-import tkinter as tk
 
 from microdetect.annotation.visualization import AnnotationVisualizer
 
@@ -24,23 +24,12 @@ class TestAnnotationVisualizer(unittest.TestCase):
         Configuração dos testes.
         """
         # Criar mapeamentos para testes
-        self.class_map = {
-            "0": "0-levedura",
-            "1": "1-fungo",
-            "2": "2-micro-alga"
-        }
+        self.class_map = {"0": "0-levedura", "1": "1-fungo", "2": "2-micro-alga"}
 
-        self.color_map = {
-            "0": (0, 255, 0),  # Verde
-            "1": (0, 0, 255),  # Vermelho
-            "2": (255, 0, 0)  # Azul
-        }
+        self.color_map = {"0": (0, 255, 0), "1": (0, 0, 255), "2": (255, 0, 0)}  # Verde  # Vermelho  # Azul
 
         # Criar visualizador com mapeamentos personalizados
-        self.visualizer = AnnotationVisualizer(
-            class_map=self.class_map,
-            color_map=self.color_map
-        )
+        self.visualizer = AnnotationVisualizer(class_map=self.class_map, color_map=self.color_map)
 
         # Criar diretório temporário para testes
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -95,9 +84,7 @@ class TestAnnotationVisualizer(unittest.TestCase):
         # Testar linha válida
         annotation = "0 0.5 0.5 0.2 0.2"
         class_visibility = {"0": True, "1": True, "2": True}
-        box_data = self.visualizer._process_annotation_line(
-            annotation, 100, 100, class_visibility
-        )
+        box_data = self.visualizer._process_annotation_line(annotation, 100, 100, class_visibility)
 
         self.assertIsNotNone(box_data)
         self.assertEqual(box_data["class_id"], "0")
@@ -112,17 +99,13 @@ class TestAnnotationVisualizer(unittest.TestCase):
 
         # Testar linha inválida
         annotation = "0 0.5"  # Incompleta
-        box_data = self.visualizer._process_annotation_line(
-            annotation, 100, 100, class_visibility
-        )
+        box_data = self.visualizer._process_annotation_line(annotation, 100, 100, class_visibility)
         self.assertIsNone(box_data)
 
         # Testar classe filtrada
         annotation = "0 0.5 0.5 0.2 0.2"
         class_visibility = {"0": False, "1": True, "2": True}
-        box_data = self.visualizer._process_annotation_line(
-            annotation, 100, 100, class_visibility
-        )
+        box_data = self.visualizer._process_annotation_line(annotation, 100, 100, class_visibility)
         self.assertIsNone(box_data)
 
     @patch("cv2.imwrite")
@@ -136,9 +119,7 @@ class TestAnnotationVisualizer(unittest.TestCase):
         # Testar salvamento
         output_dir = os.path.join(self.temp_dir.name, "output")
         saved_count = self.visualizer.save_annotated_images(
-            self.temp_dir.name,
-            None,  # Usar mesmo diretório das imagens
-            output_dir
+            self.temp_dir.name, None, output_dir  # Usar mesmo diretório das imagens
         )
 
         # Verificar se o método foi chamado para a imagem de teste
@@ -148,10 +129,7 @@ class TestAnnotationVisualizer(unittest.TestCase):
         # Testar com filtro de classes
         mock_imwrite.reset_mock()
         saved_count = self.visualizer.save_annotated_images(
-            self.temp_dir.name,
-            None,
-            output_dir,
-            filter_classes={"1"}  # Apenas fungo
+            self.temp_dir.name, None, output_dir, filter_classes={"1"}  # Apenas fungo
         )
 
         # Ainda deve salvar a imagem, mas com apenas uma anotação
@@ -180,10 +158,7 @@ class TestAnnotationVisualizer(unittest.TestCase):
         mock_root.mainloop.side_effect = destroy_window
 
         # Testar visualização em modo interativo
-        self.visualizer.visualize_annotations(
-            self.temp_dir.name,
-            None  # Usar mesmo diretório das imagens
-        )
+        self.visualizer.visualize_annotations(self.temp_dir.name, None)  # Usar mesmo diretório das imagens
 
         # Verificar se o Tkinter foi inicializado e a janela principal criada
         mock_tk.assert_called_once()

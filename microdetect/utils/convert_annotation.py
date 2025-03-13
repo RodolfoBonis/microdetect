@@ -23,9 +23,7 @@ from microdetect.utils.config import config
 
 
 def yolo_to_absolute_coords(
-        yolo_box: Tuple[float, float, float, float],
-        img_width: int,
-        img_height: int
+    yolo_box: Tuple[float, float, float, float], img_width: int, img_height: int
 ) -> Tuple[int, int, int, int]:
     """
     Converte coordenadas YOLO normalizadas para coordenadas absolutas.
@@ -56,9 +54,7 @@ def yolo_to_absolute_coords(
 
 
 def absolute_to_yolo_coords(
-        box: Tuple[int, int, int, int],
-        img_width: int,
-        img_height: int
+    box: Tuple[int, int, int, int], img_width: int, img_height: int
 ) -> Tuple[float, float, float, float]:
     """
     Converte coordenadas absolutas para o formato YOLO normalizado.
@@ -88,12 +84,7 @@ def absolute_to_yolo_coords(
     return center_x, center_y, width, height
 
 
-def yolo_to_pascal_voc(
-        yolo_dir: str,
-        image_dir: str,
-        output_dir: str,
-        class_map: Optional[Dict[str, str]] = None
-) -> int:
+def yolo_to_pascal_voc(yolo_dir: str, image_dir: str, output_dir: str, class_map: Optional[Dict[str, str]] = None) -> int:
     """
     Converte anotações do formato YOLO para Pascal VOC XML.
 
@@ -193,11 +184,7 @@ def yolo_to_pascal_voc(
             height_norm = float(height_norm)
 
             # Converter para coordenadas absolutas
-            x1, y1, x2, y2 = yolo_to_absolute_coords(
-                (center_x, center_y, width_norm, height_norm),
-                img_width,
-                img_height
-            )
+            x1, y1, x2, y2 = yolo_to_absolute_coords((center_x, center_y, width_norm, height_norm), img_width, img_height)
 
             # Garantir que as coordenadas estão dentro dos limites da imagem
             x1 = max(0, min(x1, img_width - 1))
@@ -252,12 +239,7 @@ def yolo_to_pascal_voc(
     return converted_count
 
 
-def pascal_voc_to_yolo(
-        xml_dir: str,
-        image_dir: str,
-        output_dir: str,
-        class_map: Optional[Dict[str, str]] = None
-) -> int:
+def pascal_voc_to_yolo(xml_dir: str, image_dir: str, output_dir: str, class_map: Optional[Dict[str, str]] = None) -> int:
     """
     Converte anotações do formato Pascal VOC XML para YOLO.
 
@@ -330,11 +312,7 @@ def pascal_voc_to_yolo(
                     y2 = int(bndbox.find("ymax").text)
 
                     # Converter para formato YOLO
-                    center_x, center_y, width, height = absolute_to_yolo_coords(
-                        (x1, y1, x2, y2),
-                        img_width,
-                        img_height
-                    )
+                    center_x, center_y, width, height = absolute_to_yolo_coords((x1, y1, x2, y2), img_width, img_height)
 
                     # Escrever no arquivo YOLO
                     f.write(f"{class_id} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
@@ -348,12 +326,7 @@ def pascal_voc_to_yolo(
     return converted_count
 
 
-def yolo_to_coco(
-        yolo_dir: str,
-        image_dir: str,
-        output_json: str,
-        class_map: Optional[Dict[str, str]] = None
-) -> Dict:
+def yolo_to_coco(yolo_dir: str, image_dir: str, output_json: str, class_map: Optional[Dict[str, str]] = None) -> Dict:
     """
     Converte anotações do formato YOLO para COCO JSON.
 
@@ -383,29 +356,19 @@ def yolo_to_coco(
             "version": "1.0",
             "year": datetime.now().year,
             "contributor": "MicroDetect",
-            "date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "date_created": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         },
-        "licenses": [
-            {
-                "id": 1,
-                "name": "Unknown",
-                "url": ""
-            }
-        ],
+        "licenses": [{"id": 1, "name": "Unknown", "url": ""}],
         "categories": [],
         "images": [],
-        "annotations": []
+        "annotations": [],
     }
 
     # Adicionar categorias
     categories = {}
     for class_id, class_name in class_map.items():
         cat_id = int(class_id) + 1  # COCO IDs começam em 1
-        coco_json["categories"].append({
-            "id": cat_id,
-            "name": class_name,
-            "supercategory": "microorganism"
-        })
+        coco_json["categories"].append({"id": cat_id, "name": class_name, "supercategory": "microorganism"})
         categories[class_id] = cat_id
 
     image_id = 0
@@ -437,14 +400,16 @@ def yolo_to_coco(
 
         # Adicionar imagem ao COCO
         image_id += 1
-        coco_json["images"].append({
-            "id": image_id,
-            "file_name": os.path.basename(img_path),
-            "width": img_width,
-            "height": img_height,
-            "license": 1,
-            "date_captured": ""
-        })
+        coco_json["images"].append(
+            {
+                "id": image_id,
+                "file_name": os.path.basename(img_path),
+                "width": img_width,
+                "height": img_height,
+                "license": 1,
+                "date_captured": "",
+            }
+        )
 
         # Ler anotações YOLO
         try:
@@ -465,11 +430,7 @@ def yolo_to_coco(
                 height_norm = float(height_norm)
 
                 # Converter para coordenadas absolutas
-                x1, y1, x2, y2 = yolo_to_absolute_coords(
-                    (center_x, center_y, width_norm, height_norm),
-                    img_width,
-                    img_height
-                )
+                x1, y1, x2, y2 = yolo_to_absolute_coords((center_x, center_y, width_norm, height_norm), img_width, img_height)
 
                 # Calcular largura e altura
                 width = x2 - x1
@@ -483,15 +444,17 @@ def yolo_to_coco(
 
                 # Adicionar anotação ao COCO
                 annotation_id += 1
-                coco_json["annotations"].append({
-                    "id": annotation_id,
-                    "image_id": image_id,
-                    "category_id": category_id,
-                    "bbox": [x1, y1, width, height],
-                    "area": width * height,
-                    "segmentation": [],
-                    "iscrowd": 0
-                })
+                coco_json["annotations"].append(
+                    {
+                        "id": annotation_id,
+                        "image_id": image_id,
+                        "category_id": category_id,
+                        "bbox": [x1, y1, width, height],
+                        "area": width * height,
+                        "segmentation": [],
+                        "iscrowd": 0,
+                    }
+                )
 
         except Exception as e:
             print(f"Erro ao processar {txt_file}: {str(e)}")
@@ -500,17 +463,15 @@ def yolo_to_coco(
     with open(output_json, "w") as f:
         json.dump(coco_json, f, indent=2)
 
-    print(f"Conversão concluída: {len(coco_json['images'])} imagens e "
-          f"{len(coco_json['annotations'])} anotações convertidas para COCO")
+    print(
+        f"Conversão concluída: {len(coco_json['images'])} imagens e "
+        f"{len(coco_json['annotations'])} anotações convertidas para COCO"
+    )
 
     return coco_json
 
 
-def coco_to_yolo(
-        coco_json: str,
-        output_dir: str,
-        class_map: Optional[Dict[int, str]] = None
-) -> int:
+def coco_to_yolo(coco_json: str, output_dir: str, class_map: Optional[Dict[int, str]] = None) -> int:
     """
     Converte anotações do formato COCO JSON para YOLO.
 
@@ -583,9 +544,7 @@ def coco_to_yolo(
                 x2, y2 = x + width, y + height
 
                 center_x, center_y, width_norm, height_norm = absolute_to_yolo_coords(
-                    (x1, y1, x2, y2),
-                    image_width,
-                    image_height
+                    (x1, y1, x2, y2), image_width, image_height
                 )
 
                 # Escrever no arquivo YOLO
@@ -597,12 +556,7 @@ def coco_to_yolo(
     return processed_count
 
 
-def yolo_to_csv(
-        yolo_dir: str,
-        image_dir: str,
-        output_csv: str,
-        class_map: Optional[Dict[str, str]] = None
-) -> int:
+def yolo_to_csv(yolo_dir: str, image_dir: str, output_csv: str, class_map: Optional[Dict[str, str]] = None) -> int:
     """
     Converte anotações do formato YOLO para CSV.
 
@@ -629,9 +583,7 @@ def yolo_to_csv(
         csv_writer = csv.writer(csvfile)
 
         # Escrever cabeçalho
-        csv_writer.writerow([
-            "filename", "width", "height", "class", "class_id", "xmin", "ymin", "xmax", "ymax"
-        ])
+        csv_writer.writerow(["filename", "width", "height", "class", "class_id", "xmin", "ymin", "xmax", "ymax"])
 
         # Processar cada arquivo de anotação YOLO
         annotation_count = 0
@@ -678,26 +630,16 @@ def yolo_to_csv(
 
                     # Converter para coordenadas absolutas
                     x1, y1, x2, y2 = yolo_to_absolute_coords(
-                        (center_x, center_y, width_norm, height_norm),
-                        img_width,
-                        img_height
+                        (center_x, center_y, width_norm, height_norm), img_width, img_height
                     )
 
                     # Obter nome da classe
                     class_name = class_map.get(class_id, f"class_{class_id}")
 
                     # Escrever no CSV
-                    csv_writer.writerow([
-                        os.path.basename(img_path),
-                        img_width,
-                        img_height,
-                        class_name,
-                        class_id,
-                        x1,
-                        y1,
-                        x2,
-                        y2
-                    ])
+                    csv_writer.writerow(
+                        [os.path.basename(img_path), img_width, img_height, class_name, class_id, x1, y1, x2, y2]
+                    )
 
                     annotation_count += 1
 
@@ -708,11 +650,7 @@ def yolo_to_csv(
     return annotation_count
 
 
-def csv_to_yolo(
-        csv_file: str,
-        output_dir: str,
-        class_map: Optional[Dict[str, str]] = None
-) -> int:
+def csv_to_yolo(csv_file: str, output_dir: str, class_map: Optional[Dict[str, str]] = None) -> int:
     """
     Converte anotações do formato CSV para YOLO.
 
@@ -763,13 +701,15 @@ def csv_to_yolo(
                     class_id = "0"
 
             # Adicionar anotação
-            annotations_by_file[filename].append({
-                "class_id": class_id,
-                "xmin": int(row["xmin"]),
-                "ymin": int(row["ymin"]),
-                "xmax": int(row["xmax"]),
-                "ymax": int(row["ymax"])
-            })
+            annotations_by_file[filename].append(
+                {
+                    "class_id": class_id,
+                    "xmin": int(row["xmin"]),
+                    "ymin": int(row["ymin"]),
+                    "xmax": int(row["xmax"]),
+                    "ymax": int(row["ymax"]),
+                }
+            )
 
     # Processar cada arquivo
     processed_count = 0
@@ -790,11 +730,7 @@ def csv_to_yolo(
                 y2 = ann["ymax"]
 
                 # Converter para formato YOLO
-                center_x, center_y, width, height = absolute_to_yolo_coords(
-                    (x1, y1, x2, y2),
-                    img_width,
-                    img_height
-                )
+                center_x, center_y, width, height = absolute_to_yolo_coords((x1, y1, x2, y2), img_width, img_height)
 
                 # Escrever no arquivo YOLO
                 f.write(f"{ann['class_id']} {center_x:.6f} {center_y:.6f} {width:.6f} {height:.6f}\n")
