@@ -140,7 +140,7 @@ class StatisticalAnalyzer:
         return output_path
 
     def analyze_size_distribution(
-        self, detections: List[Dict], output_dir: Optional[str] = None, by_class: bool = True
+        self, detections: List[Dict], output_dir: Optional[str] = None, by_class: bool = True, cls_names=None
     ) -> Dict[str, str]:
         """
         Analisa a distribuição de tamanho dos objetos detectados.
@@ -149,7 +149,7 @@ class StatisticalAnalyzer:
             detections: Lista de detecções com dimensões
             output_dir: Diretório para salvar os gráficos
             by_class: Se True, gera análise separada por classe
-
+            cls_names: Lista de nomes de classes (opcional)
         Returns:
             Dicionário com caminhos para os gráficos gerados
         """

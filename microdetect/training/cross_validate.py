@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
+from microdetect.training import ModelEvaluator
+
 logger = logging.getLogger(__name__)
 
 
