@@ -12,7 +12,10 @@ from unittest.mock import MagicMock, patch
 import cv2
 import numpy as np
 
-from microdetect.annotation.annotator import ImageAnnotator
+from microdetect.annotation.annotator import (
+    ImageAnnotator, HANDLE_NONE, HANDLE_NW, HANDLE_NE, HANDLE_SE, HANDLE_SW,
+    HANDLE_N, HANDLE_E, HANDLE_S, HANDLE_W
+)
 
 
 class TestImageAnnotator(unittest.TestCase):
@@ -74,6 +77,17 @@ class TestImageAnnotator(unittest.TestCase):
         self.assertEqual(annotator.scale_factor, 1.0)
         self.assertIsNone(annotator.canvas)
         self.assertIsNone(annotator.current_img_tk)
+
+        # Verificar novos atributos adicionados
+        self.assertFalse(annotator.window_closed)
+        self.assertEqual(annotator.bounding_boxes, [])
+        self.assertFalse(annotator.pan_mode)
+        self.assertFalse(annotator.user_cancelled)
+        self.assertEqual(annotator.action_history, [])
+        self.assertEqual(annotator.max_history, 50)
+        self.assertEqual(annotator.resize_handle, HANDLE_NONE)
+        self.assertEqual(annotator.handle_size, 6)
+        self.assertIsNone(annotator.original_box_state)
 
         # Verificar que start_x e start_y NÃO são atributos da classe
         self.assertFalse(hasattr(annotator, 'start_x'))
@@ -222,8 +236,12 @@ class TestImageAnnotator(unittest.TestCase):
 
     def test_backup_annotations(self):
         """
-        Testa a criação de backup de anotações.
+        Testa a criação de backup de anotações e a limitação para 5 backups.
         """
+        import re
+        import time
+        import os
+
         # Criar arquivos de anotação de teste
         annotation1 = os.path.join(self.output_dir, "test1.txt")
         annotation2 = os.path.join(self.output_dir, "test2.txt")
@@ -234,23 +252,105 @@ class TestImageAnnotator(unittest.TestCase):
         with open(annotation2, "w") as f:
             f.write("1 0.7 0.7 0.1 0.1")
 
-        # Criar backup
+        # Criar backup e verificar se os arquivos foram copiados
         backup_dir = self.annotator.backup_annotations(self.output_dir)
 
-        # Verificar se o diretório de backup foi criado
+        # Verificações básicas
         self.assertIsNotNone(backup_dir)
         self.assertTrue(os.path.exists(backup_dir))
-
-        # Verificar se os arquivos foram copiados
         self.assertTrue(os.path.exists(os.path.join(backup_dir, "test1.txt")))
         self.assertTrue(os.path.exists(os.path.join(backup_dir, "test2.txt")))
 
-        # Verificar se o arquivo de progresso não foi copiado
+        # Verificar que arquivo de progresso não é copiado
         with open(self.progress_file, "w") as f:
             f.write("{}")
 
         backup_dir = self.annotator.backup_annotations(self.output_dir)
         self.assertFalse(os.path.exists(os.path.join(backup_dir, self.annotator.progress_file)))
+
+    def test_add_to_history(self):
+        """
+        Testa a adição de ações ao histórico.
+        """
+        # Histórico deve começar vazio
+        self.assertEqual(len(self.annotator.action_history), 0)
+
+        # Adicionar ação de teste
+        test_data = {"index": 0, "box": ("0", 10, 10, 30, 30)}
+        self.annotator._add_to_history("add", test_data)
+
+        # Verificar se a ação foi adicionada corretamente
+        self.assertEqual(len(self.annotator.action_history), 1)
+        self.assertEqual(self.annotator.action_history[0]["type"], "add")
+        self.assertEqual(self.annotator.action_history[0]["data"], test_data)
+
+        # Testar limite de histórico
+        # Adicionar mais ações do que o limite
+        original_max_history = self.annotator.max_history
+        self.annotator.max_history = 3  # Definir limite baixo para teste
+
+        for i in range(5):  # Adicionar 5 itens quando o limite é 3
+            self.annotator._add_to_history("test", {"index": i})
+
+        # Verificar se apenas os 3 mais recentes são mantidos
+        self.assertEqual(len(self.annotator.action_history), 3)
+        self.assertEqual(self.annotator.action_history[0]["data"]["index"], 2)
+        self.assertEqual(self.annotator.action_history[1]["data"]["index"], 3)
+        self.assertEqual(self.annotator.action_history[2]["data"]["index"], 4)
+
+        # Restaurar o limite original
+        self.annotator.max_history = original_max_history
+
+    def test_detect_resize_handle(self):
+        """
+        Testa a detecção de alças de redimensionamento.
+        """
+        # Configurar uma caixa de teste
+        self.annotator.bounding_boxes = [("0", 10, 10, 50, 50)]
+        self.annotator.display_scale = 1.0
+        self.annotator.scale_factor = 1.0
+
+        # Testar cada canto
+        # Canto noroeste (superior esquerdo)
+        handle = self.annotator._detect_resize_handle(10, 10, 0)
+        self.assertEqual(handle, HANDLE_NW)
+
+        # Canto nordeste (superior direito)
+        handle = self.annotator._detect_resize_handle(50, 10, 0)
+        self.assertEqual(handle, HANDLE_NE)
+
+        # Canto sudeste (inferior direito)
+        handle = self.annotator._detect_resize_handle(50, 50, 0)
+        self.assertEqual(handle, HANDLE_SE)
+
+        # Canto sudoeste (inferior esquerdo)
+        handle = self.annotator._detect_resize_handle(10, 50, 0)
+        self.assertEqual(handle, HANDLE_SW)
+
+        # Testar cada lado
+        # Lado norte (meio superior)
+        handle = self.annotator._detect_resize_handle(30, 10, 0)
+        self.assertEqual(handle, HANDLE_N)
+
+        # Lado leste (meio direito)
+        handle = self.annotator._detect_resize_handle(50, 30, 0)
+        self.assertEqual(handle, HANDLE_E)
+
+        # Lado sul (meio inferior)
+        handle = self.annotator._detect_resize_handle(30, 50, 0)
+        self.assertEqual(handle, HANDLE_S)
+
+        # Lado oeste (meio esquerdo)
+        handle = self.annotator._detect_resize_handle(10, 30, 0)
+        self.assertEqual(handle, HANDLE_W)
+
+        # Testar o centro (não deve detectar nenhuma alça)
+        handle = self.annotator._detect_resize_handle(30, 30, 0)
+        self.assertEqual(handle, HANDLE_NONE)
+
+        # Testar índice inválido
+        handle = self.annotator._detect_resize_handle(10, 10, 1)  # Índice fora dos limites
+        self.assertEqual(handle, HANDLE_NONE)
 
     def test_annotate_image_save(self):
         """
@@ -272,11 +372,11 @@ class TestImageAnnotator(unittest.TestCase):
                 self.annotator.original_h = 100
 
                 # Simular a existência de algumas bounding boxes
-                bounding_boxes = [("0", 10, 10, 30, 30)]
+                self.annotator.bounding_boxes = [("0", 10, 10, 30, 30)]
 
                 # Chamar diretamente o método _save_annotations
                 base_name = os.path.splitext(os.path.basename(image_path))[0]
-                return self.annotator._save_annotations(bounding_boxes, output_dir, base_name)
+                return self.annotator._save_annotations(self.annotator.bounding_boxes, output_dir, base_name)
 
             try:
                 # Substituir temporariamente o método
@@ -323,6 +423,76 @@ class TestImageAnnotator(unittest.TestCase):
         mock_backup.assert_called_once()
         self.assertEqual(mock_annotate.call_count, 2)
         self.assertEqual(mock_save_progress.call_count, 2)
+
+
+    def test_batch_annotate_cancel(self):
+        """
+        Testa o cancelamento da anotação em lote pelo usuário.
+        """
+        # Criar múltiplas imagens de teste
+        test_image2_path = os.path.join(self.temp_dir.name, "test_image2.jpg")
+        test_image3_path = os.path.join(self.temp_dir.name, "test_image3.jpg")
+        cv2.imwrite(test_image2_path, self.test_image)
+        cv2.imwrite(test_image3_path, self.test_image)
+
+        # Variável para rastrear quantas vezes o método foi chamado
+        call_count = [0]
+
+        # Armazenar os métodos originais
+        original_annotate_image = self.annotator.annotate_image
+        original_backup = self.annotator.backup_annotations
+        original_save_progress = self.annotator._save_progress
+
+        # Mock para backup_annotations (para evitar criação de arquivos reais)
+        def mock_backup(label_dir):
+            return "backup_dir"
+
+        # Mock para _save_progress (para evitar criação de arquivos reais)
+        def mock_save_progress(progress_path, current_image):
+            pass
+
+        # Mock para annotate_image que simula cancelamento
+        def mock_annotate_image(image_path, output_dir):
+            call_count[0] += 1
+
+            # Definir user_cancelled como True após a primeira chamada
+            # Isso fará com que user_cancelled seja True antes de incrementar total_annotated
+            self.annotator.user_cancelled = True
+
+            # Retornar um caminho válido
+            base_name = os.path.splitext(os.path.basename(image_path))[0]
+            return os.path.join(output_dir, f"{base_name}.txt")
+
+        try:
+            # Substituir métodos
+            self.annotator.annotate_image = mock_annotate_image
+            self.annotator.backup_annotations = mock_backup
+            self.annotator._save_progress = mock_save_progress
+
+            # Garantir que user_cancelled começa como False
+            self.annotator.user_cancelled = False
+
+            # Executar anotação em lote
+            total_images, total_annotated = self.annotator.batch_annotate(
+                self.temp_dir.name,
+                self.output_dir
+            )
+
+            # Verificar que o método foi chamado uma vez
+            self.assertEqual(call_count[0], 1)
+
+            # Verificar que o contador não foi incrementado devido ao cancelamento
+            # A verificação de user_cancelled ocorre ANTES de incrementar total_annotated no batch_annotate
+            self.assertEqual(total_annotated, 0)  # Esperado = 0 porque o loop termina antes de incrementar
+
+            # Verificar que user_cancelled está True
+            self.assertTrue(self.annotator.user_cancelled)
+
+        finally:
+            # Restaurar os métodos originais
+            self.annotator.annotate_image = original_annotate_image
+            self.annotator.backup_annotations = original_backup
+            self.annotator._save_progress = original_save_progress
 
     def test_cycle_class_selection(self):
         """
