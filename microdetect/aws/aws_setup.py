@@ -204,7 +204,7 @@ class AWSSetupManager:
         print(f"{INFO}Testando conexão com AWS CodeArtifact...{RESET}")
 
         try:
-            from microdetect.utils.updater import UpdateManager
+            from microdetect.updater.updater import UpdateManager
 
             success, token, endpoint = UpdateManager.get_aws_codeartifact_token()
 

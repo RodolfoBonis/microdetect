@@ -12,14 +12,15 @@ from typing import List, Optional
 from microdetect import __version__
 from microdetect.annotation.annotator import ImageAnnotator
 from microdetect.annotation.visualization import AnnotationVisualizer
+from microdetect.aws import AWSSetupManager
 from microdetect.data.augmentation import DataAugmenter
 from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import AWSSetupManager, ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
+from microdetect.utils import ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
-from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
+from microdetect.docs import DEFAULT_LANGUAGE, LANGUAGES
 
 # Configuração de logging
 logging.basicConfig(
@@ -32,7 +33,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 def setup_convert_parser(subparsers):
     """Configurar parser para comando de conversão de imagens."""
@@ -47,13 +47,11 @@ def setup_convert_parser(subparsers):
     )
     parser.add_argument("--format", default="tiff-to-png", help="Formato de conversão (ex: tiff-to-png)")
 
-
 def setup_annotate_parser(subparsers):
     """Configurar parser para comando de anotação."""
     parser = subparsers.add_parser("annotate", help="Anotar imagens manualmente")
     parser.add_argument("--image_dir", required=True, help="Diretório com imagens para anotação")
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
-
 
 def setup_visualize_parser(subparsers):
     """Configurar parser para comando de visualização."""
@@ -69,7 +67,6 @@ def setup_visualize_parser(subparsers):
         help='Lista separada por vírgulas de IDs de classe para exibir (ex: "0,1")',
     )
 
-
 def setup_augment_parser(subparsers):
     """Configurar parser para comando de augmentação."""
     parser = subparsers.add_parser("augment", help="Aplicar augmentação em imagens e anotações")
@@ -78,7 +75,6 @@ def setup_augment_parser(subparsers):
     parser.add_argument("--output_image_dir", help="Diretório para salvar imagens aumentadas")
     parser.add_argument("--output_label_dir", help="Diretório para salvar anotações aumentadas")
     parser.add_argument("--factor", type=int, help="Fator de augmentação")
-
 
 def setup_dataset_parser(subparsers):
     """Configurar parser para comando de preparação de dataset."""
@@ -89,7 +85,6 @@ def setup_dataset_parser(subparsers):
     parser.add_argument("--train_ratio", type=float, help="Proporção para treinamento")
     parser.add_argument("--val_ratio", type=float, help="Proporção para validação")
     parser.add_argument("--test_ratio", type=float, help="Proporção para teste")
-
 
 def setup_train_parser(subparsers):
     """Configurar parser para comando de treinamento."""
@@ -112,7 +107,6 @@ def setup_train_parser(subparsers):
         help="Buscar melhores hiperparâmetros",
     )
 
-
 def setup_evaluate_parser(subparsers):
     """Configurar parser para comando de avaliação."""
     parser = subparsers.add_parser("evaluate", help="Avaliar modelo treinado")
@@ -121,7 +115,6 @@ def setup_evaluate_parser(subparsers):
     parser.add_argument("--data_yaml", help="Caminho para arquivo data.yaml")
     parser.add_argument("--output_dir", help="Diretório para relatórios")
     parser.add_argument("--confusion_matrix", action="store_true", help="Gerar matriz de confusão")
-
 
 def setup_init_parser(subparsers):
     """Configurar parser para comando de inicialização."""
@@ -134,13 +127,11 @@ def setup_init_parser(subparsers):
         help="Diretório para inicializar (padrão: diretório atual)",
     )
 
-
 def setup_update_parser(subparsers):
     """Configurar parser para comando de atualização."""
     parser = subparsers.add_parser("update", help="Verificar e instalar atualizações")
     parser.add_argument("--force", action="store_true", help="Forçar atualização sem confirmação")
     parser.add_argument("--check-only", action="store_true", help="Apenas verificar se há atualizações")
-
 
 def setup_aws_parser(subparsers):
     """Configurar parser para comando de configuração AWS."""
@@ -151,7 +142,6 @@ def setup_aws_parser(subparsers):
     parser.add_argument("--region", help="Região AWS (padrão: us-east-1)")
     parser.add_argument("--configure-aws", action="store_true", help="Configurar credenciais AWS")
     parser.add_argument("--test", action="store_true", help="Testar conexão com AWS CodeArtifact")
-
 
 def setup_docs_parser(subparsers):
     """Configurar parser para comando de documentação."""
@@ -168,7 +158,6 @@ def setup_docs_parser(subparsers):
     group.add_argument("--stop", action="store_true", help="Parar servidor em execução em background")
     group.add_argument("--status", action="store_true", help="Verificar status do servidor em background")
 
-
 def setup_install_docs_parser(subparsers):
     """Configurar o parser para o comando install-docs."""
     parser = subparsers.add_parser("install-docs", help="Instala ou atualiza a documentação local")
@@ -176,6 +165,59 @@ def setup_install_docs_parser(subparsers):
     parser.add_argument("--no-interactive", dest="interactive", action="store_false", help="Modo não interativo")
     return parser
 
+def setup_model_comparison_parser(subparsers):
+    """Configurar parser para comando de comparação de modelos."""
+    parser = subparsers.add_parser("compare_models", help="Comparar diferentes modelos")
+    parser.add_argument("--model_paths", required=True, help="Lista de caminhos de modelos separados por vírgula")
+    parser.add_argument("--data_yaml", required=True, help="Caminho para o arquivo data.yaml")
+    parser.add_argument("--output_dir", help="Diretório para salvar os resultados")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança para detecções")
+    parser.add_argument("--iou_threshold", type=float, default=0.7, help="Limiar de IoU para supressão não-máxima")
+    parser.add_argument("--dashboard", action="store_true", help="Gerar dashboard interativo")
+
+def setup_batch_detect_parser(subparsers):
+    """Configurar parser para comando de detecção em lote."""
+    parser = subparsers.add_parser("batch_detect", help="Processar detecções em lote")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--source", required=True, help="Diretório com imagens para processar")
+    parser.add_argument("--output_dir", help="Diretório para salvar resultados")
+    parser.add_argument("--batch_size", type=int, default=16, help="Tamanho do batch para inferência")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança")
+    parser.add_argument("--save_txt", action="store_true", help="Salvar anotações em formato YOLO")
+    parser.add_argument("--save_json", action="store_true", help="Salvar resultados em JSON")
+    parser.add_argument("--save_img", action="store_true", help="Salvar imagens com detecções")
+
+def setup_visualize_detections_parser(subparsers):
+    """Configurar parser para comando de visualização de detecções."""
+    parser = subparsers.add_parser("visualize_detections", help="Visualizar detecções interativamente")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--source", required=True, help="Diretório com imagens para visualizar")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança inicial")
+
+def setup_analyze_errors_parser(subparsers):
+    """Configurar parser para comando de análise de erros."""
+    parser = subparsers.add_parser("analyze_errors", help="Analisar erros de detecção")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--data_yaml", required=True, help="Caminho para o arquivo data.yaml")
+    parser.add_argument("--dataset_dir", required=True, help="Diretório do dataset")
+    parser.add_argument("--output_dir", help="Diretório para salvar análises")
+    parser.add_argument("--error_type", choices=["all", "false_positives", "false_negatives", "classification_errors", "localization_errors"],
+                        default="all", help="Tipo de erro para analisar")
+
+def setup_generate_report_parser(subparsers):
+    """Configurar parser para comando de geração de relatórios."""
+    parser = subparsers.add_parser("generate_report", help="Gerar relatório de avaliação")
+    parser.add_argument("--results_dir", required=True, help="Diretório com resultados de avaliação")
+    parser.add_argument("--output_file", help="Caminho para o arquivo de saída")
+    parser.add_argument("--format", choices=["pdf", "csv", "json"], default="pdf", help="Formato do relatório")
+    parser.add_argument("--include_images", help="Lista de caminhos de imagens para incluir no relatório, separados por vírgula")
+
+def setup_dashboard_parser(subparsers):
+    """Configurar parser para comando de dashboard."""
+    parser = subparsers.add_parser("dashboard", help="Iniciar dashboard interativo")
+    parser.add_argument("--results_dir", required=True, help="Diretório com resultados de detecção")
+    parser.add_argument("--port", type=int, default=8050, help="Porta para o servidor web")
+    parser.add_argument("--no_browser", action="store_true", help="Não abrir navegador automaticamente")
 
 def handle_install_docs(args):
     """
@@ -183,7 +225,6 @@ def handle_install_docs(args):
     Copia os arquivos da documentação para a pasta do usuário (.microdetect/docs).
     """
     import shutil
-    import sys
     from pathlib import Path
 
     # Diretório home do usuário
@@ -205,7 +246,7 @@ def handle_install_docs(args):
             return
 
     # Tentar encontrar os arquivos de documentação
-    from microdetect.utils.docs_server import find_docs_dir
+    from microdetect.docs.docs_server import find_docs_dir
 
     source_docs_dir = find_docs_dir()
 
@@ -229,11 +270,10 @@ def handle_install_docs(args):
         print(f"Erro ao instalar a documentação: {str(e)}")
         return
 
-
 def handle_docs(args):
     """Manipular comando de documentação."""
     try:
-        from microdetect.utils.docs_server import (
+        from microdetect.docs import (
             check_server_status,
             start_docs_server,
             start_server_in_background,
@@ -257,7 +297,7 @@ def handle_docs(args):
 
         # Configurar opções globais (se necessário)
         if args.port != 8080:
-            import microdetect.utils.docs_server as docs_server
+            import microdetect.docs.docs_server as docs_server
 
             docs_server.PORT = args.port
 
@@ -268,7 +308,7 @@ def handle_docs(args):
                 print("Acesse o URL acima no seu navegador para ver a documentação.")
                 print("Pressione Ctrl+C para parar o servidor.")
 
-            import microdetect.utils.docs_server as docs_server
+            import microdetect.docs.docs_server as docs_server
 
             docs_server.open_browser = do_nothing
 
@@ -283,7 +323,6 @@ def handle_docs(args):
         logger.info("Tente instalar as dependências necessárias: pip install markdown pygments")
     except Exception as e:
         logger.error(f"Erro ao iniciar o servidor de documentação: {str(e)}")
-
 
 def handle_setup_aws(args):
     """Manipular comando de configuração AWS."""
@@ -338,10 +377,9 @@ def handle_setup_aws(args):
     print(f"{INFO}Todas as vezes que executar comandos microdetect, o sistema verificará{RESET}")
     print(f"{INFO}automaticamente se há atualizações disponíveis.{RESET}")
 
-
 def handle_update(args):
     """Manipular comando de atualização."""
-    from microdetect.utils.updater import UpdateManager
+    from microdetect.updater import UpdateManager
 
     if args.check_only:
         update_info = UpdateManager.check_for_updates()
@@ -362,7 +400,6 @@ def handle_update(args):
             print(f"{SUCCESS}MicroDetect já está na versão mais recente {BRIGHT}({current_version}){RESET}")
     else:
         UpdateManager.update_package(args.force)
-
 
 def handle_init(args):
     """
@@ -477,7 +514,6 @@ Ou use o Makefile para passos automáticos (se disponível).
 """
     )
 
-
 def handle_convert(args):
     """Manipular comando de conversão de imagens."""
     logger.info(f"Iniciando conversão de imagens de {args.input_dir} para {args.output_dir}")
@@ -506,7 +542,6 @@ def handle_convert(args):
             + (f" e mais {len(error_messages) - 5} erros" if len(error_messages) > 5 else "")
         )
 
-
 def handle_annotate(args):
     """Manipular comando de anotação."""
     logger.info(f"Iniciando anotação manual de imagens em {args.image_dir}")
@@ -515,7 +550,6 @@ def handle_annotate(args):
     total, annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
 
     logger.info(f"Anotação concluída: {annotated}/{total} imagens anotadas")
-
 
 def handle_visualize(args):
     """Manipular comando de visualização."""
@@ -536,7 +570,6 @@ def handle_visualize(args):
         visualizer.visualize_annotations(args.image_dir, args.label_dir, args.output_dir, filter_classes)
         logger.info("Visualização interativa concluída")
 
-
 def handle_augment(args):
     """Manipular comando de augmentação."""
     logger.info(f"Iniciando augmentação de imagens em {args.image_dir}")
@@ -551,7 +584,6 @@ def handle_augment(args):
     )
 
     logger.info(f"Augmentação concluída: {augmented} novas imagens geradas a partir de {original} originais")
-
 
 def handle_dataset(args):
     """Manipular comando de preparação de dataset."""
@@ -571,7 +603,6 @@ def handle_dataset(args):
         f" {split_counts.get('test', 0)} teste"
     )
     logger.info(f"Arquivo de configuração criado: {yaml_path}")
-
 
 def handle_train(args):
     """Manipular comando de treinamento."""
@@ -605,7 +636,6 @@ def handle_train(args):
 
     logger.info("Treinamento concluído")
 
-
 def handle_evaluate(args):
     """Manipular comando de avaliação."""
     logger.info(f"Iniciando avaliação do modelo {args.model_path}")
@@ -634,7 +664,6 @@ def handle_evaluate(args):
 
     logger.info(f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}")
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
-
 
 def main(args: Optional[List[str]] = None):
     """
@@ -674,7 +703,7 @@ def main(args: Optional[List[str]] = None):
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command not in ["update", "setup-aws"]:
-        from microdetect.utils.updater import UpdateManager
+        from microdetect.updater import UpdateManager
 
         # Verificar se há atualizações disponíveis
         update_result = UpdateManager.check_for_updates_before_command()

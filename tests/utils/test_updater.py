@@ -1,13 +1,9 @@
 # tests/utils/test_updater.py
 import json
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-
-from microdetect.utils.updater import UpdateManager
+from microdetect.updater.updater import UpdateManager
 from tests.utils.version_helper import mock_microdetect_version
 
 

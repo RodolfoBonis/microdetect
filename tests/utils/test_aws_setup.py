@@ -1,14 +1,12 @@
 # tests/utils/test_aws_setup.py
-import configparser
 import os
 import tempfile
-import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from microdetect.utils.aws_setup import AWSSetupManager
+from microdetect.aws import AWSSetupManager
 
 
 # Alternative implementation using pytest fixtures

@@ -3,14 +3,13 @@ Módulo para servir documentação como uma página web com menu lateral e supor
 """
 
 import http.server
-import os
 import socketserver
 import sys
 import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from urllib.parse import parse_qs, urlparse
 
 # Importar as constantes de cores do módulo existente
