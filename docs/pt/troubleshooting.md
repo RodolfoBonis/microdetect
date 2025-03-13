@@ -387,6 +387,104 @@ ERROR: Failed to update to version X.Y.Z
    pip cache purge
    ```
 
+### Não é possível adicionar classes às bounding boxes
+
+**Sintomas:**
+- Você pode desenhar boxes, mas elas não têm classe associada
+- O menu de seleção de classe parece não funcionar
+
+**Soluções:**
+1. **Verifique a configuração de classes**:
+   ```bash
+   # Verifique se seu arquivo config.yaml está configurado corretamente
+   # As classes devem estar no formato "ID-nome" como:
+   classes:
+     - "0-levedura"
+     - "1-fungo"
+     - "2-micro-alga"
+   ```
+
+2. **Reinicie a aplicação**:
+   Saia completamente da aplicação e reinicie-a.
+
+3. **Verifique logs**:
+   Verifique os arquivos de log em `microdetect.log` para identificar erros.
+
+### Não consigo editar (mover/redimensionar) as boxes
+
+**Sintomas:**
+- Ao tentar selecionar uma box existente, nada acontece
+- O modo de edição não parece funcionar
+
+**Soluções:**
+1. **Ative o modo de edição**:
+   - Certifique-se de pressionar a tecla 'E' ou clicar no botão "Modo Edição" para ativar o modo de edição
+   - No modo de edição, você verá "MODO EDIÇÃO" na barra de status
+
+2. **Usando o modo de edição**:
+   - Clique em uma box para selecioná-la (ficará destacada em vermelho)
+   - Clique e arraste no centro da box para movê-la
+   - Clique e arraste nas alças (pequenos quadrados) nos cantos e laterais para redimensionar
+
+3. **Verifique a escala da imagem**:
+   - Se a imagem estiver muito ampliada ou reduzida, pode ser difícil selecionar boxes
+   - Use 'R' para resetar o zoom e tente novamente
+
+### As anotações não são salvas
+
+**Sintomas:**
+- Você faz alterações, clica em "Salvar" ou "Salvar e Sair", mas as mudanças não aparecem
+- Ao retornar à visualização, as anotações originais ainda estão lá
+
+**Soluções:**
+1. **Verifique permissões de diretório**:
+   ```bash
+   # Certifique-se de que você tem permissão de escrita no diretório
+   chmod -R u+w caminho/para/anotacoes
+   ```
+
+2. **Use caminhos absolutos**:
+   Em vez de caminhos relativos, tente especificar caminhos absolutos:
+   ```bash
+   microdetect visualize --image_dir /caminho/completo/para/imagens --label_dir /caminho/completo/para/anotacoes
+   ```
+
+3. **Salve manualmente**:
+   - Pressione 'S' para salvar suas alterações antes de sair
+   - Ou use a combinação 'X' para salvar e sair
+
+4. **Verifique backup**:
+   - O sistema mantém backups automáticos em uma pasta `backup_annotations_TIMESTAMP`
+   - Verifique se suas anotações estão sendo salvas lá
+
+### A aplicação trava durante a edição
+
+**Soluções:**
+1. **Trate imagens grandes**:
+   - Imagens muito grandes podem causar problemas de desempenho
+   - Considere redimensionar imagens muito grandes antes da anotação
+
+2. **Limpe arquivos temporários**:
+   - Procure e remova arquivos `.annotation_progress.json` em seu diretório de anotações
+
+3. **Modo simplificado**:
+   - Se estiver enfrentando travamentos, tente evitar zoom e pan excessivos
+
+## Comandos úteis para depuração
+
+```bash
+# Verificar quais anotações existem
+find caminho/para/anotacoes -name "*.txt" | wc -l
+
+# Verificar o conteúdo de uma anotação específica
+cat caminho/para/anotacoes/nome_da_imagem.txt
+
+# Limpar arquivos de progresso temporários
+find caminho/para/anotacoes -name ".annotation_progress.json" -delete
+```
+
+Se os problemas persistirem, por favor, relate-os com detalhes específicos sobre sua configuração e os passos exatos para reproduzir o problema.
+
 ## Erros Comuns e Soluções
 
 ### Erro: "ModuleNotFoundError: No module named 'cv2'"
