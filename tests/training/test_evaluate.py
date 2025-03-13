@@ -69,7 +69,7 @@ def test_evaluate_model(mock_yolo, mock_yolo_results, model_path):
 
     # Check that YOLO was initialized and validate was called
     mock_yolo.assert_called_once_with(model_path)
-    mock_model.val.assert_called_once_with(data="path/to/data.yaml")
+    mock_model.val.assert_called_once_with(data="path/to/data.yaml", conf=0.25, iou=0.7)
 
     # Check extracted metrics
     assert "metricas_gerais" in metrics
@@ -91,6 +91,29 @@ def test_evaluate_model(mock_yolo, mock_yolo_results, model_path):
     assert class_metrics[0]["Precisão (AP50)"] == 0.95
     assert class_metrics[0]["Recall"] == 0.92
     assert class_metrics[0]["Precisão"] == 0.94
+
+
+@patch("microdetect.training.evaluate.YOLO")
+def test_evaluate_model_with_custom_thresholds(mock_yolo, mock_yolo_results, model_path):
+    """Test evaluating a model with custom confidence and IoU thresholds."""
+    # Configure YOLO mock
+    mock_model = MagicMock()
+    mock_model.val.return_value = mock_yolo_results
+    mock_yolo.return_value = mock_model
+
+    # Create evaluator
+    evaluator = ModelEvaluator()
+
+    # Call evaluate_model with custom thresholds
+    metrics = evaluator.evaluate_model(
+        model_path,
+        "path/to/data.yaml",
+        conf_threshold=0.4,
+        iou_threshold=0.6
+    )
+
+    # Check that validate was called with correct parameters
+    mock_model.val.assert_called_once_with(data="path/to/data.yaml", conf=0.4, iou=0.6)
 
 
 @patch("microdetect.training.evaluate.YOLO")
