@@ -3,9 +3,11 @@ Interface de linha de comando para o projeto MicroDetect.
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
+from datetime import datetime
 from getpass import getpass
 from typing import List, Optional
 
@@ -665,6 +667,295 @@ def handle_evaluate(args):
     logger.info(f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}")
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
 
+def handle_model_comparison(args):
+    """Manipular comando de comparação de modelos."""
+    logger.info(f"Iniciando comparação de modelos: {args.model_paths}")
+
+    # Separar lista de modelos
+    model_paths = args.model_paths.split(',')
+
+    # Validar que os modelos existem
+    for model_path in model_paths:
+        if not os.path.exists(model_path):
+            logger.error(f"Modelo não encontrado: {model_path}")
+            return
+
+    # Verificar arquivo data.yaml
+    if not os.path.exists(args.data_yaml):
+        logger.error(f"Arquivo data.yaml não encontrado: {args.data_yaml}")
+        return
+
+    # Criar diretório de saída se fornecido
+    output_dir = args.output_dir or os.path.join("reports", "model_comparison",
+                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        # Instanciar comparador de modelos
+        from microdetect.training.model_comparison import ModelComparator
+
+        comparator = ModelComparator(output_dir)
+
+        # Executar comparação
+        results = comparator.compare_models(
+            model_paths=model_paths,
+            data_yaml=args.data_yaml,
+            conf_threshold=args.conf_threshold,
+            iou_threshold=args.iou_threshold
+        )
+
+        # Gerar dashboard interativo se solicitado
+        if args.dashboard:
+            from microdetect.visualization.dashboards import DashboardGenerator
+
+            dashboard = DashboardGenerator(output_dir)
+            port = dashboard.create_model_comparison_dashboard(results)
+
+            logger.info(f"Dashboard iniciado em: http://localhost:{port}")
+
+        logger.info(f"Comparação de modelos concluída. Resultados salvos em: {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Erro durante a comparação de modelos: {str(e)}")
+
+def handle_batch_detect(args):
+    """Manipular comando de detecção em lote."""
+    logger.info(f"Iniciando processamento em lote com modelo: {args.model_path}")
+
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
+
+    # Verificar diretório de origem
+    if not os.path.exists(args.source):
+        logger.error(f"Diretório de origem não encontrado: {args.source}")
+        return
+
+    # Definir diretório de saída
+    output_dir = args.output_dir or os.path.join("runs", "detect",
+                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+    try:
+        # Instanciar processador em lote
+        from microdetect.analysis.batch_processing import BatchProcessor
+
+        processor = BatchProcessor()
+
+        # Executar processamento em lote
+        results = processor.process_batch(
+            model_path=args.model_path,
+            source_dir=args.source,
+            output_dir=output_dir,
+            batch_size=args.batch_size,
+            conf_threshold=args.conf_threshold,
+            save_txt=args.save_txt,
+            save_img=args.save_img,
+            save_json=args.save_json
+        )
+
+        logger.info(f"Processamento em lote concluído: {results['processed']}/{results['total']} imagens processadas")
+        logger.info(f"Resultados salvos em: {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Erro durante o processamento em lote: {str(e)}")
+
+def handle_visualize_detections(args):
+    """Manipular comando de visualização interativa de detecções."""
+    logger.info(f"Iniciando visualização interativa com modelo: {args.model_path}")
+
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
+
+    # Verificar diretório de origem
+    if not os.path.exists(args.source):
+        logger.error(f"Diretório de imagens não encontrado: {args.source}")
+        return
+
+    try:
+        # Instanciar visualizador de detecções
+        from microdetect.visualization.detection_viz import DetectionVisualizer
+
+        visualizer = DetectionVisualizer()
+
+        # Iniciar visualização interativa
+        visualizer.visualize_interactive(
+            model_path=args.model_path,
+            image_dir=args.source,
+            conf_threshold=args.conf_threshold
+        )
+
+        logger.info("Visualização interativa finalizada")
+
+    except Exception as e:
+        logger.error(f"Erro durante a visualização interativa: {str(e)}")
+
+def handle_analyze_errors(args):
+    """Manipular comando de análise de erros."""
+    logger.info(f"Iniciando análise de erros para o modelo: {args.model_path}")
+
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
+
+    # Verificar arquivo data.yaml
+    if not os.path.exists(args.data_yaml):
+        logger.error(f"Arquivo data.yaml não encontrado: {args.data_yaml}")
+        return
+
+    # Verificar diretório do dataset
+    if not os.path.exists(args.dataset_dir):
+        logger.error(f"Diretório do dataset não encontrado: {args.dataset_dir}")
+        return
+
+    # Definir diretório de saída
+    output_dir = args.output_dir or os.path.join("reports", "error_analysis",
+                                                 datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+    try:
+        # Instanciar analisador de erros
+        from microdetect.analysis.error_analysis import ErrorAnalyzer
+
+        analyzer = ErrorAnalyzer(output_dir)
+
+        # Executar análise de erros
+        results = analyzer.analyze_errors(
+            model_path=args.model_path,
+            data_yaml=args.data_yaml,
+            dataset_dir=args.dataset_dir,
+            error_type=args.error_type,
+            output_dir=output_dir
+        )
+
+        # Exibir resultados
+        for error_type, count in results["error_counts"].items():
+            logger.info(f"{error_type.replace('_', ' ').title()}: {count}")
+
+        logger.info(f"Análise de erros concluída. Resultados salvos em: {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Erro durante a análise de erros: {str(e)}")
+
+def handle_generate_report(args):
+    """Manipular comando de geração de relatórios."""
+    logger.info(f"Iniciando geração de relatório para os resultados em: {args.results_dir}")
+
+    # Verificar diretório de resultados
+    if not os.path.exists(args.results_dir):
+        logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
+        return
+
+    # Definir arquivo de saída
+    if not args.output_file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        extension = ".pdf" if args.format == "pdf" else f".{args.format}"
+        args.output_file = os.path.join("reports", f"report_{timestamp}{extension}")
+
+    # Criar diretório de saída se necessário
+    os.makedirs(os.path.dirname(os.path.abspath(args.output_file)), exist_ok=True)
+
+    try:
+        # Instanciar gerador de relatórios
+        from microdetect.visualization.reporting import ReportGenerator
+
+        # Preparar lista de imagens para incluir no relatório
+        include_images = []
+        if args.include_images:
+            include_images = args.include_images.split(',')
+            # Verificar se as imagens existem
+            for img_path in include_images:
+                if not os.path.exists(img_path):
+                    logger.warning(f"Imagem não encontrada: {img_path}")
+
+        # Carregar métricas do arquivo JSON
+        metrics_file = None
+        for file in os.listdir(args.results_dir):
+            if file.endswith(".json") and ("metrics" in file or "report" in file):
+                metrics_file = os.path.join(args.results_dir, file)
+                break
+
+        if not metrics_file:
+            logger.error("Arquivo de métricas não encontrado no diretório de resultados")
+            return
+
+        with open(metrics_file, 'r') as f:
+            metrics = json.load(f)
+
+        # Determinar caminho do modelo (pode estar no arquivo JSON)
+        model_path = metrics.get("modelo", {}).get("caminho", "unknown_model")
+
+        # Gerar relatório no formato solicitado
+        generator = ReportGenerator(os.path.dirname(args.output_file))
+
+        if args.format == "pdf":
+            report_path = generator.generate_pdf_report(
+                metrics=metrics,
+                model_path=model_path,
+                output_file=args.output_file,
+                include_images=include_images
+            )
+        elif args.format == "csv":
+            report_path = generator.generate_csv_report(
+                metrics=metrics,
+                output_file=args.output_file
+            )
+        else:  # json
+            # Copiar o arquivo JSON existente com eventuais modificações
+            with open(args.output_file, 'w') as f:
+                json.dump(metrics, f, indent=4)
+            report_path = args.output_file
+
+        logger.info(f"Relatório gerado com sucesso: {report_path}")
+
+    except Exception as e:
+        logger.error(f"Erro durante a geração do relatório: {str(e)}")
+
+def handle_dashboard(args):
+    """Manipular comando de dashboard interativo."""
+    logger.info(f"Iniciando dashboard para os resultados em: {args.results_dir}")
+
+    # Verificar diretório de resultados
+    if not os.path.exists(args.results_dir):
+        logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
+        return
+
+    # Verificar se há arquivos JSON no diretório
+    json_files = [f for f in os.listdir(args.results_dir) if f.endswith('.json')]
+    if not json_files:
+        logger.error(f"Nenhum arquivo JSON encontrado em: {args.results_dir}")
+        return
+
+    try:
+        # Instanciar gerador de dashboard
+        from microdetect.visualization.dashboards import DashboardGenerator
+
+        generator = DashboardGenerator(args.results_dir)
+
+        # Iniciar o dashboard
+        port = generator.create_detection_dashboard(
+            results_dir=args.results_dir,
+            port=args.port,
+            open_browser=not args.no_browser
+        )
+
+        logger.info(f"Dashboard iniciado em: http://localhost:{port}")
+        logger.info("Pressione Ctrl+C para encerrar o dashboard")
+
+        # O dashboard já está rodando em um servidor, só precisamos manter o programa rodando
+        # até o usuário interromper com Ctrl+C
+        try:
+            # Aguardar indefinidamente (até Ctrl+C)
+            import signal
+            signal.pause()
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Dashboard encerrado pelo usuário")
+
+    except Exception as e:
+        logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
+
 def main(args: Optional[List[str]] = None):
     """
     Ponto de entrada principal para o CLI.
@@ -693,6 +984,13 @@ def main(args: Optional[List[str]] = None):
     setup_aws_parser(subparsers)
     setup_docs_parser(subparsers)
     setup_install_docs_parser(subparsers)
+    # Adicionar os novos parsers
+    setup_model_comparison_parser(subparsers)
+    setup_batch_detect_parser(subparsers)
+    setup_visualize_detections_parser(subparsers)
+    setup_analyze_errors_parser(subparsers)
+    setup_generate_report_parser(subparsers)
+    setup_dashboard_parser(subparsers)
 
     # Adicionar versão e ajuda
     parser.add_argument(
@@ -737,6 +1035,19 @@ def main(args: Optional[List[str]] = None):
             handle_docs(parsed_args)
         elif parsed_args.command == "install-docs":
             handle_install_docs(parsed_args)
+        # Adicionar os novos handlers
+        elif parsed_args.command == "compare_models":
+            handle_model_comparison(parsed_args)
+        elif parsed_args.command == "batch_detect":
+            handle_batch_detect(parsed_args)
+        elif parsed_args.command == "visualize_detections":
+            handle_visualize_detections(parsed_args)
+        elif parsed_args.command == "analyze_errors":
+            handle_analyze_errors(parsed_args)
+        elif parsed_args.command == "generate_report":
+            handle_generate_report(parsed_args)
+        elif parsed_args.command == "dashboard":
+            handle_dashboard(parsed_args)
         else:
             parser.print_help()
             return
