@@ -1,6 +1,6 @@
-# Visualization and Annotation Guide
+# Annotation Guide
 
-This guide explains how to use MicroDetect's tools for annotating microorganism images and visualizing annotations.
+This guide explains how to use MicroDetect's annotation tools to label microorganisms in microscopy images.
 
 ## Table of Contents
 - [Introduction](#introduction)
@@ -10,11 +10,6 @@ This guide explains how to use MicroDetect's tools for annotating microorganism 
   - [Annotation Workflow](#annotation-workflow)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
   - [Auto-save and Progress Tracking](#auto-save-and-progress-tracking)
-- [Visualization Tool](#visualization-tool)
-  - [Visualizing Single Images](#visualizing-single-images)
-  - [Batch Visualization](#batch-visualization)
-  - [Filtering by Class](#filtering-by-class)
-  - [Customizing Visual Output](#customizing-visual-output)
 - [Managing Annotation Data](#managing-annotation-data)
   - [YOLO Format](#yolo-format)
   - [Converting to Other Formats](#converting-to-other-formats)
@@ -27,11 +22,14 @@ This guide explains how to use MicroDetect's tools for annotating microorganism 
 
 ## Introduction
 
-MicroDetect provides specialized tools for annotating microorganisms in microscopy images and visualizing these annotations. This process is crucial for:
+Accurate annotation of microscopy images is a critical step in developing effective microorganism detection models. MicroDetect provides a specialized annotation tool designed specifically for annotating microorganisms in microscopy images, with features such as:
 
-1. Creating training datasets for machine learning models
-2. Validating detection results
-3. Analyzing the distribution of microorganisms
+1. User-friendly interface with familiar controls
+2. Resumable annotation sessions
+3. Progress tracking
+4. Automatic saving to prevent data loss
+5. Support for multiple microorganism classes
+6. Keyboard shortcuts for efficient workflow
 
 ## Annotation Tool
 
@@ -63,6 +61,8 @@ The annotation interface includes:
 4. **Tool Panel**: Tools for annotation (Rectangle, Zoom, Pan)
 5. **Status Bar**: Shows current image name, progress, and status
 
+![Annotation Interface](https://example.com/annotation_interface.png)
+
 ### Annotation Workflow
 
 1. **Load Image**: The tool loads an image from the specified directory
@@ -72,6 +72,13 @@ The annotation interface includes:
 5. **Add More Objects**: Repeat steps 2-4 for additional microorganisms
 6. **Save Annotations**: Annotations are automatically saved or press 'S' to save manually
 7. **Navigate**: Use navigation buttons or keyboard shortcuts to move to the next/previous image
+
+Tips for effective annotation:
+- Draw tight bounding boxes around each microorganism
+- For clustered microorganisms, annotate each one individually if distinguishable
+- Be consistent in annotation across all images
+- Use zoom for small microorganisms
+- Use keyboard shortcuts to speed up the process
 
 ### Keyboard Shortcuts
 
@@ -90,6 +97,8 @@ The annotation tool supports the following keyboard shortcuts:
 | ESC | Deselect all annotations |
 | Q | Quit annotation tool |
 
+These shortcuts make the annotation process faster and more efficient, especially when annotating large datasets.
+
 ### Auto-save and Progress Tracking
 
 The annotation tool automatically saves your work to prevent data loss:
@@ -99,51 +108,10 @@ The annotation tool automatically saves your work to prevent data loss:
 - When restarting the tool with the same directories, you can resume where you left off
 - A backup of previous annotation versions is maintained in case of errors
 
-## Visualization Tool
-
-### Visualizing Single Images
-
-To visualize annotations for a single image interactively:
+To resume an annotation session:
 
 ```bash
-microdetect visualize --image_dir path/to/images --label_dir path/to/labels
-```
-
-This opens a window showing the image with overlaid annotations.
-
-### Batch Visualization
-
-To generate annotated images for an entire directory:
-
-```bash
-microdetect visualize --image_dir path/to/images --label_dir path/to/labels --output_dir path/to/output
-```
-
-This creates a copy of each image with annotations drawn on it and saves them to the output directory.
-
-### Filtering by Class
-
-To visualize only specific classes:
-
-```bash
-microdetect visualize --image_dir path/to/images --label_dir path/to/labels --filter_classes 0,1
-```
-
-This shows only annotations for classes with IDs 0 and 1.
-
-### Customizing Visual Output
-
-You can customize the visualization in `config.yaml`:
-
-```yaml
-annotation:
-  box_thickness: 2                # Box thickness for visualization
-  text_size: 0.5                  # Text size for class labels
-  
-color_map:
-  "0": [0, 255, 0]                # RGB color for class 0
-  "1": [0, 0, 255]                # RGB color for class 1
-  "2": [255, 0, 0]                # RGB color for class 2
+microdetect annotate --image_dir path/to/images --output_dir path/to/labels --resume
 ```
 
 ## Managing Annotation Data
@@ -157,7 +125,14 @@ MicroDetect uses the YOLO annotation format:
   class_id center_x center_y width height
   ```
 - All values are normalized to the range [0,1]
-- Example: `0 0.5 0.5 0.1 0.2` represents a class 0 object in the center of the image
+- Example: `0 0.5 0.5 0.1 0.2` represents a class 0 object in the center of the image with width 10% and height 20% of the image dimensions
+
+Example annotation file for an image containing three microorganisms (two of class 0 and one of class 1):
+```
+0 0.762 0.451 0.112 0.087
+0 0.245 0.321 0.098 0.076
+1 0.542 0.622 0.156 0.143
+```
 
 ### Converting to Other Formats
 
@@ -175,6 +150,8 @@ Supported conversions:
 - YOLO ↔ COCO
 - YOLO ↔ CSV
 
+These conversions can be useful when integrating with other tools or frameworks that require different annotation formats.
+
 ### Backing Up Annotations
 
 It's recommended to regularly back up your annotation files:
@@ -186,6 +163,8 @@ mkdir -p "$backup_dir"
 cp -r path/to/labels/* "$backup_dir"
 ```
 
+You can also use version control systems like Git to track changes to your annotation files.
+
 ## Best Practices
 
 ### Annotation Consistency
@@ -196,6 +175,13 @@ For best results:
 - For clustered microorganisms, decide whether to annotate them individually or as a group
 - Consider using a validation process where multiple annotators review the same images
 
+Example annotation guidelines:
+1. Always draw tight bounding boxes that contain the complete microorganism
+2. For partially visible microorganisms at image borders, include the visible part
+3. For overlapping microorganisms, annotate each one separately if boundaries are clear
+4. For out-of-focus microorganisms, annotate only those that are clearly visible
+5. Use consistent class assignments for similar-looking microorganisms
+
 ### Handling Difficult Cases
 
 For challenging images:
@@ -203,6 +189,11 @@ For challenging images:
 - For partially visible objects at image edges, include the visible part
 - For microorganisms in different focal planes, annotate those that are clearly in focus
 - Document any special cases for reference
+
+For very crowded images:
+- Consider breaking annotation into multiple sessions to avoid fatigue
+- Use the zoom feature to focus on specific regions
+- Be methodical in covering all areas of the image (e.g., work from top to bottom)
 
 ### Quality Control
 
@@ -212,6 +203,11 @@ Regularly check annotation quality:
 - Verify that bounding boxes are tight around the microorganisms
 - Review class distribution to ensure a balanced dataset
 
+Establish a validation process:
+- Have another person review a sample of annotations
+- Compare annotations between annotators to establish consistency
+- Create a reference guide with examples of correctly annotated images
+
 ## Troubleshooting
 
 **Problem**: Annotation tool doesn't start
@@ -220,7 +216,7 @@ Regularly check annotation quality:
 **Problem**: Annotations not saving
 **Solution**: Check directory permissions and paths; use absolute paths if necessary
 
-**Problem**: Annotation boxes not visible in visualization
+**Problem**: Can't see annotations when reviewing
 **Solution**: Verify that the label filename matches the image filename (without extension)
 
 **Problem**: Performance issues with large images
@@ -228,5 +224,11 @@ Regularly check annotation quality:
 
 **Problem**: Incomplete progress tracking
 **Solution**: Check for and remove empty `.annotation_progress.json` files
+
+**Problem**: Difficult to draw precise annotations
+**Solution**: Use the zoom feature to get a more detailed view; adjust boxes after initial drawing
+
+**Problem**: Missing classes in dropdown
+**Solution**: Verify that classes are properly defined in config.yaml or use the `--classes` parameter
 
 For more issues, refer to the [Troubleshooting Guide](troubleshooting.md).

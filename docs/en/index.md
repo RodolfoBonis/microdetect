@@ -111,8 +111,7 @@ If you're new to MicroDetect, we recommend starting with these guides:
 
 1. **Model Evaluation & Analysis**
    - [Model Evaluation Guide](model_evaluation_analysis.md) - Comprehensive model evaluation metrics and visualization
-   - [Cross-Validation Guide](cross_validation_benchmarking.md) - K-fold cross-validation and model stability analysis
-   - [Benchmarking Guide](cross_validation_benchmarking.md) - Speed and resource utilization benchmarking
+   - [Cross-Validation and Benchmarking Guide](cross_validation_benchmark.md) - K-fold cross-validation and model stability analysis and Speed and resource utilization benchmarking
    - [Model Comparison Guide](model_comparison.md) - Comparing different models and configurations
 
 2. **Error Analysis**

@@ -1,6 +1,6 @@
-# Guia de Visualização e Anotação
+# Guia de Anotação
 
-Este guia explica como usar as ferramentas do MicroDetect para anotar imagens de microorganismos e visualizar anotações.
+Este guia explica como usar as ferramentas de anotação do MicroDetect para rotular microorganismos em imagens de microscopia.
 
 ## Sumário
 - [Introdução](#introdução)
@@ -10,11 +10,6 @@ Este guia explica como usar as ferramentas do MicroDetect para anotar imagens de
   - [Fluxo de Trabalho de Anotação](#fluxo-de-trabalho-de-anotação)
   - [Atalhos de Teclado](#atalhos-de-teclado)
   - [Salvamento Automático e Acompanhamento de Progresso](#salvamento-automático-e-acompanhamento-de-progresso)
-- [Ferramenta de Visualização](#ferramenta-de-visualização)
-  - [Visualizando Imagens Individuais](#visualizando-imagens-individuais)
-  - [Visualização em Lote](#visualização-em-lote)
-  - [Filtragem por Classe](#filtragem-por-classe)
-  - [Personalizando a Saída Visual](#personalizando-a-saída-visual)
 - [Gerenciando Dados de Anotação](#gerenciando-dados-de-anotação)
   - [Formato YOLO](#formato-yolo)
   - [Convertendo para Outros Formatos](#convertendo-para-outros-formatos)
@@ -27,11 +22,14 @@ Este guia explica como usar as ferramentas do MicroDetect para anotar imagens de
 
 ## Introdução
 
-O MicroDetect fornece ferramentas especializadas para anotar microorganismos em imagens de microscopia e visualizar essas anotações. Este processo é crucial para:
+A anotação precisa de imagens de microscopia é uma etapa crítica no desenvolvimento de modelos eficazes de detecção de microorganismos. O MicroDetect fornece uma ferramenta de anotação especializada projetada especificamente para anotar microorganismos em imagens de microscopia, com recursos como:
 
-1. Criar datasets de treinamento para modelos de aprendizado de máquina
-2. Validar resultados de detecção
-3. Analisar a distribuição de microorganismos
+1. Interface amigável com controles familiares
+2. Sessões de anotação que podem ser retomadas
+3. Acompanhamento de progresso
+4. Salvamento automático para evitar perda de dados
+5. Suporte para múltiplas classes de microorganismos
+6. Atalhos de teclado para fluxo de trabalho eficiente
 
 ## Ferramenta de Anotação
 
@@ -63,6 +61,8 @@ A interface de anotação inclui:
 4. **Painel de Ferramentas**: Ferramentas para anotação (Retângulo, Zoom, Pan)
 5. **Barra de Status**: Mostra o nome da imagem atual, progresso e status
 
+![Interface de Anotação](https://example.com/annotation_interface.png)
+
 ### Fluxo de Trabalho de Anotação
 
 1. **Carregar Imagem**: A ferramenta carrega uma imagem do diretório especificado
@@ -72,6 +72,13 @@ A interface de anotação inclui:
 5. **Adicionar Mais Objetos**: Repita os passos 2-4 para microorganismos adicionais
 6. **Salvar Anotações**: As anotações são salvas automaticamente ou pressione 'S' para salvar manualmente
 7. **Navegar**: Use os botões de navegação ou atalhos de teclado para mover para a próxima/anterior imagem
+
+Dicas para anotação eficaz:
+- Desenhe caixas delimitadoras ajustadas em torno de cada microorganismo
+- Para microorganismos agrupados, anote cada um individualmente se forem distinguíveis
+- Seja consistente na anotação em todas as imagens
+- Use zoom para microorganismos pequenos
+- Use atalhos de teclado para agilizar o processo
 
 ### Atalhos de Teclado
 
@@ -90,6 +97,8 @@ A ferramenta de anotação suporta os seguintes atalhos de teclado:
 | ESC | Desselecionar todas as anotações |
 | Q | Sair da ferramenta de anotação |
 
+Esses atalhos tornam o processo de anotação mais rápido e eficiente, especialmente ao anotar grandes conjuntos de dados.
+
 ### Salvamento Automático e Acompanhamento de Progresso
 
 A ferramenta de anotação salva automaticamente seu trabalho para prevenir perda de dados:
@@ -99,51 +108,10 @@ A ferramenta de anotação salva automaticamente seu trabalho para prevenir perd
 - Ao reiniciar a ferramenta com os mesmos diretórios, você pode continuar de onde parou
 - Um backup das versões anteriores de anotação é mantido em caso de erros
 
-## Ferramenta de Visualização
-
-### Visualizando Imagens Individuais
-
-Para visualizar anotações para uma única imagem interativamente:
+Para retomar uma sessão de anotação:
 
 ```bash
-microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes
-```
-
-Isso abre uma janela mostrando a imagem com as anotações sobrepostas.
-
-### Visualização em Lote
-
-Para gerar imagens anotadas para um diretório inteiro:
-
-```bash
-microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes --output_dir caminho/para/saida
-```
-
-Isso cria uma cópia de cada imagem com anotações desenhadas nela e as salva no diretório de saída.
-
-### Filtragem por Classe
-
-Para visualizar apenas classes específicas:
-
-```bash
-microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes --filter_classes 0,1
-```
-
-Isso mostra apenas anotações para classes com IDs 0 e 1.
-
-### Personalizando a Saída Visual
-
-Você pode personalizar a visualização no `config.yaml`:
-
-```yaml
-annotation:
-  box_thickness: 2                # Espessura da caixa para visualização
-  text_size: 0.5                  # Tamanho do texto para rótulos de classe
-  
-color_map:
-  "0": [0, 255, 0]                # Cor RGB para classe 0
-  "1": [0, 0, 255]                # Cor RGB para classe 1
-  "2": [255, 0, 0]                # Cor RGB para classe 2
+microdetect annotate --image_dir caminho/para/imagens --output_dir caminho/para/anotacoes --resume
 ```
 
 ## Gerenciando Dados de Anotação
@@ -157,7 +125,14 @@ O MicroDetect usa o formato de anotação YOLO:
   class_id center_x center_y width height
   ```
 - Todos os valores são normalizados para o intervalo [0,1]
-- Exemplo: `0 0.5 0.5 0.1 0.2` representa um objeto da classe 0 no centro da imagem
+- Exemplo: `0 0.5 0.5 0.1 0.2` representa um objeto da classe 0 no centro da imagem com largura 10% e altura 20% das dimensões da imagem
+
+Exemplo de arquivo de anotação para uma imagem contendo três microorganismos (dois da classe 0 e um da classe 1):
+```
+0 0.762 0.451 0.112 0.087
+0 0.245 0.321 0.098 0.076
+1 0.542 0.622 0.156 0.143
+```
 
 ### Convertendo para Outros Formatos
 
@@ -175,6 +150,8 @@ Conversões suportadas:
 - YOLO ↔ COCO
 - YOLO ↔ CSV
 
+Essas conversões podem ser úteis ao integrar com outras ferramentas ou frameworks que requerem diferentes formatos de anotação.
+
 ### Fazendo Backup das Anotações
 
 É recomendável fazer backup regularmente dos seus arquivos de anotação:
@@ -186,6 +163,8 @@ mkdir -p "$backup_dir"
 cp -r caminho/para/anotacoes/* "$backup_dir"
 ```
 
+Você também pode usar sistemas de controle de versão como Git para rastrear mudanças nos seus arquivos de anotação.
+
 ## Melhores Práticas
 
 ### Consistência nas Anotações
@@ -196,6 +175,13 @@ Para melhores resultados:
 - Para microorganismos agrupados, decida se vai anotá-los individualmente ou como grupo
 - Considere usar um processo de validação onde múltiplos anotadores revisam as mesmas imagens
 
+Exemplo de diretrizes de anotação:
+1. Sempre desenhe caixas delimitadoras ajustadas que contenham o microorganismo completo
+2. Para microorganismos parcialmente visíveis nas bordas da imagem, inclua a parte visível
+3. Para microorganismos sobrepostos, anote cada um separadamente se os limites estiverem claros
+4. Para microorganismos fora de foco, anote apenas aqueles que estão claramente visíveis
+5. Use atribuições de classe consistentes para microorganismos de aparência semelhante
+
 ### Lidando com Casos Difíceis
 
 Para imagens desafiadoras:
@@ -203,6 +189,11 @@ Para imagens desafiadoras:
 - Para objetos parcialmente visíveis nas bordas da imagem, inclua a parte visível
 - Para microorganismos em diferentes planos focais, anote aqueles que estão claramente em foco
 - Documente casos especiais para referência
+
+Para imagens muito aglomeradas:
+- Considere dividir a anotação em múltiplas sessões para evitar fadiga
+- Use o recurso de zoom para focar em regiões específicas
+- Seja metódico ao cobrir todas as áreas da imagem (ex., trabalhe de cima para baixo)
 
 ### Controle de Qualidade
 
@@ -212,6 +203,11 @@ Verifique regularmente a qualidade das anotações:
 - Confirme que as caixas delimitadoras estão ajustadas corretamente aos microorganismos
 - Revise a distribuição de classes para garantir um dataset balanceado
 
+Estabeleça um processo de validação:
+- Peça a outra pessoa para revisar uma amostra das anotações
+- Compare anotações entre anotadores para estabelecer consistência
+- Crie um guia de referência com exemplos de imagens corretamente anotadas
+
 ## Solução de Problemas
 
 **Problema**: Ferramenta de anotação não inicia
@@ -220,7 +216,7 @@ Verifique regularmente a qualidade das anotações:
 **Problema**: Anotações não estão sendo salvas
 **Solução**: Verifique as permissões e caminhos do diretório; use caminhos absolutos se necessário
 
-**Problema**: Caixas de anotação não são visíveis na visualização
+**Problema**: Não é possível ver anotações ao revisar
 **Solução**: Verifique se o nome do arquivo de anotação corresponde ao nome da imagem (sem extensão)
 
 **Problema**: Problemas de desempenho com imagens grandes
@@ -228,5 +224,11 @@ Verifique regularmente a qualidade das anotações:
 
 **Problema**: Acompanhamento de progresso incompleto
 **Solução**: Verifique e remova arquivos `.annotation_progress.json` vazios
+
+**Problema**: Difícil desenhar anotações precisas
+**Solução**: Use o recurso de zoom para obter uma visão mais detalhada; ajuste as caixas após o desenho inicial
+
+**Problema**: Classes faltando no menu suspenso
+**Solução**: Verifique se as classes estão definidas corretamente no config.yaml ou use o parâmetro `--classes`
 
 Para mais problemas, consulte o [Guia de Solução de Problemas](troubleshooting.md).

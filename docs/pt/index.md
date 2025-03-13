@@ -111,8 +111,7 @@ Se você é novo no MicroDetect, recomendamos começar com estes guias:
 
 1. **Avaliação e Análise de Modelos**
    - [Guia de Avaliação de Modelos](model_evaluation_analysis.md) - Métricas e visualização abrangentes de avaliação de modelos
-   - [Guia de Validação Cruzada](cross_validation_benchmarking.md) - Validação cruzada k-fold e análise de estabilidade do modelo
-   - [Guia de Benchmarking](cross_validation_benchmarking.md) - Benchmarking de velocidade e utilização de recursos
+   - [Guia de Validação Cruzada e Benchmark](cross_validation_benchmark.md) - Validação cruzada k-fold e análise de estabilidade do modelo e Benchmarking de velocidade e utilização de recursos
    - [Guia de Comparação de Modelos](model_comparison.md) - Comparando diferentes modelos e configurações
 
 2. **Análise de Erros**
