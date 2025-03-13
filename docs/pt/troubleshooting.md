@@ -7,6 +7,7 @@ Este guia ajuda a resolver problemas comuns que você pode encontrar ao usar o M
 - [Problemas de Instalação](#problemas-de-instalação)
 - [Problemas de Conversão de Imagens](#problemas-de-conversão-de-imagens)
 - [Problemas de Anotação](#problemas-de-anotação)
+- [Problemas de Visualização](#problemas-de-visualização)
 - [Problemas de Dataset](#problemas-de-dataset)
 - [Problemas de Treinamento](#problemas-de-treinamento)
 - [Problemas de GPU](#problemas-de-gpu)
@@ -195,6 +196,67 @@ A interface trava ou fica lenta com imagens muito grandes.
    ```bash
    # Usando o ImageMagick
    mogrify -resize 1024x1024\> data/images/*.png
+   ```
+
+## Problemas de Visualização
+
+### Erro: Interface de Visualização não Abre
+
+**Sintomas:**
+Nenhuma janela aparece ou mensagem de erro sobre o display.
+
+**Soluções:**
+1. Instale o Tkinter:
+   ```bash
+   sudo apt-get install python3-tk
+   ```
+
+2. Verifique se você está em um ambiente com suporte a display:
+   ```bash
+   # Defina a variável de display se necessário
+   export DISPLAY=:0
+   ```
+
+### Erro: Anotações Não Visíveis
+
+**Sintomas:**
+As imagens são exibidas, mas as anotações não aparecem.
+
+**Soluções:**
+1. Verifique os caminhos dos arquivos de anotação:
+   ```bash
+   # Verifique se os arquivos de anotação existem
+   ls caminho/para/anotacoes/*.txt
+   ```
+
+2. Verifique o formato do arquivo de anotação:
+   ```bash
+   # Veja o conteúdo de um arquivo de anotação
+   cat caminho/para/anotacoes/nome_da_imagem.txt
+   # Deve conter linhas como: class_id center_x center_y width height
+   ```
+
+3. Use um diretório de anotação explícito:
+   ```bash
+   microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes
+   ```
+
+### Erro: Problemas de Desempenho com Imagens Grandes
+
+**Sintomas:**
+A visualização fica lenta ou trava com imagens grandes.
+
+**Soluções:**
+1. Use o modo em lote para grandes coleções:
+   ```bash
+   microdetect visualize --image_dir caminho/para/imagens --label_dir caminho/para/anotacoes --batch --output_dir caminho/para/saida
+   ```
+
+2. Redimensione as imagens apenas para visualização:
+   ```bash
+   # Em Python
+   from PIL import Image
+   Image.open('imagem_grande.jpg').resize((1024, 768)).save('imagem_redimensionada.jpg')
    ```
 
 ## Problemas de Dataset

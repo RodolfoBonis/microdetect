@@ -7,6 +7,7 @@ This guide helps solve common problems you might encounter when using MicroDetec
 - [Installation Issues](#installation-issues)
 - [Image Conversion Issues](#image-conversion-issues)
 - [Annotation Issues](#annotation-issues)
+- [Visualization Issues](#visualization-issues)
 - [Dataset Issues](#dataset-issues)
 - [Training Issues](#training-issues)
 - [GPU Issues](#gpu-issues)
@@ -195,6 +196,67 @@ The interface hangs or becomes slow with very large images.
    ```bash
    # Using ImageMagick
    mogrify -resize 1024x1024\> data/images/*.png
+   ```
+
+## Visualization Issues
+
+### Error: Visualization Interface Doesn't Open
+
+**Symptoms:**
+No window appears or error message about display.
+
+**Solutions:**
+1. Install Tkinter:
+   ```bash
+   sudo apt-get install python3-tk
+   ```
+
+2. Check if you're in a display-enabled environment:
+   ```bash
+   # Set display variable if needed
+   export DISPLAY=:0
+   ```
+
+### Error: Annotations Not Visible
+
+**Symptoms:**
+Images display, but the annotations don't appear.
+
+**Solutions:**
+1. Verify label file paths:
+   ```bash
+   # Check if annotation files exist
+   ls path/to/labels/*.txt
+   ```
+
+2. Check label file format:
+   ```bash
+   # Cat the content of a label file
+   cat path/to/labels/image_name.txt
+   # Should contain lines like: class_id center_x center_y width height
+   ```
+
+3. Use explicit label directory:
+   ```bash
+   microdetect visualize --image_dir path/to/images --label_dir path/to/labels
+   ```
+
+### Error: Performance Issues with Large Images
+
+**Symptoms:**
+Visualization is slow or freezes with large images.
+
+**Solutions:**
+1. Use batch mode for large collections:
+   ```bash
+   microdetect visualize --image_dir path/to/images --label_dir path/to/labels --batch --output_dir path/to/output
+   ```
+
+2. Resize images for visualization only:
+   ```bash
+   # In Python
+   from PIL import Image
+   Image.open('large_image.jpg').resize((1024, 768)).save('resized_image.jpg')
    ```
 
 ## Dataset Issues
