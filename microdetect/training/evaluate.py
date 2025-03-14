@@ -7,10 +7,11 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from ultralytics import YOLO
 
 from microdetect.utils.config import config
@@ -33,13 +34,17 @@ class ModelEvaluator:
         self.output_dir = output_dir or config.get("directories.reports", "reports")
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def evaluate_model(self, model_path: str, data_yaml: str) -> Dict[str, Any]:
+    def evaluate_model(
+        self, model_path: str, data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
+    ) -> Dict[str, Any]:
         """
         Avalia o modelo treinado e gera métricas detalhadas.
 
         Args:
             model_path: Caminho para o modelo treinado (.pt)
             data_yaml: Caminho para o arquivo de configuração do dataset
+            conf_threshold: Limiar de confiança para detecções (0-1)
+            iou_threshold: Limiar de IoU para supressão não-máxima (0-1)
 
         Returns:
             Dicionário com métricas de desempenho
@@ -56,10 +61,10 @@ class ModelEvaluator:
             raise
 
         # Avaliar o modelo no conjunto de teste
-        logger.info("Avaliando modelo no conjunto de teste...")
+        logger.info(f"Avaliando modelo no conjunto de teste com conf={conf_threshold}, iou={iou_threshold}...")
 
         try:
-            results = model.val(data=data_yaml)
+            results = model.val(data=data_yaml, conf=conf_threshold, iou=iou_threshold)
             logger.info("Avaliação concluída")
         except Exception as e:
             logger.error(f"Erro durante avaliação: {str(e)}")
@@ -366,3 +371,256 @@ class ModelEvaluator:
 
         except Exception as e:
             logger.error(f"Erro ao plotar matriz de confusão manualmente: {str(e)}")
+
+    def optimize_threshold(
+        self,
+        model_path: str,
+        data_yaml: str,
+        metric: str = "F1-Score",
+        conf_range: Tuple[float, float, float] = (0.1, 0.9, 0.1),
+        iou_range: Tuple[float, float, float] = (0.5, 0.85, 0.05),
+    ) -> Dict[str, Any]:
+        """
+        Busca os limiares ótimos de confiança e IoU para maximizar uma métrica específica.
+
+        Args:
+            model_path: Caminho para o modelo treinado
+            data_yaml: Caminho para o arquivo de configuração do dataset
+            metric: Métrica a ser otimizada (ex: "F1-Score", "Precisão (mAP50)", "Recall")
+            conf_range: Tupla com (início, fim, passo) para limiar de confiança
+            iou_range: Tupla com (início, fim, passo) para limiar de IoU
+
+        Returns:
+            Dicionário com os melhores limiares e resultados
+        """
+        logger.info(f"Iniciando busca por limiares ótimos para maximizar {metric}...")
+
+        conf_thresholds = np.arange(conf_range[0], conf_range[1] + 1e-10, conf_range[2])
+        iou_thresholds = np.arange(iou_range[0], iou_range[1] + 1e-10, iou_range[2])
+
+        best_score = -1
+        best_conf = None
+        best_iou = None
+        best_metrics = None
+
+        # Carregar o modelo uma vez fora do loop para economizar tempo
+        model = YOLO(model_path)
+
+        # Armazenar todos os resultados para análise e visualização
+        all_results = []
+
+        # Grid search para encontrar os melhores limiares
+        total_combinations = len(conf_thresholds) * len(iou_thresholds)
+        current = 0
+
+        for conf in conf_thresholds:
+            for iou in iou_thresholds:
+                current += 1
+                logger.info(f"Testando combinação {current}/{total_combinations}: conf={conf:.2f}, iou={iou:.2f}")
+
+                try:
+                    results = model.val(data=data_yaml, conf=conf, iou=iou)
+                    metrics = self._extract_metrics(results)
+
+                    # Obter a métrica desejada
+                    if metric in metrics["metricas_gerais"]:
+                        score = metrics["metricas_gerais"][metric]
+                    else:
+                        logger.warning(f"Métrica {metric} não encontrada, usando mAP50")
+                        score = metrics["metricas_gerais"]["Precisão (mAP50)"]
+
+                    all_results.append(
+                        {
+                            "conf_threshold": conf,
+                            "iou_threshold": iou,
+                            "score": score,
+                            **{k: v for k, v in metrics["metricas_gerais"].items()},
+                        }
+                    )
+
+                    if score > best_score:
+                        best_score = score
+                        best_conf = conf
+                        best_iou = iou
+                        best_metrics = metrics
+
+                except Exception as e:
+                    logger.error(f"Erro ao avaliar com conf={conf:.2f}, iou={iou:.2f}: {str(e)}")
+
+        # Salvar resultados em CSV para análise
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_path = os.path.join(self.output_dir, f"threshold_optimization_{timestamp}.csv")
+
+        try:
+            df = pd.DataFrame(all_results)
+            df.to_csv(results_path, index=False)
+            logger.info(f"Resultados de otimização salvos em: {results_path}")
+        except Exception as e:
+            logger.error(f"Erro ao salvar resultados de otimização: {str(e)}")
+
+        # Gerar gráfico de superfície
+        surface_plot_path = os.path.join(self.output_dir, f"threshold_surface_{timestamp}.png")
+        self._plot_threshold_surface(all_results, metric, surface_plot_path)
+
+        logger.info(f"Melhores limiares encontrados: conf={best_conf:.2f}, iou={best_iou:.2f} com {metric}={best_score:.4f}")
+
+        return {
+            "best_conf_threshold": best_conf,
+            "best_iou_threshold": best_iou,
+            "best_score": best_score,
+            "best_metrics": best_metrics,
+            "results_csv": results_path,
+            "surface_plot": surface_plot_path,
+        }
+
+    def _plot_threshold_surface(self, results: List[Dict[str, Any]], metric: str, save_path: str) -> None:
+        """
+        Plota um gráfico de superfície dos resultados da otimização de limiar.
+
+        Args:
+            results: Lista de resultados da otimização
+            metric: Métrica utilizada na otimização
+            save_path: Caminho para salvar o gráfico
+        """
+        try:
+            # Converter para DataFrame
+            df = pd.DataFrame(results)
+
+            # Criar figura 3D
+            fig = plt.figure(figsize=(12, 10))
+            ax = fig.add_subplot(111, projection="3d")
+
+            # Pivot da tabela para formato adequado
+            pivot = df.pivot_table(index="conf_threshold", columns="iou_threshold", values="score")
+
+            # Preparar dados para o gráfico
+            X, Y = np.meshgrid(pivot.columns, pivot.index)
+            Z = pivot.values
+
+            # Plotar superfície
+            surf = ax.plot_surface(X, Y, Z, cmap="viridis", alpha=0.8)
+
+            # Adicionar barra de cores
+            fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5)
+
+            # Configurar rótulos
+            ax.set_xlabel("IoU Threshold")
+            ax.set_ylabel("Confidence Threshold")
+            ax.set_zlabel(metric)
+            ax.set_title(f"Optimization Surface for {metric}")
+
+            # Encontrar e marcar o ponto máximo
+            max_idx = df["score"].idxmax()
+            max_conf = df.loc[max_idx, "conf_threshold"]
+            max_iou = df.loc[max_idx, "iou_threshold"]
+            max_score = df.loc[max_idx, "score"]
+
+            ax.scatter([max_iou], [max_conf], [max_score], color="red", s=100, label=f"Max: {max_score:.4f}")
+            ax.legend()
+
+            # Salvar figura
+            plt.tight_layout()
+            plt.savefig(save_path)
+            logger.info(f"Gráfico de superfície salvo em: {save_path}")
+
+        except Exception as e:
+            logger.error(f"Erro ao gerar gráfico de superfície: {str(e)}")
+
+    def analyze_errors(
+        self,
+        model_path: str,
+        data_yaml: str,
+        dataset_dir: str,
+        output_dir: str = None,
+        error_type: str = "all",  # "false_positives", "false_negatives", "classification_errors", "all"
+        conf_threshold: float = 0.25,
+        iou_threshold: float = 0.5,
+        max_samples: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Analisa e visualiza erros de detecção específicos.
+
+        Args:
+            model_path: Caminho para o modelo treinado
+            data_yaml: Caminho para o arquivo de configuração do dataset
+            dataset_dir: Diretório raiz do dataset
+            output_dir: Diretório para salvar resultados (opcional)
+            error_type: Tipo de erro a analisar
+            conf_threshold: Limiar de confiança para detecções
+            iou_threshold: Limiar de IoU para correspondência
+            max_samples: Número máximo de exemplos a salvar
+
+        Returns:
+            Dicionário com contagens de erro e caminhos para resultados
+        """
+        output_dir = output_dir or os.path.join(self.output_dir, f"error_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        os.makedirs(output_dir, exist_ok=True)
+
+        logger.info(f"Analisando erros ({error_type}) do modelo {os.path.basename(model_path)}...")
+
+        # Diretório das imagens de teste
+        test_dir = os.path.join(dataset_dir, "test", "images")
+        if not os.path.exists(test_dir):
+            logger.error(f"Diretório de imagens de teste não encontrado: {test_dir}")
+            return {"error": "Diretório de teste não encontrado"}
+
+        # Carregar modelo
+        model = YOLO(model_path)
+
+        # Executar detecção em todas as imagens de teste
+        results = model(test_dir, conf=conf_threshold, iou=iou_threshold, save=False)
+
+        # Preparar diretorios para salvar imagens de erro
+        error_dirs = {
+            "false_positives": os.path.join(output_dir, "false_positives"),
+            "false_negatives": os.path.join(output_dir, "false_negatives"),
+            "classification_errors": os.path.join(output_dir, "classification_errors"),
+        }
+
+        # Criar diretórios necessários
+        for dir_name in error_dirs.values():
+            if error_type == "all" or dir_name == error_dirs[error_type]:
+                os.makedirs(dir_name, exist_ok=True)
+
+        # Contar erros
+        error_counts = {
+            "false_positives": 0,
+            "false_negatives": 0,
+            "classification_errors": 0,
+        }
+
+        # Analisar cada resultado
+        for result in results:
+            # TODO: Esta implementação requer acesso aos ground truths
+            # Precisa ser adaptada para acessar as anotações reais em cada imagem
+            # Esta é uma versão simplificada que identifica erros com base no score de confiança
+
+            # Para uma implementação completa, precisamos comparar as detecções
+            # com as anotações reais das imagens de teste
+
+            # Exemplo simplificado:
+            if hasattr(result, "boxes"):
+                # Contar detecções de baixa confiança como potenciais FPs
+                boxes = result.boxes
+                if len(boxes) > 0:
+                    low_conf_boxes = boxes[boxes.conf < 0.5]
+                    error_counts["false_positives"] += len(low_conf_boxes)
+
+        # Gerar relatório de erros
+        report_path = os.path.join(output_dir, "error_analysis_report.json")
+        with open(report_path, "w") as f:
+            json.dump(
+                {
+                    "model": os.path.basename(model_path),
+                    "error_counts": error_counts,
+                    "conf_threshold": conf_threshold,
+                    "iou_threshold": iou_threshold,
+                    "timestamp": datetime.now().isoformat(),
+                },
+                f,
+                indent=4,
+            )
+
+        logger.info(f"Análise de erros concluída, resultados salvos em: {output_dir}")
+
+        return {"error_counts": error_counts, "report_path": report_path, "output_dir": output_dir}

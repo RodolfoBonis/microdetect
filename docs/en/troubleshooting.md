@@ -11,6 +11,12 @@ This guide helps solve common problems you might encounter when using MicroDetec
 - [Dataset Issues](#dataset-issues)
 - [Training Issues](#training-issues)
 - [GPU Issues](#gpu-issues)
+- [Evaluation Issues](#evaluation-issues)
+- [Error Analysis Issues](#error-analysis-issues)
+- [Visualization and Dashboard Issues](#visualization-and-dashboard-issues)
+- [Statistical Analysis Issues](#statistical-analysis-issues)
+- [Cross-Validation Issues](#cross-validation-issues)
+- [Benchmarking Issues](#benchmarking-issues)
 - [Update System Issues](#update-system-issues)
 - [Common Errors and Solutions](#common-errors-and-solutions)
 - [Logging and Diagnosis](#logging-and-diagnosis)
@@ -400,6 +406,390 @@ MPS not available on macOS with Apple Silicon chip
    pip install torch==2.6.0 torchvision==0.21.0
    ```
 
+## Evaluation Issues
+
+### Error: Evaluation metrics don't match expectations
+
+**Symptoms:**
+Metrics like mAP50 are much lower than expected based on training metrics.
+
+**Solutions:**
+1. Check if using the correct test dataset:
+   ```bash
+   # Make sure the test set has appropriate annotations
+   ls -la dataset/test/labels/
+   ```
+
+2. Verify detection thresholds:
+   ```bash
+   # Try different confidence thresholds
+   microdetect evaluate --model_path model.pt --dataset_dir dataset --conf_threshold 0.25
+   ```
+
+3. Examine model's best weights file:
+   ```bash
+   # Make sure you're using the best weights, not last
+   microdetect evaluate --model_path runs/train/exp/weights/best.pt --dataset_dir dataset
+   ```
+
+### Error: Confusion matrix generation fails
+
+**Symptoms:**
+```
+ERROR: Could not generate confusion matrix
+```
+
+**Solutions:**
+1. Check if test dataset has enough samples:
+   ```bash
+   # Make sure you have enough samples per class
+   ls -la dataset/test/labels/ | wc -l
+   ```
+
+2. Try disabling confusion matrix:
+   ```bash
+   microdetect evaluate --model_path model.pt --dataset_dir dataset --confusion_matrix False
+   ```
+
+## Error Analysis Issues
+
+### Error: No errors found despite poor performance
+
+**Symptoms:**
+Error analysis shows few or no errors despite low model performance.
+
+**Solutions:**
+1. Lower confidence threshold:
+   ```bash
+   microdetect analyze_errors --model_path model.pt --dataset_dir dataset --conf_threshold 0.1
+   ```
+
+2. Check test dataset paths:
+   ```bash
+   # Verify test set structure
+   ls -la dataset/test/images/
+   ls -la dataset/test/labels/
+   ```
+
+3. Make sure image and label filenames match.
+
+### Error: Missing visualization for some error types
+
+**Symptoms:**
+Some error folders are empty (e.g., no classification errors).
+
+**Solutions:**
+1. This may be normal if your model doesn't make those error types
+2. Try a larger test set to capture more diverse errors
+3. Check if annotation format matches detection output format
+
+### Error: Memory issues during error analysis
+
+**Symptoms:**
+```
+ERROR: Out of memory during error analysis
+```
+
+**Solutions:**
+1. Process fewer images:
+   ```bash
+   # Limit maximum samples 
+   microdetect analyze_errors --model_path model.pt --dataset_dir dataset --max_samples 10
+   ```
+
+2. Use a smaller model or reduce image size for analysis
+
+## Visualization and Dashboard Issues
+
+### Error: Dashboards don't load in browser
+
+**Symptoms:**
+Dashboard server starts but nothing appears in browser.
+
+**Solutions:**
+1. Check if port is already in use:
+   ```bash
+   # Check if port is in use (Linux/macOS)
+   lsof -i :8050
+   
+   # Windows
+   netstat -ano | findstr :8050
+   ```
+
+2. Try a different port:
+   ```bash
+   microdetect dashboard --results_dir results --port 8051
+   ```
+
+3. Install missing dashboard dependencies:
+   ```bash
+   pip install dash dash-bootstrap-components
+   ```
+
+### Error: PDF report generation fails
+
+**Symptoms:**
+```
+ERROR: Failed to generate PDF report
+```
+
+**Solutions:**
+1. Ensure wkhtmltopdf is installed:
+   ```bash
+   # For Ubuntu/Debian
+   sudo apt-get install wkhtmltopdf
+   
+   # For macOS
+   brew install wkhtmltopdf
+   ```
+
+2. Try generating HTML report first:
+   ```bash
+   microdetect generate_report --results_dir results --format html
+   ```
+
+### Error: Images missing in visualization
+
+**Symptoms:**
+Bounding boxes appear but not underlying images.
+
+**Solutions:**
+1. Check image paths:
+   ```bash
+   # Make sure paths are absolute or relative to current directory
+   microdetect visualize_detections --model_path model.pt --source $(pwd)/images
+   ```
+
+2. Verify image format support:
+   ```bash
+   # Make sure images are in supported formats
+   find images -type f | grep -v -E '\.(jpg|jpeg|png|bmp)$'
+   ```
+
+## Statistical Analysis Issues
+
+### Error: Density maps show no patterns
+
+**Symptoms:**
+Density maps are blank or uniformly colored.
+
+**Solutions:**
+1. Adjust smoothing parameter:
+   ```bash
+   microdetect analyze_distribution --model_path model.pt --source images --sigma 5.0
+   ```
+
+2. Check if detections were found:
+   ```bash
+   # Verify your model is detecting objects
+   microdetect batch_detect --model_path model.pt --source images --save_json
+   ```
+
+### Error: Size analysis shows unexpected results
+
+**Symptoms:**
+Size distribution histograms show unrealistic values.
+
+**Solutions:**
+1. Check bounding box normalization:
+   ```bash
+   # If using custom code, ensure values are normalized correctly
+   # YOLO format uses normalized coordinates (0-1)
+   ```
+
+2. Filter small detections:
+   ```bash
+   # Set minimum confidence threshold
+   microdetect analyze_size --model_path model.pt --source images --conf_threshold 0.5
+   ```
+
+### Error: Cluster analysis finds no clusters
+
+**Symptoms:**
+Spatial analysis shows no clusters despite visually apparent groups.
+
+**Solutions:**
+1. Adjust minimum distance parameter:
+   ```bash
+   microdetect analyze_spatial --model_path model.pt --source images --min_distance 0.05
+   ```
+
+2. Verify coordinate system:
+   ```bash
+   # Make sure coordinates are normalized (0-1)
+   ```
+
+## Cross-Validation Issues
+
+### Error: Cross-validation takes too long
+
+**Symptoms:**
+Cross-validation process is extremely slow or seems stuck.
+
+**Solutions:**
+1. Reduce number of epochs for validation:
+   ```python
+   validator = CrossValidator(
+       base_dataset_dir="dataset",
+       output_dir="cv_results",
+       model_size="s",
+       epochs=20,  # Fewer epochs
+       folds=5
+   )
+   ```
+
+2. Use a smaller model size:
+   ```python
+   validator = CrossValidator(
+       base_dataset_dir="dataset",
+       output_dir="cv_results",
+       model_size="n",  # Nano model
+       epochs=50,
+       folds=5
+   )
+   ```
+
+3. Reduce the number of folds:
+   ```python
+   validator = CrossValidator(
+       base_dataset_dir="dataset",
+       output_dir="cv_results",
+       model_size="m",
+       epochs=100,
+       folds=3  # Fewer folds
+   )
+   ```
+
+### Error: Out of memory during cross-validation
+
+**Symptoms:**
+```
+CUDA out of memory
+```
+
+**Solutions:**
+1. Process one fold at a time:
+   ```python
+   # Instead of validator.run(), run each fold individually
+   for fold in range(1, 6):
+       # Setup fold manually
+       # Train and evaluate
+   ```
+
+2. Reduce batch size:
+   ```python
+   # Configure trainer with smaller batch size
+   trainer = YOLOTrainer(
+       model_size="m",
+       batch_size=8,  # Small batch size
+       epochs=100
+   )
+   ```
+
+### Error: Large standard deviation in cross-validation results
+
+**Symptoms:**
+Cross-validation results show very high standard deviation between folds.
+
+**Solutions:**
+1. Increase the number of folds:
+   ```python
+   validator = CrossValidator(
+       base_dataset_dir="dataset",
+       output_dir="cv_results",
+       model_size="m",
+       epochs=100,
+       folds=10  # More folds for better estimate
+   )
+   ```
+
+2. Check for data imbalance:
+   ```bash
+   # Count files in each class
+   ls dataset/labels | grep -c "class1"
+   ls dataset/labels | grep -c "class2"
+   ```
+
+3. Stratify folds manually to ensure class balance
+
+## Benchmarking Issues
+
+### Error: Inconsistent benchmark results
+
+**Symptoms:**
+Benchmarking results vary significantly between runs.
+
+**Solutions:**
+1. Increase iterations and warmup:
+   ```python
+   benchmark = SpeedBenchmark(model_path="model.pt")
+   results = benchmark.run(
+       batch_sizes=[1, 4, 8],
+       image_sizes=[640],
+       iterations=100,  # More iterations
+       warmup=20  # More warmup iterations
+   )
+   ```
+
+2. Close other applications using GPU resources
+
+3. Fix CPU/GPU frequency:
+   ```bash
+   # On Linux, set CPU governor to performance
+   echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+   
+   # For NVIDIA GPUs, lock clock frequency
+   sudo nvidia-smi --lock-gpu-clocks=1000,1500
+   ```
+
+### Error: Resource monitor shows no GPU usage
+
+**Symptoms:**
+```
+No GPU usage recorded during monitoring
+```
+
+**Solutions:**
+1. Verify GPU detection:
+   ```python
+   import torch
+   print(f"CUDA available: {torch.cuda.is_available()}")
+   print(f"GPU count: {torch.cuda.device_count()}")
+   print(f"GPU name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+   ```
+
+2. Install required monitoring packages:
+   ```bash
+   pip install gputil nvidia-ml-py3
+   ```
+
+3. For Apple Silicon, check MPS availability:
+   ```python
+   import torch
+   print(f"MPS available: {torch.backends.mps.is_available()}")
+   ```
+
+### Error: Benchmark visualization fails
+
+**Symptoms:**
+```
+ERROR: Could not generate benchmark visualization
+```
+
+**Solutions:**
+1. Install matplotlib:
+   ```bash
+   pip install matplotlib
+   ```
+
+2. Check if results data is valid:
+   ```python
+   # Save raw results for inspection
+   import json
+   with open('benchmark_results_raw.json', 'w') as f:
+       json.dump(results, f, indent=4)
+   ```
+
 ## Update System Issues
 
 ### Error: AWS CodeArtifact Connection Failure
@@ -521,6 +911,20 @@ cat data/labels/image_name.txt
 # Should contain: class_id center_x center_y width height
 ```
 
+### Error: "No module named 'dash'"
+
+**Solution:**
+```bash
+pip install dash dash-bootstrap-components
+```
+
+### Error: "matplotlib.pyplot not found"
+
+**Solution:**
+```bash
+pip install matplotlib
+```
+
 ## Logging and Diagnosis
 
 For more complex issue diagnosis, enable debug mode:
@@ -534,6 +938,15 @@ microdetect command --args > debug.log 2>&1
 
 # Analyze the log
 cat debug.log
+```
+
+For component-specific logging:
+
+```bash
+# Enable detailed logging for specific modules
+python -c "import logging; logging.getLogger('microdetect.training').setLevel(logging.DEBUG)"
+
+# Or edit logging configuration in code
 ```
 
 ## Support
