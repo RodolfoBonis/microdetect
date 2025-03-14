@@ -160,7 +160,7 @@ class ErrorAnalyzer:
                     error_examples[error_type].append({"image_path": image_path, "errors": errors})
 
         # Gerar visualizações para cada tipo de erro
-        for error_type, examples in error_examples.items():
+        for error_category, examples in error_examples.items():
             if not examples:
                 continue
 
@@ -169,8 +169,8 @@ class ErrorAnalyzer:
                 self._visualize_error(
                     example["image_path"],
                     example["errors"],
-                    os.path.join(error_dirs[error_type], f"example_{i + 1}.png"),
-                    error_type,
+                    os.path.join(error_dirs[error_category], f"example_{i + 1}.png"),
+                    error_category,
                 )
 
         # Gerar gráfico de resumo

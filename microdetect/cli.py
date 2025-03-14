@@ -860,7 +860,6 @@ def handle_analyze_errors(args):
             data_yaml=args.data_yaml,
             dataset_dir=args.dataset_dir,
             error_type=args.error_type,
-            output_dir=output_dir,
         )
 
         # Exibir resultados
