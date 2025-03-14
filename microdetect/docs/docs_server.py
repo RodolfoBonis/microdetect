@@ -1,7 +1,7 @@
 """
 Módulo para servir documentação como uma página web com menu lateral organizado e suporte a múltiplos idiomas.
 """
-
+import errno
 import http.server
 import re
 import socketserver
@@ -2012,6 +2012,32 @@ def get_pid_file_path():
     return temp_dir / "docs_server.pid"
 
 
+def check_process_exists(pid, signal=0):
+    """
+    Verifica se um processo com o PID especificado está em execução.
+
+    Args:
+        pid: ID do processo a verificar
+        signal: Sinal a ser enviado ao processo (0 para verificar apenas)
+
+    Returns:
+        True se o processo existe, False caso contrário
+    """
+    try:
+        # Signal 0 não envia um sinal real ao processo,
+        # apenas verifica se o processo existe e se temos permissão para enviar sinais
+        os.kill(pid, signal)
+        return True
+    except OSError as e:
+        if e.errno == errno.ESRCH:  # No such process
+            return False
+        elif e.errno == errno.EPERM:  # No permission
+            return True
+        else:
+            return False
+    except Exception:
+        return False
+
 def start_server_in_background(port=None, language=None):
     """
     Inicia o servidor de documentação em background.
@@ -2049,8 +2075,7 @@ def start_server_in_background(port=None, language=None):
 
     # Verificar se o processo ainda está em execução
     try:
-        os.kill(pid, 0)  # Verifica se o processo existe, sem enviar sinal
-        running = True
+        running = check_process_exists(pid)
     except OSError:
         running = False
 
@@ -2112,7 +2137,7 @@ def stop_background_server():
         if os.name == "nt":  # Windows
             subprocess.call(["taskkill", "/F", "/PID", str(pid)])
         else:  # Unix/Linux/Mac
-            os.kill(pid, signal.SIGTERM)
+            check_process_exists(pid, signal.SIGTERM)
 
         # Remover arquivo PID
         pid_file.unlink()
@@ -2152,7 +2177,7 @@ def check_server_status():
 
     # Verificar se o processo ainda está em execução
     try:
-        os.kill(pid, 0)  # Verifica se o processo existe, sem enviar sinal
+        check_process_exists(pid, signal.SIGTERM)
         return {"status": "running", "pid": pid, "url": f"http://{HOST}:{PORT}"}
     except OSError:
         # Processo não existe mais, remover arquivo PID
