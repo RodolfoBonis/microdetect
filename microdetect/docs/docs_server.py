@@ -1,6 +1,7 @@
 """
 Módulo para servir documentação como uma página web com menu lateral organizado e suporte a múltiplos idiomas.
 """
+
 import errno
 import http.server
 import re
@@ -2037,6 +2038,7 @@ def check_process_exists(pid, signal=0):
             return False
     except Exception:
         return False
+
 
 def start_server_in_background(port=None, language=None):
     """
