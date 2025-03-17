@@ -23,7 +23,7 @@ def test_utils_imports():
 
     # AWS related utilities
     try:
-        from microdetect.utils import aws_setup
+        from microdetect.aws import aws_setup
 
         assert hasattr(aws_setup, "AWSSetupManager")
     except ImportError:
@@ -31,7 +31,7 @@ def test_utils_imports():
 
     # Update utilities
     try:
-        from microdetect.utils import updater
+        from microdetect.updater import updater
 
         assert hasattr(updater, "UpdateManager")
     except ImportError:

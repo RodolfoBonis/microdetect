@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from microdetect.training.train import YOLOTrainer
+from microdetect.training import YOLOTrainer
 
 
 @pytest.fixture

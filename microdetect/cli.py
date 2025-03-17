@@ -3,29 +3,26 @@ Interface de linha de comando para o projeto MicroDetect.
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
+from datetime import datetime
 from getpass import getpass
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional
 
 from microdetect import __version__
 from microdetect.annotation.annotator import ImageAnnotator
 from microdetect.annotation.visualization import AnnotationVisualizer
+from microdetect.aws import AWSSetupManager
 from microdetect.data.augmentation import DataAugmenter
 from microdetect.data.conversion import ImageConverter
 from microdetect.data.dataset import DatasetManager
+from microdetect.docs import DEFAULT_LANGUAGE, LANGUAGES
 from microdetect.training.evaluate import ModelEvaluator
 from microdetect.training.train import YOLOTrainer
-from microdetect.utils import (
-    AWSSetupManager,
-    ColoredHelpFormatter,
-    ColoredVersionAction,
-    convert_annotation,
-    get_logo_with_name_ascii,
-)
+from microdetect.utils import ColoredHelpFormatter, ColoredVersionAction, get_logo_with_name_ascii
 from microdetect.utils.colors import BRIGHT, ERROR, INFO, RESET, SUCCESS, WARNING
-from microdetect.utils.docs_server import DEFAULT_LANGUAGE, LANGUAGES
 
 # Configuração de logging
 logging.basicConfig(
@@ -59,12 +56,6 @@ def setup_annotate_parser(subparsers):
     parser = subparsers.add_parser("annotate", help="Anotar imagens manualmente")
     parser.add_argument("--image_dir", required=True, help="Diretório com imagens para anotação")
     parser.add_argument("--output_dir", required=True, help="Diretório para salvar as anotações")
-    parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
-    parser.add_argument("--auto_save", action="store_true", default=True, help="Ativar salvamento automático (padrão: True)")
-    parser.add_argument(
-        "--auto_save_interval", type=int, default=300, help="Intervalo em segundos entre salvamentos automáticos (padrão: 300)"
-    )
-    parser.add_argument("--resume", action="store_true", help="Retomar a partir da última imagem anotada")
 
 
 def setup_visualize_parser(subparsers):
@@ -80,7 +71,6 @@ def setup_visualize_parser(subparsers):
         "--filter_classes",
         help='Lista separada por vírgulas de IDs de classe para exibir (ex: "0,1")',
     )
-    parser.add_argument("--batch", action="store_true", help="Processar em lote sem interface interativa")
 
 
 def setup_augment_parser(subparsers):
@@ -141,8 +131,8 @@ def setup_init_parser(subparsers):
     parser = subparsers.add_parser("init", help="Inicializar ambiente de trabalho MicroDetect")
     parser.add_argument("--force", action="store_true", help="Sobrescrever arquivos existentes")
     parser.add_argument(
-        "--directory",
-        "-d",
+        "--project",
+        "-p",
         default=".",
         help="Diretório para inicializar (padrão: diretório atual)",
     )
@@ -190,29 +180,70 @@ def setup_install_docs_parser(subparsers):
     return parser
 
 
-def setup_format_convert_parser(subparsers):
-    """Configurar parser para comando de conversão entre formatos de anotação."""
-    parser = subparsers.add_parser("format-convert", help="Converter entre formatos de anotação")
-    parser.add_argument("--input_dir", required=True, help="Diretório contendo os arquivos de anotação a serem convertidos")
-    parser.add_argument("--image_dir", required=True, help="Diretório contendo as imagens correspondentes")
-    parser.add_argument("--output_dir", required=True, help="Diretório para salvar os arquivos convertidos")
-    parser.add_argument(
-        "--from_format", required=True, choices=["yolo", "pascal_voc", "coco", "csv"], help="Formato de origem das anotações"
-    )
-    parser.add_argument(
-        "--to_format",
-        required=True,
-        choices=["yolo", "pascal_voc", "coco", "csv"],
-        help="Formato de destino para as anotações",
-    )
-    parser.add_argument("--classes", help="Lista de classes separadas por vírgula (ex: '0-levedura,1-fungo')")
+def setup_model_comparison_parser(subparsers):
+    """Configurar parser para comando de comparação de modelos."""
+    parser = subparsers.add_parser("compare_models", help="Comparar diferentes modelos")
+    parser.add_argument("--model_paths", required=True, help="Lista de caminhos de modelos separados por vírgula")
+    parser.add_argument("--data_yaml", required=True, help="Caminho para o arquivo data.yaml")
+    parser.add_argument("--output_dir", help="Diretório para salvar os resultados")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança para detecções")
+    parser.add_argument("--iou_threshold", type=float, default=0.7, help="Limiar de IoU para supressão não-máxima")
+    parser.add_argument("--dashboard", action="store_true", help="Gerar dashboard interativo")
 
 
-def setup_backup_parser(subparsers):
-    """Configurar parser para comando de backup de anotações."""
-    parser = subparsers.add_parser("backup", help="Criar backup de anotações")
-    parser.add_argument("--label_dir", required=True, help="Diretório contendo os arquivos de anotação a serem copiados")
-    parser.add_argument("--output_dir", help="Diretório para salvar o backup (se omitido, cria um diretório com timestamp)")
+def setup_batch_detect_parser(subparsers):
+    """Configurar parser para comando de detecção em lote."""
+    parser = subparsers.add_parser("batch_detect", help="Processar detecções em lote")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--source", required=True, help="Diretório com imagens para processar")
+    parser.add_argument("--output_dir", help="Diretório para salvar resultados")
+    parser.add_argument("--batch_size", type=int, default=16, help="Tamanho do batch para inferência")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança")
+    parser.add_argument("--save_txt", action="store_true", help="Salvar anotações em formato YOLO")
+    parser.add_argument("--save_json", action="store_true", help="Salvar resultados em JSON")
+    parser.add_argument("--save_img", action="store_true", help="Salvar imagens com detecções")
+
+
+def setup_visualize_detections_parser(subparsers):
+    """Configurar parser para comando de visualização de detecções."""
+    parser = subparsers.add_parser("visualize_detections", help="Visualizar detecções interativamente")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--source", required=True, help="Diretório com imagens para visualizar")
+    parser.add_argument("--conf_threshold", type=float, default=0.25, help="Limiar de confiança inicial")
+
+
+def setup_analyze_errors_parser(subparsers):
+    """Configurar parser para comando de análise de erros."""
+    parser = subparsers.add_parser("analyze_errors", help="Analisar erros de detecção")
+    parser.add_argument("--model_path", required=True, help="Caminho para o modelo")
+    parser.add_argument("--data_yaml", required=True, help="Caminho para o arquivo data.yaml")
+    parser.add_argument("--dataset_dir", required=True, help="Diretório do dataset")
+    parser.add_argument("--output_dir", help="Diretório para salvar análises")
+    parser.add_argument(
+        "--error_type",
+        choices=["all", "false_positives", "false_negatives", "classification_errors", "localization_errors"],
+        default="all",
+        help="Tipo de erro para analisar",
+    )
+
+
+def setup_generate_report_parser(subparsers):
+    """Configurar parser para comando de geração de relatórios."""
+    parser = subparsers.add_parser("generate_report", help="Gerar relatório de avaliação")
+    parser.add_argument("--results_dir", required=True, help="Diretório com resultados de avaliação")
+    parser.add_argument("--output_file", help="Caminho para o arquivo de saída")
+    parser.add_argument("--format", choices=["pdf", "csv", "json"], default="pdf", help="Formato do relatório")
+    parser.add_argument(
+        "--include_images", help="Lista de caminhos de imagens para incluir no relatório, separados por vírgula"
+    )
+
+
+def setup_dashboard_parser(subparsers):
+    """Configurar parser para comando de dashboard."""
+    parser = subparsers.add_parser("dashboard", help="Iniciar dashboard interativo")
+    parser.add_argument("--results_dir", required=True, help="Diretório com resultados de detecção")
+    parser.add_argument("--port", type=int, default=8050, help="Porta para o servidor web")
+    parser.add_argument("--no_browser", action="store_true", help="Não abrir navegador automaticamente")
 
 
 def handle_install_docs(args):
@@ -221,7 +252,6 @@ def handle_install_docs(args):
     Copia os arquivos da documentação para a pasta do usuário (.microdetect/docs).
     """
     import shutil
-    import sys
     from pathlib import Path
 
     # Diretório home do usuário
@@ -243,7 +273,7 @@ def handle_install_docs(args):
             return
 
     # Tentar encontrar os arquivos de documentação
-    from microdetect.utils.docs_server import find_docs_dir
+    from microdetect.docs.docs_server import find_docs_dir
 
     source_docs_dir = find_docs_dir()
 
@@ -271,7 +301,7 @@ def handle_install_docs(args):
 def handle_docs(args):
     """Manipular comando de documentação."""
     try:
-        from microdetect.utils.docs_server import (
+        from microdetect.docs import (
             check_server_status,
             start_docs_server,
             start_server_in_background,
@@ -295,7 +325,7 @@ def handle_docs(args):
 
         # Configurar opções globais (se necessário)
         if args.port != 8080:
-            import microdetect.utils.docs_server as docs_server
+            import microdetect.docs.docs_server as docs_server
 
             docs_server.PORT = args.port
 
@@ -306,7 +336,7 @@ def handle_docs(args):
                 print("Acesse o URL acima no seu navegador para ver a documentação.")
                 print("Pressione Ctrl+C para parar o servidor.")
 
-            import microdetect.utils.docs_server as docs_server
+            import microdetect.docs.docs_server as docs_server
 
             docs_server.open_browser = do_nothing
 
@@ -379,7 +409,7 @@ def handle_setup_aws(args):
 
 def handle_update(args):
     """Manipular comando de atualização."""
-    from microdetect.utils.updater import UpdateManager
+    from microdetect.updater import UpdateManager
 
     if args.check_only:
         update_info = UpdateManager.check_for_updates()
@@ -413,16 +443,16 @@ def handle_init(args):
     import pkg_resources
     import yaml
 
-    target_dir = os.path.abspath(args.directory)
-    logger.info(f"Inicializando ambiente MicroDetect em: {target_dir}")
+    target_project = os.path.abspath(args.project)
+    logger.info(f"Inicializando ambiente MicroDetect em: {target_project}")
 
     # Verificar/criar o diretório
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-        logger.info(f"Diretório criado: {target_dir}")
+    if not os.path.exists(target_project):
+        os.makedirs(target_project)
+        logger.info(f"Diretório criado: {target_project}")
 
     # Caminho para o arquivo de configuração
-    config_path = os.path.join(target_dir, "config.yaml")
+    config_path = os.path.join(target_project, "config.yaml")
 
     # Verificar se o arquivo já existe
     if os.path.exists(config_path) and not args.force:
@@ -487,11 +517,11 @@ def handle_init(args):
 
     # Criar estrutura de diretórios
     directories = [
-        os.path.join(target_dir, "data", "images"),
-        os.path.join(target_dir, "data", "labels"),
-        os.path.join(target_dir, "dataset"),
-        os.path.join(target_dir, "runs", "train"),
-        os.path.join(target_dir, "reports"),
+        os.path.join(target_project, "data", "images"),
+        os.path.join(target_project, "data", "labels"),
+        os.path.join(target_project, "dataset"),
+        os.path.join(target_project, "runs", "train"),
+        os.path.join(target_project, "reports"),
     ]
 
     for directory in directories:
@@ -505,7 +535,7 @@ Ambiente MicroDetect inicializado com sucesso!
 
 Para começar:
 
-1. Adicione suas imagens em:        {os.path.join(target_dir, 'data', 'images')}
+1. Adicione suas imagens em:        {os.path.join(target_project, 'data', 'images')}
 2. Anote as imagens:                microdetect annotate
 3. Prepare o dataset:               microdetect dataset
 4. Treine o modelo:                 microdetect train
@@ -549,62 +579,29 @@ def handle_annotate(args):
     """Manipular comando de anotação."""
     logger.info(f"Iniciando anotação manual de imagens em {args.image_dir}")
 
-    # Validar diretórios
-    if not os.path.isdir(args.image_dir):
-        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
-        sys.exit(1)
+    annotator = ImageAnnotator()
+    total, annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
 
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    # Processar classes se fornecidas
-    classes = None
-    if args.classes:
-        classes = args.classes.split(",")
-
-    # Criar anotador
-    annotator = ImageAnnotator(classes=classes, auto_save=args.auto_save, auto_save_interval=args.auto_save_interval)
-
-    # Executar anotação em lote
-    total_images, total_annotated = annotator.batch_annotate(args.image_dir, args.output_dir)
-
-    # Exibir resumo
-    logger.info(f"Anotação concluída: {total_annotated}/{total_images} imagens")
+    logger.info(f"Anotação concluída: {annotated}/{total} imagens anotadas")
 
 
 def handle_visualize(args):
     """Manipular comando de visualização."""
     logger.info(f"Iniciando visualização de anotações para imagens em {args.image_dir}")
 
-    # Validar diretórios
-    if not os.path.isdir(args.image_dir):
-        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
-        sys.exit(1)
-
-    if args.label_dir and not os.path.isdir(args.label_dir):
-        logger.error(f"Diretório de anotações não encontrado: {args.label_dir}")
-        sys.exit(1)
-
-    # Processar filtro de classes se fornecido
     filter_classes = None
     if args.filter_classes:
         filter_classes = set(args.filter_classes.split(","))
 
-    # Criar visualizador
     visualizer = AnnotationVisualizer()
 
-    # Executar visualização
-    if args.batch or args.output_dir:
-        # Modo batch - salvar imagens
-        out_dir = args.output_dir or "annotated_images"
-        os.makedirs(out_dir, exist_ok=True)
-
-        saved_count = visualizer.save_annotated_images(args.image_dir, args.label_dir, out_dir, filter_classes)
-
-        logger.info(f"Visualização em lote concluída: {saved_count} imagens salvas em {out_dir}")
+    if args.output_dir:
+        # Modo de salvamento batch
+        count = visualizer.save_annotated_images(args.image_dir, args.label_dir, args.output_dir, filter_classes)
+        logger.info(f"Visualização em batch concluída: {count} imagens anotadas salvas")
     else:
         # Modo interativo
-        visualizer.visualize_annotations(args.image_dir, args.label_dir, None, filter_classes)
-
+        visualizer.visualize_annotations(args.image_dir, args.label_dir, args.output_dir, filter_classes)
         logger.info("Visualização interativa concluída")
 
 
@@ -707,108 +704,284 @@ def handle_evaluate(args):
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
 
 
-def handle_format_convert(args):
-    """Manipular comando de conversão entre formatos de anotação."""
-    logger.info(f"Iniciando conversão de anotações de {args.from_format} para {args.to_format}")
+def handle_model_comparison(args):
+    """Manipular comando de comparação de modelos."""
+    logger.info(f"Iniciando comparação de modelos: {args.model_paths}")
 
-    # Validar diretórios
-    if not os.path.isdir(args.input_dir):
-        logger.error(f"Diretório de entrada não encontrado: {args.input_dir}")
-        sys.exit(1)
+    # Separar lista de modelos
+    model_paths = args.model_paths.split(",")
 
-    if not os.path.isdir(args.image_dir):
-        logger.error(f"Diretório de imagens não encontrado: {args.image_dir}")
-        sys.exit(1)
+    # Validar que os modelos existem
+    for model_path in model_paths:
+        if not os.path.exists(model_path):
+            logger.error(f"Modelo não encontrado: {model_path}")
+            return
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Verificar arquivo data.yaml
+    if not os.path.exists(args.data_yaml):
+        logger.error(f"Arquivo data.yaml não encontrado: {args.data_yaml}")
+        return
 
-    # Processar classes se fornecidas
-    class_map = None
-    if args.classes:
-        class_list = args.classes.split(",")
-        class_map = {}
-        for cls in class_list:
-            parts = cls.split("-", 1)
-            if len(parts) == 2:
-                class_map[parts[0]] = parts[1]
+    # Criar diretório de saída se fornecido
+    output_dir = args.output_dir or os.path.join("reports", "model_comparison", datetime.now().strftime("%Y%m%d_%H%M%S"))
+    os.makedirs(output_dir, exist_ok=True)
 
-    # Executar conversão
     try:
-        if args.from_format == "yolo":
-            if args.to_format == "pascal_voc":
-                count = convert_annotation.yolo_to_pascal_voc(args.input_dir, args.image_dir, args.output_dir, class_map)
-                logger.info(f"Conversão concluída: {count} arquivos convertidos de YOLO para Pascal VOC")
+        # Instanciar comparador de modelos
+        from microdetect.training.model_comparison import ModelComparator
 
-            elif args.to_format == "coco":
-                output_json = os.path.join(args.output_dir, "annotations.json")
-                coco_data = convert_annotation.yolo_to_coco(args.input_dir, args.image_dir, output_json, class_map)
-                logger.info(f"Conversão concluída: {len(coco_data['images'])} imagens convertidas de YOLO para COCO")
+        comparator = ModelComparator(output_dir)
 
-            elif args.to_format == "csv":
-                output_csv = os.path.join(args.output_dir, "annotations.csv")
-                count = convert_annotation.yolo_to_csv(args.input_dir, args.image_dir, output_csv, class_map)
-                logger.info(f"Conversão concluída: {count} anotações convertidas de YOLO para CSV")
+        # Executar comparação
+        results = comparator.compare_models(
+            model_paths=model_paths,
+            data_yaml=args.data_yaml,
+            conf_threshold=args.conf_threshold,
+            iou_threshold=args.iou_threshold,
+        )
 
-        elif args.from_format == "pascal_voc":
-            if args.to_format == "yolo":
-                count = convert_annotation.pascal_voc_to_yolo(args.input_dir, args.image_dir, args.output_dir, class_map)
-                logger.info(f"Conversão concluída: {count} arquivos convertidos de Pascal VOC para YOLO")
+        # Gerar dashboard interativo se solicitado
+        if args.dashboard:
+            from microdetect.visualization.dashboards import DashboardGenerator
 
-        elif args.from_format == "coco":
-            if args.to_format == "yolo":
-                # Procurar arquivo JSON no diretório de entrada
-                json_files = [f for f in os.listdir(args.input_dir) if f.endswith(".json")]
-                if not json_files:
-                    logger.error("Nenhum arquivo JSON encontrado no diretório de entrada")
-                    sys.exit(1)
+            dashboard = DashboardGenerator(output_dir)
+            port = dashboard.create_model_comparison_dashboard(results)
 
-                json_file = os.path.join(args.input_dir, json_files[0])
-                count = convert_annotation.coco_to_yolo(json_file, args.output_dir, class_map)
-                logger.info(f"Conversão concluída: {count} imagens convertidas de COCO para YOLO")
+            logger.info(f"Dashboard iniciado em: http://localhost:{port}")
 
-        elif args.from_format == "csv":
-            if args.to_format == "yolo":
-                # Procurar arquivo CSV no diretório de entrada
-                csv_files = [f for f in os.listdir(args.input_dir) if f.endswith(".csv")]
-                if not csv_files:
-                    logger.error("Nenhum arquivo CSV encontrado no diretório de entrada")
-                    sys.exit(1)
+        logger.info(f"Comparação de modelos concluída. Resultados salvos em: {output_dir}")
 
-                csv_file = os.path.join(args.input_dir, csv_files[0])
-                count = convert_annotation.csv_to_yolo(csv_file, args.output_dir, class_map)
-                logger.info(f"Conversão concluída: {count} imagens convertidas de CSV para YOLO")
-
-        else:
-            logger.error(f"Conversão de {args.from_format} para {args.to_format} não suportada")
-            sys.exit(1)
     except Exception as e:
-        logger.error(f"Erro durante a conversão: {str(e)}")
-        sys.exit(1)
+        logger.error(f"Erro durante a comparação de modelos: {str(e)}")
 
 
-def handle_backup(args):
-    """Manipular comando de backup de anotações."""
-    logger.info(f"Iniciando backup de anotações em {args.label_dir}")
+def handle_batch_detect(args):
+    """Manipular comando de detecção em lote."""
+    logger.info(f"Iniciando processamento em lote com modelo: {args.model_path}")
 
-    # Validar diretório
-    if not os.path.isdir(args.label_dir):
-        logger.error(f"Diretório de anotações não encontrado: {args.label_dir}")
-        sys.exit(1)
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
 
-    # Criar anotador (apenas para usar a função de backup)
-    annotator = ImageAnnotator()
+    # Verificar diretório de origem
+    if not os.path.exists(args.source):
+        logger.error(f"Diretório de origem não encontrado: {args.source}")
+        return
 
-    # Configurar diretório de saída se especificado
-    output_dir = args.output_dir
+    # Definir diretório de saída
+    output_dir = args.output_dir or os.path.join("runs", "detect", datetime.now().strftime("%Y%m%d_%H%M%S"))
 
-    # Executar backup
-    backup_dir = annotator.backup_annotations(args.label_dir)
+    try:
+        # Instanciar processador em lote
+        from microdetect.analysis.batch_processing import BatchProcessor
 
-    if backup_dir:
-        logger.info(f"Backup criado com sucesso em: {backup_dir}")
-    else:
-        logger.error("Falha ao criar backup")
-        sys.exit(1)
+        processor = BatchProcessor()
+
+        # Executar processamento em lote
+        results = processor.process_batch(
+            model_path=args.model_path,
+            source_dir=args.source,
+            output_dir=output_dir,
+            batch_size=args.batch_size,
+            conf_threshold=args.conf_threshold,
+            save_txt=args.save_txt,
+            save_img=args.save_img,
+            save_json=args.save_json,
+        )
+
+        logger.info(f"Processamento em lote concluído: {results['processed']}/{results['total']} imagens processadas")
+        logger.info(f"Resultados salvos em: {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Erro durante o processamento em lote: {str(e)}")
+
+
+def handle_visualize_detections(args):
+    """Manipular comando de visualização interativa de detecções."""
+    logger.info(f"Iniciando visualização interativa com modelo: {args.model_path}")
+
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
+
+    # Verificar diretório de origem
+    if not os.path.exists(args.source):
+        logger.error(f"Diretório de imagens não encontrado: {args.source}")
+        return
+
+    try:
+        # Instanciar visualizador de detecções
+        from microdetect.visualization.detection_viz import DetectionVisualizer
+
+        visualizer = DetectionVisualizer()
+
+        # Iniciar visualização interativa
+        visualizer.visualize_interactive(model_path=args.model_path, image_dir=args.source, conf_threshold=args.conf_threshold)
+
+        logger.info("Visualização interativa finalizada")
+
+    except Exception as e:
+        logger.error(f"Erro durante a visualização interativa: {str(e)}")
+
+
+def handle_analyze_errors(args):
+    """Manipular comando de análise de erros."""
+    logger.info(f"Iniciando análise de erros para o modelo: {args.model_path}")
+
+    # Verificar se o modelo existe
+    if not os.path.exists(args.model_path):
+        logger.error(f"Modelo não encontrado: {args.model_path}")
+        return
+
+    # Verificar arquivo data.yaml
+    if not os.path.exists(args.data_yaml):
+        logger.error(f"Arquivo data.yaml não encontrado: {args.data_yaml}")
+        return
+
+    # Verificar diretório do dataset
+    if not os.path.exists(args.dataset_dir):
+        logger.error(f"Diretório do dataset não encontrado: {args.dataset_dir}")
+        return
+
+    # Definir diretório de saída
+    output_dir = args.output_dir or os.path.join("reports", "error_analysis", datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+    try:
+        # Instanciar analisador de erros
+        from microdetect.analysis.error_analysis import ErrorAnalyzer
+
+        analyzer = ErrorAnalyzer(output_dir)
+
+        # Executar análise de erros
+        results = analyzer.analyze_errors(
+            model_path=args.model_path,
+            data_yaml=args.data_yaml,
+            dataset_dir=args.dataset_dir,
+            error_type=args.error_type,
+        )
+
+        # Exibir resultados
+        for error_type, count in results["error_counts"].items():
+            logger.info(f"{error_type.replace('_', ' ').title()}: {count}")
+
+        logger.info(f"Análise de erros concluída. Resultados salvos em: {output_dir}")
+
+    except Exception as e:
+        logger.error(f"Erro durante a análise de erros: {str(e)}")
+
+
+def handle_generate_report(args):
+    """Manipular comando de geração de relatórios."""
+    logger.info(f"Iniciando geração de relatório para os resultados em: {args.results_dir}")
+
+    # Verificar diretório de resultados
+    if not os.path.exists(args.results_dir):
+        logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
+        return
+
+    # Definir arquivo de saída
+    if not args.output_file:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        extension = ".pdf" if args.format == "pdf" else f".{args.format}"
+        args.output_file = os.path.join("reports", f"report_{timestamp}{extension}")
+
+    # Criar diretório de saída se necessário
+    os.makedirs(os.path.dirname(os.path.abspath(args.output_file)), exist_ok=True)
+
+    try:
+        # Instanciar gerador de relatórios
+        from microdetect.visualization.reporting import ReportGenerator
+
+        # Preparar lista de imagens para incluir no relatório
+        include_images = []
+        if args.include_images:
+            include_images = args.include_images.split(",")
+            # Verificar se as imagens existem
+            for img_path in include_images:
+                if not os.path.exists(img_path):
+                    logger.warning(f"Imagem não encontrada: {img_path}")
+
+        # Carregar métricas do arquivo JSON
+        metrics_file = None
+        for file in os.listdir(args.results_dir):
+            if file.endswith(".json") and ("metrics" in file or "report" in file):
+                metrics_file = os.path.join(args.results_dir, file)
+                break
+
+        if not metrics_file:
+            logger.error("Arquivo de métricas não encontrado no diretório de resultados")
+            return
+
+        with open(metrics_file, "r") as f:
+            metrics = json.load(f)
+
+        # Determinar caminho do modelo (pode estar no arquivo JSON)
+        model_path = metrics.get("modelo", {}).get("caminho", "unknown_model")
+
+        # Gerar relatório no formato solicitado
+        generator = ReportGenerator(os.path.dirname(args.output_file))
+
+        if args.format == "pdf":
+            report_path = generator.generate_pdf_report(
+                metrics=metrics, model_path=model_path, output_file=args.output_file, include_images=include_images
+            )
+        elif args.format == "csv":
+            report_path = generator.generate_csv_report(metrics=metrics, output_file=args.output_file)
+        else:  # json
+            # Copiar o arquivo JSON existente com eventuais modificações
+            with open(args.output_file, "w") as f:
+                json.dump(metrics, f, indent=4)
+            report_path = args.output_file
+
+        logger.info(f"Relatório gerado com sucesso: {report_path}")
+
+    except Exception as e:
+        logger.error(f"Erro durante a geração do relatório: {str(e)}")
+
+
+def handle_dashboard(args):
+    """Manipular comando de dashboard interativo."""
+    logger.info(f"Iniciando dashboard para os resultados em: {args.results_dir}")
+
+    # Verificar diretório de resultados
+    if not os.path.exists(args.results_dir):
+        logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
+        return
+
+    # Verificar se há arquivos JSON no diretório
+    json_files = [f for f in os.listdir(args.results_dir) if f.endswith(".json")]
+    if not json_files:
+        logger.error(f"Nenhum arquivo JSON encontrado em: {args.results_dir}")
+        return
+
+    try:
+        # Instanciar gerador de dashboard
+        from microdetect.visualization.dashboards import DashboardGenerator
+
+        generator = DashboardGenerator(args.results_dir)
+
+        # Iniciar o dashboard
+        port = generator.create_detection_dashboard(
+            results_dir=args.results_dir, port=args.port, open_browser=not args.no_browser
+        )
+
+        logger.info(f"Dashboard iniciado em: http://localhost:{port}")
+        logger.info("Pressione Ctrl+C para encerrar o dashboard")
+
+        # O dashboard já está rodando em um servidor, só precisamos manter o programa rodando
+        # até o usuário interromper com Ctrl+C
+        try:
+            # Aguardar indefinidamente (até Ctrl+C)
+            import signal
+
+            signal.pause()
+        except (KeyboardInterrupt, SystemExit):
+            logger.info("Dashboard encerrado pelo usuário")
+
+    except Exception as e:
+        logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
 
 
 def main(args: Optional[List[str]] = None):
@@ -839,8 +1012,13 @@ def main(args: Optional[List[str]] = None):
     setup_aws_parser(subparsers)
     setup_docs_parser(subparsers)
     setup_install_docs_parser(subparsers)
-    setup_format_convert_parser(subparsers)
-    setup_backup_parser(subparsers)
+    # Adicionar os novos parsers
+    setup_model_comparison_parser(subparsers)
+    setup_batch_detect_parser(subparsers)
+    setup_visualize_detections_parser(subparsers)
+    setup_analyze_errors_parser(subparsers)
+    setup_generate_report_parser(subparsers)
+    setup_dashboard_parser(subparsers)
 
     # Adicionar versão e ajuda
     parser.add_argument(
@@ -851,7 +1029,7 @@ def main(args: Optional[List[str]] = None):
     parsed_args = parser.parse_args(args)
 
     if parsed_args.command not in ["update", "setup-aws"]:
-        from microdetect.utils.updater import UpdateManager
+        from microdetect.updater import UpdateManager
 
         # Verificar se há atualizações disponíveis
         update_result = UpdateManager.check_for_updates_before_command()
@@ -885,10 +1063,19 @@ def main(args: Optional[List[str]] = None):
             handle_docs(parsed_args)
         elif parsed_args.command == "install-docs":
             handle_install_docs(parsed_args)
-        elif parsed_args.command == "format-convert":
-            handle_format_convert(parsed_args)
-        elif parsed_args.command == "backup":
-            handle_backup(parsed_args)
+        # Adicionar os novos handlers
+        elif parsed_args.command == "compare_models":
+            handle_model_comparison(parsed_args)
+        elif parsed_args.command == "batch_detect":
+            handle_batch_detect(parsed_args)
+        elif parsed_args.command == "visualize_detections":
+            handle_visualize_detections(parsed_args)
+        elif parsed_args.command == "analyze_errors":
+            handle_analyze_errors(parsed_args)
+        elif parsed_args.command == "generate_report":
+            handle_generate_report(parsed_args)
+        elif parsed_args.command == "dashboard":
+            handle_dashboard(parsed_args)
         else:
             parser.print_help()
             return

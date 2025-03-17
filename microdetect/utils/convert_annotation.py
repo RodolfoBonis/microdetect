@@ -570,8 +570,6 @@ def coco_to_yolo(coco_json: str, output_dir: str, class_map: Optional[Dict[int, 
 
     print(f"Conversão concluída: {processed_count} imagens convertidas para YOLO")
     return processed_count
-    print(f"Conversão concluída: {processed_count} imagens convertidas para YOLO")
-    return processed_count
 
 
 def yolo_to_csv(yolo_dir: str, image_dir: str, output_csv: str, class_map: Optional[Dict[str, str]] = None) -> int:
