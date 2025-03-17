@@ -5,7 +5,7 @@ Módulo para análise detalhada de erros de detecção.
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 import cv2
 import matplotlib.pyplot as plt
@@ -35,26 +35,27 @@ class ErrorAnalyzer:
         model_path: str,
         data_yaml: str,
         dataset_dir: str,
-        error_type: str = "false_positives" or "false_negatives" or "classification_errors" or "localization_errors" or "all",
+        error_type: Literal[
+            "false_positives", "false_negatives", "classification_errors", "localization_errors", "all"
+        ] = "all",
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.5,
         max_samples: int = 20,
     ) -> Dict[str, Any]:
         """
-        Analisa diferentes tipos de erros de detecção.
+        Analisa e visualiza erros de detecção específicos.
 
         Args:
             model_path: Caminho para o modelo treinado
             data_yaml: Caminho para o arquivo de configuração do dataset
-            dataset_dir: Diretório com imagens e anotações de teste
-            error_type: Tipo de erro a analisar (false_positives, false_negatives,
-                       classification_errors, localization_errors, all)
+            dataset_dir: Diretório raiz do dataset
+            error_type: Tipo de erro a analisar
             conf_threshold: Limiar de confiança para detecções
             iou_threshold: Limiar de IoU para correspondência
             max_samples: Número máximo de exemplos a salvar
 
         Returns:
-            Dicionário com resultados da análise
+            Dicionário com contagens de erro e caminhos para resultados
         """
         # Criar diretórios para cada tipo de erro
         error_dirs = {
