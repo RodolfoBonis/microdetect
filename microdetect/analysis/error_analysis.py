@@ -35,7 +35,7 @@ class ErrorAnalyzer:
         model_path: str,
         data_yaml: str,
         dataset_dir: str,
-        error_type: str = "all",
+        error_type: str = "false_positives" or "false_negatives" or "classification_errors" or "localization_errors" or "all",
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.5,
         max_samples: int = 20,

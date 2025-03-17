@@ -131,8 +131,8 @@ def setup_init_parser(subparsers):
     parser = subparsers.add_parser("init", help="Inicializar ambiente de trabalho MicroDetect")
     parser.add_argument("--force", action="store_true", help="Sobrescrever arquivos existentes")
     parser.add_argument(
-        "--directory",
-        "-d",
+        "--project",
+        "-p",
         default=".",
         help="Diretório para inicializar (padrão: diretório atual)",
     )
@@ -443,16 +443,16 @@ def handle_init(args):
     import pkg_resources
     import yaml
 
-    target_dir = os.path.abspath(args.directory)
-    logger.info(f"Inicializando ambiente MicroDetect em: {target_dir}")
+    target_project = os.path.abspath(args.project)
+    logger.info(f"Inicializando ambiente MicroDetect em: {target_project}")
 
     # Verificar/criar o diretório
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
-        logger.info(f"Diretório criado: {target_dir}")
+    if not os.path.exists(target_project):
+        os.makedirs(target_project)
+        logger.info(f"Diretório criado: {target_project}")
 
     # Caminho para o arquivo de configuração
-    config_path = os.path.join(target_dir, "config.yaml")
+    config_path = os.path.join(target_project, "config.yaml")
 
     # Verificar se o arquivo já existe
     if os.path.exists(config_path) and not args.force:
@@ -517,11 +517,11 @@ def handle_init(args):
 
     # Criar estrutura de diretórios
     directories = [
-        os.path.join(target_dir, "data", "images"),
-        os.path.join(target_dir, "data", "labels"),
-        os.path.join(target_dir, "dataset"),
-        os.path.join(target_dir, "runs", "train"),
-        os.path.join(target_dir, "reports"),
+        os.path.join(target_project, "data", "images"),
+        os.path.join(target_project, "data", "labels"),
+        os.path.join(target_project, "dataset"),
+        os.path.join(target_project, "runs", "train"),
+        os.path.join(target_project, "reports"),
     ]
 
     for directory in directories:
@@ -535,7 +535,7 @@ Ambiente MicroDetect inicializado com sucesso!
 
 Para começar:
 
-1. Adicione suas imagens em:        {os.path.join(target_dir, 'data', 'images')}
+1. Adicione suas imagens em:        {os.path.join(target_project, 'data', 'images')}
 2. Anote as imagens:                microdetect annotate
 3. Prepare o dataset:               microdetect dataset
 4. Treine o modelo:                 microdetect train
