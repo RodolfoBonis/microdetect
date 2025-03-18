@@ -41,7 +41,7 @@ KEYBOARD_SHORTCUTS = {
 }
 
 DEFAULT_AUTO_SAVE = True
-DEFAULT_AUTO_SAVE_INTERVAL = 20  # 5 minutos
+DEFAULT_AUTO_SAVE_INTERVAL = 300  # 5 minutos
 
 # Constantes para alças de redimensionamento
 HANDLE_NONE = 0
@@ -352,6 +352,110 @@ class ImageAnnotator:
             Nome completo da classe (ex: "0-levedura")
         """
         return next((c for c in self.classes if c.startswith(class_id)), f"Classe {class_id}")
+
+    def _show_option_dialog(self, title: str, message: str, options: List[str]) -> int:
+        """
+        Exibe um diálogo com opções que o usuário pode selecionar usando as teclas de seta.
+
+        Args:
+            title: Título da janela de diálogo
+            message: Mensagem a ser exibida
+            options: Lista de opções a serem mostradas
+
+        Returns:
+            Índice da opção selecionada (0 a len(options)-1)
+        """
+        # Criar uma janela de diálogo
+        dialog = tk.Toplevel()
+        dialog.title(title)
+        dialog.geometry("500x300")
+        dialog.resizable(False, False)
+
+        # Tornar a janela modal (bloqueia interação com outras janelas)
+        dialog.transient()
+        dialog.grab_set()
+
+        # Centralizar a janela na tela
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Adicionar a mensagem
+        tk.Label(dialog, text=message, pady=10, wraplength=450).pack()
+
+        # Criar frame para as opções
+        options_frame = tk.Frame(dialog)
+        options_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Variável para armazenar a seleção atual
+        selected_option = tk.IntVar(value=0)  # Padrão: primeira opção
+
+        # Adicionar radiobuttons para as opções
+        option_buttons = []
+        for i, option in enumerate(options):
+            radio = tk.Radiobutton(
+                options_frame,
+                text=option,
+                variable=selected_option,
+                value=i,
+                font=("Arial", 12),
+                anchor=tk.W,
+                padx=10,
+                pady=5,
+                indicatoron=0,  # Fazer o botão ocupar toda a largura
+                relief=tk.GROOVE,
+                selectcolor="lightblue",
+                width=40
+            )
+            radio.pack(fill=tk.X, pady=2)
+            option_buttons.append(radio)
+
+        # Selecionar primeiro botão visualmente
+        option_buttons[0].select() if option_buttons else None
+
+        # Variável para armazenar o resultado
+        result = [0]  # Usar lista para poder modificar dentro das funções internas
+
+        # Função para atualizar a seleção ao navegar com as teclas
+        def move_selection(delta):
+            new_index = (selected_option.get() + delta) % len(options)
+            selected_option.set(new_index)
+            option_buttons[new_index].focus_set()
+
+        # Função para confirmar a seleção
+        def confirm_selection():
+            result[0] = selected_option.get()
+            dialog.destroy()
+
+        # Adicionar botão de confirmação
+        tk.Button(
+            dialog,
+            text="Confirmar",
+            command=confirm_selection,
+            width=15,
+            bg="lightgreen"
+        ).pack(pady=10)
+
+        # Configurar eventos de teclado para toda a janela
+        dialog.bind("<Up>", lambda e: move_selection(-1))
+        dialog.bind("<Down>", lambda e: move_selection(1))
+        dialog.bind("<Return>", lambda e: confirm_selection())
+
+        # Também vincular eventos de teclado para números 1-9
+        for i in range(min(9, len(options))):
+            dialog.bind(f"{i+1}", lambda e, idx=i: selected_option.set(idx) or confirm_selection())
+
+        # Focar no primeiro botão ao iniciar
+        if option_buttons:
+            option_buttons[0].focus_set()
+
+        # Aguardar até que o diálogo seja fechado
+        dialog.wait_window()
+
+        return result[0]
 
     def annotate_image(self, image_path: str, output_dir: str) -> Optional[str]:
         """
@@ -1443,6 +1547,21 @@ class ImageAnnotator:
         )
         next_button.pack(side=tk.LEFT, padx=5)
 
+        # Adicionar informações de atalhos
+        shortcuts_frame = tk.Frame(main_frame)
+        shortcuts_frame.pack(fill=tk.X, pady=5)
+
+        shortcuts_label = tk.Label(
+            shortcuts_frame,
+            text="Atalhos: "
+            + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()])
+            + "\nNo modo Edição: Arraste as alças para redimensionar caixas, clique e arraste no centro para mover",
+            justify=tk.LEFT,
+            anchor=tk.W,
+            wraplength=780,
+        )
+        shortcuts_label.pack(fill=tk.X, padx=5)
+
         # Vincular atalhos de teclado
         root.bind("<r>", lambda e: reset())
         root.bind("<z>", lambda e: undo())
@@ -1576,6 +1695,436 @@ class ImageAnnotator:
 
         return None
 
+    def show_statistics(self, output_dir: str):
+        """
+        Exibe um dashboard com estatísticas das anotações.
+
+        Args:
+            output_dir: Diretório contendo as anotações
+        """
+        try:
+            # Importar matplotlib aqui para evitar dependência desnecessária se não for usado
+            import matplotlib.pyplot as plt
+            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+            from matplotlib.figure import Figure
+
+            # Calcular estatísticas
+            class_counts, total_objetos = self._count_annotations_by_class(output_dir)
+
+            # Contar arquivos de anotação
+            annotation_files = [f for f in glob.glob(os.path.join(output_dir, "*.txt"))
+                                if os.path.basename(f) != self.progress_file]
+            total_imagens_anotadas = len(annotation_files)
+
+            # Criar janela para o dashboard
+            stats_window = tk.Toplevel()
+            stats_window.title("Dashboard de Estatísticas de Anotação")
+            stats_window.geometry("800x600")
+            stats_window.minsize(600, 400)
+
+            # Frame principal
+            main_frame = tk.Frame(stats_window)
+            main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+            # Título
+            tk.Label(main_frame, text="Estatísticas de Anotação",
+                     font=("Arial", 16, "bold")).pack(pady=10)
+
+            # Frame para estatísticas gerais
+            stats_frame = tk.Frame(main_frame)
+            stats_frame.pack(fill=tk.X, pady=10)
+
+            # Estatísticas gerais
+            tk.Label(stats_frame, text=f"Total de imagens anotadas: {total_imagens_anotadas}",
+                     font=("Arial", 12)).pack(anchor="w")
+            tk.Label(stats_frame, text=f"Total de objetos anotados: {total_objetos}",
+                     font=("Arial", 12)).pack(anchor="w")
+
+            # Média de objetos por imagem
+            avg_objects = total_objetos / total_imagens_anotadas if total_imagens_anotadas > 0 else 0
+            tk.Label(stats_frame, text=f"Média de objetos por imagem: {avg_objects:.2f}",
+                     font=("Arial", 12)).pack(anchor="w")
+
+            # Frame para gráficos
+            graph_frame = tk.Frame(main_frame)
+            graph_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+            # Criar figura para gráficos
+            figure = Figure(figsize=(8, 4), dpi=100)
+
+            # Gráfico de distribuição de classes
+            ax1 = figure.add_subplot(121)  # 1 linha, 2 colunas, posição 1
+
+            # Preparar dados para o gráfico
+            classes = []
+            counts = []
+            colors = ['#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', '#00BCD4', '#FF9800', '#795548']
+
+            for i, (class_id, count) in enumerate(sorted(class_counts.items())):
+                if count > 0:
+                    classes.append(self._get_class_name(class_id))
+                    counts.append(count)
+
+            # Criar gráfico de barras
+            ax1.bar(classes, counts, color=colors[:len(classes)])
+            ax1.set_title('Distribuição de Classes')
+            ax1.set_ylabel('Quantidade')
+            ax1.tick_params(axis='x', rotation=45)
+
+            # Gráfico de pizza com porcentagens
+            ax2 = figure.add_subplot(122)  # 1 linha, 2 colunas, posição 2
+
+            # Calcular porcentagens
+            if sum(counts) > 0:
+                percentages = [count / sum(counts) * 100 for count in counts]
+                ax2.pie(percentages, labels=classes, autopct='%1.1f%%',
+                        startangle=90, colors=colors[:len(classes)])
+                ax2.set_title('Porcentagem por Classe')
+
+            figure.tight_layout()
+
+            # Incorporar o gráfico no tkinter
+            canvas = FigureCanvasTkAgg(figure, graph_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+            # Frame para detalhes por classe
+            details_frame = tk.Frame(main_frame)
+            details_frame.pack(fill=tk.X, pady=10)
+
+            # Título da seção
+            tk.Label(details_frame, text="Detalhes por Classe",
+                     font=("Arial", 12, "bold")).pack(anchor="w", pady=5)
+
+            # Tabela de detalhes
+            class_details = tk.Frame(details_frame)
+            class_details.pack(fill=tk.X)
+
+            # Cabeçalhos
+            tk.Label(class_details, text="Classe", width=20, font=("Arial", 10, "bold"),
+                     relief=tk.RIDGE).grid(row=0, column=0, sticky="ew")
+            tk.Label(class_details, text="Quantidade", width=10, font=("Arial", 10, "bold"),
+                     relief=tk.RIDGE).grid(row=0, column=1, sticky="ew")
+            tk.Label(class_details, text="Porcentagem", width=15, font=("Arial", 10, "bold"),
+                     relief=tk.RIDGE).grid(row=0, column=2, sticky="ew")
+
+            # Preencher dados da tabela
+            for i, (class_name, count) in enumerate(zip(classes, counts)):
+                percentage = count / total_objetos * 100 if total_objetos > 0 else 0
+
+                tk.Label(class_details, text=class_name, width=20, anchor="w",
+                         relief=tk.RIDGE).grid(row=i + 1, column=0, sticky="ew")
+                tk.Label(class_details, text=str(count), width=10,
+                         relief=tk.RIDGE).grid(row=i + 1, column=1, sticky="ew")
+                tk.Label(class_details, text=f"{percentage:.1f}%", width=15,
+                         relief=tk.RIDGE).grid(row=i + 1, column=2, sticky="ew")
+
+            # Botão para fechar
+            tk.Button(main_frame, text="Fechar", command=stats_window.destroy,
+                      width=10).pack(pady=10)
+
+            # Centralizar janela
+            stats_window.update_idletasks()
+            width = stats_window.winfo_width()
+            height = stats_window.winfo_height()
+            x = (stats_window.winfo_screenwidth() // 2) - (width // 2)
+            y = (stats_window.winfo_screenheight() // 2) - (height // 2)
+            stats_window.geometry(f"{width}x{height}+{x}+{y}")
+
+            # Tornar modal
+            stats_window.transient()
+            stats_window.grab_set()
+            stats_window.wait_window()
+
+        except Exception as e:
+            logger.error(f"Erro ao exibir estatísticas: {e}")
+            messagebox.showerror("Erro", f"Não foi possível exibir as estatísticas: {str(e)}")
+
+        return
+
+    def search_and_filter_images(self, image_dir: str, output_dir: str) -> List[str]:
+        """
+        Abre um diálogo para buscar e filtrar imagens para anotação.
+
+        Args:
+            image_dir: Diretório de imagens
+            output_dir: Diretório de anotações
+
+        Returns:
+            Lista de caminhos de imagem selecionados
+        """
+        # Obter todas as imagens
+        all_images = []
+        for ext in ["*.jpg", "*.jpeg", "*.png"]:
+            all_images.extend(glob.glob(os.path.join(image_dir, ext)))
+
+        # Ordenar imagens
+        all_images.sort()
+
+        if not all_images:
+            messagebox.showinfo("Informação", "Nenhuma imagem encontrada no diretório.")
+            return []
+
+        # Criar janela de busca
+        search_window = tk.Toplevel()
+        search_window.title("Buscar e Filtrar Imagens")
+        search_window.geometry("800x600")
+        search_window.minsize(600, 400)
+
+        # Variáveis para armazenar resultados
+        filtered_images = all_images.copy()
+        selected_images = []
+        result_images = []  # Para retornar
+
+        # Frame principal
+        main_frame = tk.Frame(search_window)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Frame de busca
+        search_frame = tk.Frame(main_frame)
+        search_frame.pack(fill=tk.X, pady=5)
+
+        # Campo de busca
+        tk.Label(search_frame, text="Buscar por nome:").pack(side=tk.LEFT, padx=5)
+        search_var = tk.StringVar()
+        search_entry = tk.Entry(search_frame, textvariable=search_var, width=30)
+        search_entry.pack(side=tk.LEFT, padx=5)
+
+        # Opção para mostrar apenas imagens anotadas
+        show_annotated_var = tk.BooleanVar(value=False)
+        show_annotated_check = tk.Checkbutton(search_frame, text="Mostrar apenas imagens anotadas",
+                                              variable=show_annotated_var)
+        show_annotated_check.pack(side=tk.LEFT, padx=20)
+
+        # Opção para mostrar apenas imagens não anotadas
+        show_unannotated_var = tk.BooleanVar(value=False)
+        show_unannotated_check = tk.Checkbutton(search_frame, text="Mostrar apenas imagens não anotadas",
+                                                variable=show_unannotated_var)
+        show_unannotated_check.pack(side=tk.LEFT, padx=5)
+
+        # Função para atualizar a lista quando o usuário buscar
+        def update_image_list():
+            nonlocal filtered_images
+
+            # Obter termo de busca
+            search_term = search_var.get().lower().strip()
+            show_annotated = show_annotated_var.get()
+            show_unannotated = show_unannotated_var.get()
+
+            # Filtrar imagens
+            filtered_images = []
+            for img_path in all_images:
+                img_filename = os.path.basename(img_path).lower()
+                base_name = os.path.splitext(os.path.basename(img_path))[0]
+                annotation_path = os.path.join(output_dir, f"{base_name}.txt")
+                is_annotated = os.path.exists(annotation_path)
+
+                # Verificar filtros
+                if search_term and search_term not in img_filename:
+                    continue
+
+                if show_annotated and not is_annotated:
+                    continue
+
+                if show_unannotated and is_annotated:
+                    continue
+
+                filtered_images.append(img_path)
+
+            # Atualizar listbox
+            image_listbox.delete(0, tk.END)
+            for img_path in filtered_images:
+                base_name = os.path.splitext(os.path.basename(img_path))[0]
+                annotation_path = os.path.join(output_dir, f"{base_name}.txt")
+                is_annotated = os.path.exists(annotation_path)
+
+                display_text = f"{os.path.basename(img_path)}"
+                if is_annotated:
+                    display_text += " [Anotada]"
+
+                image_listbox.insert(tk.END, display_text)
+
+            # Atualizar contadores
+            total_label.config(text=f"Total: {len(filtered_images)} / {len(all_images)} imagens")
+
+        # Botão de busca
+        search_button = tk.Button(search_frame, text="Buscar", command=update_image_list)
+        search_button.pack(side=tk.LEFT, padx=5)
+
+        # Função auxiliar para impedir que os checkboxes sejam ambos selecionados
+        def handle_annotated_check():
+            if show_annotated_var.get() and show_unannotated_var.get():
+                show_unannotated_var.set(False)
+            update_image_list()
+
+        def handle_unannotated_check():
+            if show_annotated_var.get() and show_unannotated_var.get():
+                show_annotated_var.set(False)
+            update_image_list()
+
+        # Configurar callbacks para os checkboxes
+        show_annotated_check.config(command=handle_annotated_check)
+        show_unannotated_check.config(command=handle_unannotated_check)
+
+        # Frame para a lista de imagens
+        list_frame = tk.Frame(main_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+
+        # Label para contagem
+        total_label = tk.Label(list_frame, text=f"Total: {len(all_images)} imagens", anchor="w")
+        total_label.pack(fill=tk.X)
+
+        # Lista de imagens com scrollbar
+        list_subframe = tk.Frame(list_frame)
+        list_subframe.pack(fill=tk.BOTH, expand=True)
+
+        scrollbar = tk.Scrollbar(list_subframe)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        image_listbox = tk.Listbox(list_subframe, selectmode=tk.EXTENDED, yscrollcommand=scrollbar.set)
+        image_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar.config(command=image_listbox.yview)
+
+        # Preencher a lista inicialmente
+        for img_path in all_images:
+            base_name = os.path.splitext(os.path.basename(img_path))[0]
+            annotation_path = os.path.join(output_dir, f"{base_name}.txt")
+            is_annotated = os.path.exists(annotation_path)
+
+            display_text = f"{os.path.basename(img_path)}"
+            if is_annotated:
+                display_text += " [Anotada]"
+
+            image_listbox.insert(tk.END, display_text)
+
+        # Preview da imagem selecionada
+        preview_frame = tk.Frame(main_frame)
+        preview_frame.pack(fill=tk.X, pady=10)
+
+        preview_label = tk.Label(preview_frame, text="Preview:")
+        preview_label.pack(anchor="w")
+
+        preview_image = tk.Label(preview_frame, text="Selecione uma imagem para visualizar")
+        preview_image.pack(fill=tk.X, pady=5)
+
+        # Função para mostrar preview
+        preview_photo = None  # Referência global para a imagem
+
+        def show_preview(*args):
+            nonlocal preview_photo
+
+            # Limpar preview anterior
+            preview_image.config(image='', text="Selecione uma imagem para visualizar")
+
+            # Obter seleção
+            selection = image_listbox.curselection()
+            if not selection:
+                return
+
+            # Obter caminho da imagem
+            index = selection[0]
+            if index >= len(filtered_images):
+                return
+
+            img_path = filtered_images[index]
+
+            try:
+                # Carregar e redimensionar imagem para preview
+                pil_img = Image.open(img_path)
+
+                # Redimensionar mantendo proporção
+                max_size = 300
+                width, height = pil_img.size
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * (max_size / width))
+                else:
+                    new_height = max_size
+                    new_width = int(width * (max_size / height))
+
+                pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
+
+                # Converter para PhotoImage para Tkinter
+                preview_photo = ImageTk.PhotoImage(pil_img)
+
+                # Atualizar label
+                preview_image.config(image=preview_photo, text='')
+
+                # Obter informações do status de anotação
+                base_name = os.path.splitext(os.path.basename(img_path))[0]
+                annotation_path = os.path.join(output_dir, f"{base_name}.txt")
+                is_annotated = os.path.exists(annotation_path)
+
+                if is_annotated:
+                    # Contar anotações
+                    with open(annotation_path, 'r') as f:
+                        annotations = f.readlines()
+                    preview_label.config(text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
+                else:
+                    preview_label.config(text=f"Preview: {os.path.basename(img_path)} - Não anotada")
+
+            except Exception as e:
+                preview_image.config(text=f"Erro ao carregar preview: {str(e)}")
+
+        # Vincular evento de seleção para mostrar preview
+        image_listbox.bind('<<ListboxSelect>>', show_preview)
+
+        # Botões de ação
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+
+        # Função para confirmar a seleção
+        def confirm_selection():
+            nonlocal result_images
+            selection = image_listbox.curselection()
+
+            if not selection:
+                messagebox.showinfo("Informação", "Nenhuma imagem selecionada.")
+                return
+
+            # Criar lista de imagens selecionadas
+            result_images = [filtered_images[i] for i in selection]
+
+            # Fechar janela
+            search_window.destroy()
+
+        # Botão para selecionar todas
+        def select_all():
+            image_listbox.selection_set(0, tk.END)
+
+        # Botão para limpar seleção
+        def clear_selection():
+            image_listbox.selection_clear(0, tk.END)
+
+        # Adicionar botões
+        tk.Button(button_frame, text="Selecionar Todos", command=select_all).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Limpar Seleção", command=clear_selection).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Cancelar", command=search_window.destroy).pack(side=tk.RIGHT, padx=5)
+        tk.Button(button_frame, text="Iniciar Anotação", command=confirm_selection,
+                  bg="lightgreen").pack(side=tk.RIGHT, padx=5)
+
+        # Iniciar busca com os valores padrão
+        update_image_list()
+
+        # Configurar eventos de teclado para busca rápida
+        search_entry.bind("<Return>", lambda e: update_image_list())
+
+        # Centralizar janela
+        search_window.update_idletasks()
+        width = search_window.winfo_width()
+        height = search_window.winfo_height()
+        x = (search_window.winfo_screenwidth() // 2) - (width // 2)
+        y = (search_window.winfo_screenheight() // 2) - (height // 2)
+        search_window.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Tornar modal
+        search_window.transient()
+        search_window.grab_set()
+        search_window.wait_window()
+
+        return result_images
+
     def batch_annotate(self, image_dir: str, output_dir: str) -> Tuple[int, int]:
         """
         Anota uma pasta de imagens em lote.
@@ -1625,24 +2174,24 @@ class ImageAnnotator:
                     logger.info(f"Anotação anterior encontrada. Última imagem anotada: {os.path.basename(last_annotated)}")
 
                     if last_index < len(image_files) - 1:
-                        # Perguntar onde o usuário quer começar
-                        print("\nOpções:")
-                        print("1. Continuar de onde parou (próxima imagem)")
-                        print("2. Recomeçar do início")
-                        print("3. Revisar a última imagem anotada")
+                        # Oferecer opções de onde começar usando widget Tkinter ao invés de texto
+                        option_selected = self._show_option_dialog(
+                            "Opções de Anotação",
+                            "Selecione uma opção para continuar:",
+                            [
+                                "Continuar de onde parou (próxima imagem)",
+                                "Recomeçar do início",
+                                "Revisar a última imagem anotada"
+                            ]
+                        )
 
-                        opcao = input("\nEscolha uma opção (1, 2 ou 3) [1]: ").strip()
-
-                        if opcao == "2":
-                            # Recomeçar do início
+                        if option_selected == 1:  # Recomeçar do início
                             start_index = 0
                             logger.info("Reiniciando anotação do início.")
-                        elif opcao == "3":
-                            # Revisar a última imagem
+                        elif option_selected == 2:  # Revisar a última imagem anotada
                             start_index = last_index
                             logger.info(f"Revisando a última imagem anotada: {os.path.basename(last_annotated)}")
-                        else:
-                            # Opção padrão: continuar da próxima
+                        else:  # Opção padrão: continuar da próxima (índice 0 ou qualquer outro valor)
                             start_index = last_index + 1
                             next_image = os.path.basename(image_files[start_index])
                             logger.info(f"Continuando anotação a partir de: {next_image}")
@@ -1670,17 +2219,20 @@ class ImageAnnotator:
 
             logger.info(f"Anotando: {os.path.basename(img_path)} ({i + 1}/{len(image_files)})")
 
-            # Verificar se já existe anotação
-            if os.path.exists(existing_annotation):
-                print(f"\nA imagem '{os.path.basename(img_path)}' já possui anotação.")
-                print("Opções:")
-                print("p - Pular esta imagem (manter anotação existente)")
-                print("e - Editar a anotação existente")
-                print("s - Sobrescrever (criar nova anotação)")
+            # Verificar se já existe anotação e se NÃO estamos revisando a última imagem anotada
+            # (já que nesse caso o usuário explicitamente escolheu revisar)
+            if os.path.exists(existing_annotation) and i != start_index:
+                option_selected = self._show_option_dialog(
+                    f"Imagem Existente: {os.path.basename(img_path)}",
+                    "Esta imagem já possui anotação. O que deseja fazer?",
+                    [
+                        "Editar a anotação existente",
+                        "Sobrescrever (criar nova anotação)",
+                        "Pular esta imagem (manter anotação existente)"
+                    ]
+                )
 
-                should_skip = input("\nO que deseja fazer? (p/e/s) [e]: ").lower() or "e"
-
-                if should_skip == "p":
+                if option_selected == 2:  # Pular esta imagem
                     logger.info(f"Mantendo anotação existente para {base_name}")
                     imagens_existentes += 1
 
@@ -1688,9 +2240,9 @@ class ImageAnnotator:
                     self._save_progress(progress_path, img_path)
                     i += 1  # Avançar para próxima imagem
                     continue
-                elif should_skip == "e":
+                elif option_selected == 0:  # Editar anotação existente
                     logger.info(f"Editando anotação existente para {base_name}")
-                else:
+                else:  # Sobrescrever
                     logger.info(f"Sobrescrevendo anotação existente para {base_name}")
 
             # Resetar flags antes de anotar cada imagem
