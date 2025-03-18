@@ -13,7 +13,7 @@ import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Set, Union
 
 import cv2
 import numpy as np
@@ -35,12 +35,13 @@ KEYBOARD_SHORTCUTS = {
     "q": "Sair sem salvar",
     "p": "Ativar/desativar modo navegação",
     "x": "Salvar e sair",
+    "n": "Salvar e avançar para próxima imagem",
     "Del": "Excluir seleção",
     "Esc": "Cancelar seleção atual",
 }
 
 DEFAULT_AUTO_SAVE = True
-DEFAULT_AUTO_SAVE_INTERVAL = 300  # 5 minutos
+DEFAULT_AUTO_SAVE_INTERVAL = 20  # 5 minutos
 
 # Constantes para alças de redimensionamento
 HANDLE_NONE = 0
@@ -89,6 +90,9 @@ class ImageAnnotator:
         self.user_cancelled = False
         self.canvas = None
         self.current_img_tk = None
+
+        # Flag para controlar a navegação para a próxima imagem
+        self.next_image_requested = False
 
         # Lista para armazenar bounding boxes
         self.bounding_boxes = []
@@ -307,6 +311,48 @@ class ImageAnnotator:
             logger.error(f"Erro ao redesenhar imagem com zoom: {e}")
             # Não definir window_closed aqui, apenas logar o erro
 
+    def _count_annotations_by_class(self, output_dir: str) -> Tuple[dict, int]:
+        """
+        Conta o número de anotações por classe em todos os arquivos de anotação.
+
+        Args:
+            output_dir: Diretório contendo os arquivos de anotação
+
+        Returns:
+            Tupla com (dicionário de contagem por classe, total de anotações)
+        """
+        # Inicializar contagem de classes com todas as classes conhecidas
+        class_counts = {class_id.split('-')[0]: 0 for class_id in self.classes}
+        total_boxes = 0
+
+        # Percorrer todos os arquivos de anotação
+        annotation_files = glob.glob(os.path.join(output_dir, "*.txt"))
+        for ann_file in annotation_files:
+            if os.path.basename(ann_file) == self.progress_file:
+                continue  # Pular o arquivo de progresso
+
+            with open(ann_file, "r") as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:  # formato YOLO: class x_center y_center width height
+                        class_id = parts[0]
+                        class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                        total_boxes += 1
+
+        return class_counts, total_boxes
+
+    def _get_class_name(self, class_id: str) -> str:
+        """
+        Obtém o nome completo da classe a partir do ID.
+
+        Args:
+            class_id: ID da classe (ex: "0")
+
+        Returns:
+            Nome completo da classe (ex: "0-levedura")
+        """
+        return next((c for c in self.classes if c.startswith(class_id)), f"Classe {class_id}")
+
     def annotate_image(self, image_path: str, output_dir: str) -> Optional[str]:
         """
         Ferramenta para anotar manualmente células de levedura em imagens de microscopia com bounding boxes.
@@ -324,11 +370,15 @@ class ImageAnnotator:
         # Resetar flags e estado
         self.user_cancelled = False
         self.window_closed = False
+        self.next_image_requested = False  # Resetar flag para próxima imagem
         self.bounding_boxes = []
         self.action_history = []
         self.resize_handle = HANDLE_NONE
         self.original_box_state = None
         self.pan_mode = False
+
+        # Rastreamento de timers ativos
+        active_timer_ids = []
 
         # Carregar imagem
         loaded_data = self._load_image(image_path)
@@ -513,6 +563,21 @@ class ImageAnnotator:
             except Exception as e:
                 logger.error(f"Erro ao atualizar status: {e}")
                 # Não definir window_closed aqui
+
+        def cleanup_timers():
+            """Cancela todos os timers pendentes da interface."""
+            try:
+                for timer_id in active_timer_ids[:]:
+                    try:
+                        if root.winfo_exists():
+                            root.after_cancel(timer_id)
+                        active_timer_ids.remove(timer_id)
+                    except Exception as e:
+                        logger.debug(f"Erro ao cancelar timer: {e}")
+                        # Continuar mesmo com erro
+            except Exception as e:
+                logger.debug(f"Erro ao limpar timers: {e}")
+                # Continuar mesmo com erro - garantir que não interrompa o fluxo
 
         def redraw_all_boxes(highlight_idx=None):
             """Redesenha todas as bounding boxes no canvas"""
@@ -1120,13 +1185,36 @@ class ImageAnnotator:
 
             try:
                 save()
-                self.user_cancelled = True
+                cleanup_timers()  # Limpar timers antes de fechar
+                self.user_cancelled = False  # Não queremos cancelar, apenas sair normalmente
                 root.destroy()
             except Exception as e:
                 logger.error(f"Erro ao salvar e sair: {e}")
                 self.window_closed = True
-                self.user_cancelled = True
+                self.user_cancelled = False
                 try:
+                    cleanup_timers()  # Limpar timers como última tentativa
+                    root.destroy()
+                except:
+                    pass
+
+        def save_and_next():
+            """Salva as anotações e sinaliza para avançar para a próxima imagem."""
+            if not self._is_window_valid(canvas):
+                return
+
+            try:
+                save()
+                cleanup_timers()  # Limpar timers antes de fechar
+                self.next_image_requested = True  # Ativar flag para próxima imagem
+                self.user_cancelled = False  # Não queremos cancelar
+                root.destroy()
+            except Exception as e:
+                logger.error(f"Erro ao salvar e avançar: {e}")
+                self.window_closed = True
+                self.user_cancelled = False
+                try:
+                    cleanup_timers()  # Limpar timers como última tentativa
                     root.destroy()
                 except:
                     pass
@@ -1139,6 +1227,9 @@ class ImageAnnotator:
                         save()
             except:
                 pass  # Ignorar erros durante o fechamento
+
+            # Limpar timers antes de fechar
+            cleanup_timers()
 
             # Definir flags de saída
             self.window_closed = True
@@ -1262,15 +1353,39 @@ class ImageAnnotator:
             """Monitora periodicamente o estado da janela e corrige se necessário."""
             try:
                 if self.window_closed and root.winfo_exists():
-                    print("ALERTA: Detectada inconsistência - window_closed é True, mas a janela existe!")
+                    logger.debug("Detectada inconsistência - window_closed é True, mas a janela existe!")
                     self.window_closed = False
 
                 # Continuar monitorando se a janela ainda existir
                 if root.winfo_exists():
-                    root.after(1000, monitor_window_state)  # Verificar a cada segundo
+                    timer_id = root.after(1000, monitor_window_state)
+                    active_timer_ids.append(timer_id)
             except:
                 # Se falhar, a janela provavelmente já foi fechada
                 self.window_closed = True
+
+        def check_auto_save():
+            """Verifica periodicamente se é hora de auto-salvar."""
+            if self.window_closed:
+                return
+
+            try:
+                if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
+                    update_status("Auto-save realizado")
+
+                if root.winfo_exists():
+                    timer_id = root.after(10000, check_auto_save)
+                    active_timer_ids.append(timer_id)
+            except Exception as e:
+                # Em caso de erro, apenas logar e continuar
+                logger.error(f"Erro no auto-save: {e}")
+                # Tentar programar o próximo auto-save mesmo com erro
+                try:
+                    if root.winfo_exists():
+                        timer_id = root.after(10000, check_auto_save)
+                        active_timer_ids.append(timer_id)
+                except:
+                    pass
 
         # Bindings para zoom e pan
         canvas.bind("<MouseWheel>", zoom)  # Windows
@@ -1319,20 +1434,14 @@ class ImageAnnotator:
         tk.Button(button_frame2, text="Salvar e Sair (X)", command=save_and_exit).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame2, text="Excluir Seleção (Del)", command=delete_selected).pack(side=tk.LEFT, padx=5)
 
-        # Adicionar informações de atalhos
-        shortcuts_frame = tk.Frame(main_frame)
-        shortcuts_frame.pack(fill=tk.X, pady=5)
-
-        shortcuts_label = tk.Label(
-            shortcuts_frame,
-            text="Atalhos: "
-            + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()])
-            + "\nNo modo Edição: Arraste as alças para redimensionar caixas, clique e arraste no centro para mover",
-            justify=tk.LEFT,
-            anchor=tk.W,
-            wraplength=780,
+        # Adicionar novo botão para salvar e avançar
+        next_button = tk.Button(
+            button_frame2,
+            text="Salvar e Próxima (N)",
+            command=save_and_next,
+            bg="lightgreen"  # Destaque visual para o botão
         )
-        shortcuts_label.pack(fill=tk.X, padx=5)
+        next_button.pack(side=tk.LEFT, padx=5)
 
         # Vincular atalhos de teclado
         root.bind("<r>", lambda e: reset())
@@ -1343,6 +1452,7 @@ class ImageAnnotator:
         root.bind("<p>", lambda e: toggle_pan_mode())
         root.bind("<c>", lambda e: cycle_classes())
         root.bind("<x>", lambda e: save_and_exit())
+        root.bind("<n>", lambda e: save_and_next())  # Novo atalho
         root.bind("<Delete>", lambda e: delete_selected())
         root.bind("<Escape>", lambda e: select_none())
         root.bind("<w>", lambda e: reset_zoom())
@@ -1361,26 +1471,21 @@ class ImageAnnotator:
         # Desenhar as bounding boxes existentes
         redraw_all_boxes()
 
-        # Iniciar o monitoramento do estado da janela
-        root.after(1000, monitor_window_state)
+        # Iniciar o monitoramento do estado da janela e auto-save
+        # Armazenar IDs dos timers para poder cancelá-los depois
+        timer_id = root.after(1000, monitor_window_state)
+        active_timer_ids.append(timer_id)
 
         # Auto-save timer
         if self.auto_save:
-            def check_auto_save():
-                if self.window_closed:
-                    return
-                if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
-                    update_status("Auto-save realizado")
-                try:
-                    root.after(10000, check_auto_save)  # Verificar a cada 10 segundos
-                except tk.TclError:
-                    pass  # Janela fechada
-
-            # Iniciar o timer de auto-save
-            root.after(10000, check_auto_save)
+            timer_id = root.after(10000, check_auto_save)
+            active_timer_ids.append(timer_id)
 
         # Iniciar loop principal
         root.mainloop()
+
+        # Garantir que todos os timers sejam limpos ao sair
+        cleanup_timers()
 
         return annotation_path
 
@@ -1407,6 +1512,7 @@ class ImageAnnotator:
     def backup_annotations(self, label_dir: str) -> Optional[str]:
         """
         Cria um backup com timestamp das anotações atuais e mantém apenas os 5 mais recentes.
+        Os backups são armazenados em uma pasta 'backups' dentro do diretório de labels.
 
         Args:
             label_dir: Diretório contendo os arquivos de anotação
@@ -1415,8 +1521,13 @@ class ImageAnnotator:
             Caminho para o diretório de backup ou None se falhar
         """
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        parent_dir = os.path.dirname(f"{label_dir}/backups")
-        backup_dir = os.path.join(parent_dir, f"backup_annotations_{timestamp}")
+
+        # Criar diretório de backups (filho do diretório de labels)
+        backups_dir = os.path.join(label_dir, "backups")
+        os.makedirs(backups_dir, exist_ok=True)
+
+        # Criar diretório específico para este backup
+        backup_dir = os.path.join(backups_dir, f"backup_annotations_{timestamp}")
 
         try:
             if os.path.exists(label_dir):
@@ -1436,8 +1547,8 @@ class ImageAnnotator:
                     backup_pattern = re.compile(r"backup_annotations_\d{8}_\d{6}$")
                     backup_dirs = []
 
-                    for dirname in os.listdir(parent_dir):
-                        dir_path = os.path.join(parent_dir, dirname)
+                    for dirname in os.listdir(backups_dir):
+                        dir_path = os.path.join(backups_dir, dirname)
                         if os.path.isdir(dir_path) and backup_pattern.match(dirname):
                             backup_dirs.append(dir_path)
 
@@ -1498,6 +1609,7 @@ class ImageAnnotator:
         start_index = 0
         total_annotated = 0
         imagens_existentes = 0
+        last_annotated_path = None
 
         if os.path.exists(progress_path):
             try:
@@ -1507,6 +1619,7 @@ class ImageAnnotator:
                 last_annotated = progress_data.get("last_annotated", "")
                 if last_annotated in image_files:
                     last_index = image_files.index(last_annotated)
+                    last_annotated_path = last_annotated
 
                     # Mostrar informações sobre o progresso
                     logger.info(f"Anotação anterior encontrada. Última imagem anotada: {os.path.basename(last_annotated)}")
@@ -1549,7 +1662,8 @@ class ImageAnnotator:
                 imagens_existentes += 1
 
         # Processar imagens a partir do ponto de retomada
-        for i in range(start_index, len(image_files)):
+        i = start_index
+        while i < len(image_files):
             img_path = image_files[i]
             base_name = os.path.splitext(os.path.basename(img_path))[0]
             existing_annotation = os.path.join(output_dir, f"{base_name}.txt")
@@ -1572,14 +1686,16 @@ class ImageAnnotator:
 
                     # Salvar progresso após cada imagem
                     self._save_progress(progress_path, img_path)
+                    i += 1  # Avançar para próxima imagem
                     continue
                 elif should_skip == "e":
                     logger.info(f"Editando anotação existente para {base_name}")
                 else:
                     logger.info(f"Sobrescrevendo anotação existente para {base_name}")
 
-            # Resetar window_closed antes de anotar cada imagem
+            # Resetar flags antes de anotar cada imagem
             self.window_closed = False
+            self.next_image_requested = False
 
             # Anotar imagem
             annotation_path = self.annotate_image(img_path, output_dir)
@@ -1593,17 +1709,67 @@ class ImageAnnotator:
             if annotation_path:
                 total_annotated += 1
                 logger.info(f"Anotação salva para {os.path.basename(img_path)}")
+                # Atualizar último caminho anotado
+                last_annotated_path = img_path
 
             # Salvar progresso após cada imagem
             self._save_progress(progress_path, img_path)
 
-        # Exibir resumo final
-        print("\n" + "=" * 50)
-        print("RESUMO DA ANOTAÇÃO:")
-        print(f"Total de imagens: {len(image_files)}")
-        print(f"Imagens anotadas: {total_annotated + imagens_existentes}")
-        print(f"Imagens anotadas nesta sessão: {total_annotated}")
-        print(f"Imagens restantes: {len(image_files) - (total_annotated + imagens_existentes)}")
-        print("=" * 50)
+            # Decidir se deve avançar ou não para próxima imagem
+            if self.next_image_requested:
+                # Usuário solicitou avançar para próxima imagem
+                i += 1
+                logger.info("Avançando para a próxima imagem...")
+            else:
+                # Fluxo normal - sair do loop, pois o usuário não solicitou próxima imagem
+                break
 
-        return len(image_files), total_annotated + imagens_existentes
+        # Contar anotações por classe e obter total de objetos
+        class_counts, total_objetos = self._count_annotations_by_class(output_dir)
+
+        # Calcular quantas imagens ainda faltam anotar
+        imagens_anotadas = total_annotated + imagens_existentes
+        imagens_restantes = len(image_files) - imagens_anotadas
+
+        # Obter o índice da última imagem anotada
+        ultimo_indice = -1
+        if last_annotated_path and last_annotated_path in image_files:
+            ultimo_indice = image_files.index(last_annotated_path)
+
+        # Exibir resumo final
+        print("\n" + "=" * 60)
+        print(" " * 20 + "RESUMO DA ANOTAÇÃO")
+        print("=" * 60)
+        print(f"Total de imagens: {len(image_files)}")
+        print(f"Imagens anotadas: {imagens_anotadas}")
+        print(f"Imagens anotadas nesta sessão: {total_annotated}")
+        print(f"Imagens restantes: {imagens_restantes}")
+
+        # Imprimir contagem por classe
+        print("\nQuantidade de anotações por classe:")
+        for class_id, count in sorted(class_counts.items()):
+            if count > 0:  # Mostrar apenas classes que foram usadas
+                class_name = self._get_class_name(class_id)
+                print(f"  - {class_name}: {count}")
+
+        print(f"\nTotal de objetos anotados: {total_objetos}")
+
+        # Listar próximas imagens a anotar se houver
+        if imagens_restantes > 0 and ultimo_indice >= 0 and ultimo_indice < len(image_files) - 1:
+            proximas_imagens = [os.path.basename(image_files[ultimo_indice + 1])]
+
+            # Mostrar até 3 imagens próximas se houver mais
+            if ultimo_indice + 2 < len(image_files):
+                proximas_imagens.append(os.path.basename(image_files[ultimo_indice + 2]))
+            if ultimo_indice + 3 < len(image_files):
+                proximas_imagens.append(os.path.basename(image_files[ultimo_indice + 3]))
+
+            print(f"\nPróxima(s) imagem(ns) para anotar:")
+            for i, img in enumerate(proximas_imagens):
+                print(f"  {i+1}. {img}")
+
+            print(f"\nRestam {imagens_restantes} imagens para anotar após a atual.")
+
+        print("=" * 60)
+
+        return len(image_files), imagens_anotadas
