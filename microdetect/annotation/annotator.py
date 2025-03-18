@@ -12,8 +12,9 @@ import shutil
 import time
 import tkinter as tk
 from datetime import datetime
+from random import random
 from tkinter import messagebox
-from typing import Dict, List, Optional, Tuple, Set, Union
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -22,23 +23,6 @@ from PIL import Image, ImageTk
 from microdetect.utils.config import config
 
 logger = logging.getLogger(__name__)
-
-# Constantes
-KEYBOARD_SHORTCUTS = {
-    "a": "Imagem anterior",
-    "d": "Próxima imagem",
-    "s": "Salvar anotações",
-    "z": "Desfazer última ação",
-    "r": "Reiniciar anotações",
-    "e": "Mover/editar seleção",
-    "c": "Alternar entre classes",
-    "q": "Sair sem salvar",
-    "p": "Ativar/desativar modo navegação",
-    "x": "Salvar e sair",
-    "n": "Salvar e avançar para próxima imagem",
-    "Del": "Excluir seleção",
-    "Esc": "Cancelar seleção atual",
-}
 
 DEFAULT_AUTO_SAVE = True
 DEFAULT_AUTO_SAVE_INTERVAL = 300  # 5 minutos
@@ -74,12 +58,15 @@ class ImageAnnotator:
             auto_save: Se True, salva automaticamente as anotações
             auto_save_interval: Intervalo em segundos entre salvamentos automáticos
         """
+        self.current_image_path = None
+        self.suggestion_mode = False
+        self.suggested_boxes = []
         self.classes = classes or config.get("classes", ["0-levedura", "1-fungo", "2-micro-alga"])
         self.progress_file = ".annotation_progress.json"
         self.auto_save = auto_save
         self.auto_save_interval = auto_save_interval
         self.last_save_time = time.time()
-
+        self.image_references = {}
         # Inicializar variáveis utilizadas nas funções
         self.original_w = 0
         self.original_h = 0
@@ -108,6 +95,42 @@ class ImageAnnotator:
         # Controle de modos
         self.pan_mode = False
         self.window_closed = False
+
+    def _create_secure_dialog(self) -> tk.Toplevel:
+        """
+        Cria uma janela de diálogo segura que não terá problemas com referências de imagens.
+
+        Returns:
+            A janela de diálogo Toplevel
+        """
+        try:
+            # Verificar se já temos uma janela raiz
+            existing_root = None
+            for widget in tk._default_root.winfo_children():
+                if isinstance(widget, tk.Toplevel) and widget.winfo_exists():
+                    existing_root = widget
+                    break
+
+            if existing_root:
+                dialog = tk.Toplevel(existing_root)
+                dialog.transient(existing_root)
+            else:
+                # Criar uma nova janela raiz e escondê-la
+                temp_root = tk.Tk()
+                temp_root.withdraw()
+                dialog = tk.Toplevel(temp_root)
+                # Guardar referência para destruir depois
+                dialog._temp_root = temp_root
+
+            return dialog
+        except Exception as e:
+            # Fallback: criar um novo Toplevel simples
+            logger.error(f"Erro ao criar diálogo seguro: {e}")
+            root = tk.Tk()
+            root.withdraw()
+            dialog = tk.Toplevel(root)
+            dialog._temp_root = root
+            return dialog
 
     def _is_window_valid(self, widget=None):
         """
@@ -163,6 +186,251 @@ class ImageAnnotator:
         except Exception as e:
             logger.error(f"Erro ao carregar imagem {image_path}: {str(e)}")
             return None, 0, 0
+
+    def _cleanup_image_references(self):
+        """
+        Limpa referências a imagens que não são mais necessárias.
+        Chamado quando uma imagem é fechada ou quando a aplicação é encerrada.
+        """
+        try:
+            # Manter apenas a referência atual, se houver
+            current_key = None
+            for key, img in self.image_references.items():
+                if img is self.current_img_tk:
+                    current_key = key
+                    break
+
+            # Nova lista de referências
+            new_refs = {}
+            if current_key:
+                new_refs[current_key] = self.image_references[current_key]
+
+            # Substituir o dicionário
+            self.image_references = new_refs
+        except Exception as e:
+            logger.error(f"Erro ao limpar referências de imagem: {e}")
+
+    def suggest_annotations(self, image_path: str, confidence: float = 0.5) -> List[Tuple[str, int, int, int, int]]:
+        """
+        Sugere anotações automáticas usando um modelo básico de detecção.
+
+        Args:
+            image_path: Caminho para a imagem
+            confidence: Limiar de confiança para detecções
+
+        Returns:
+            Lista de bounding boxes sugeridas no formato [(class_id, x1, y1, x2, y2), ...]
+        """
+        try:
+            logger.info(f"Gerando sugestões automáticas para {os.path.basename(image_path)}")
+
+            # Carregar a imagem
+            img = cv2.imread(image_path)
+            if img is None:
+                logger.error(f"Não foi possível carregar a imagem: {image_path}")
+                return []
+
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            h, w = img_rgb.shape[:2]
+
+            # Em um cenário real, aqui você carregaria e usaria um modelo de ML
+            # Por exemplo:
+            # modelo = tf.keras.models.load_model("model/microorganisms_detector.h5")
+            # predictions = modelo.predict(preprocess_image(img_rgb))
+            # boxes = process_predictions(predictions, confidence)
+
+            # Para este exemplo, vamos simular algumas detecções aleatórias
+            # apenas para demonstrar como a função seria utilizada
+            suggested_boxes = []
+
+            # Simulação: gerar algumas caixas aleatórias
+            # Em um projeto real, isso seria substituído por detecções reais
+            num_suggestions = random.randint(3, 8)  # Número aleatório de sugestões
+
+            for _ in range(num_suggestions):
+                # Escolher classe aleatoriamente
+                class_id = random.choice([c.split('-')[0] for c in self.classes])
+
+                # Gerar coordenadas aleatórias
+                box_w = random.randint(w // 10, w // 3)
+                box_h = random.randint(h // 10, h // 3)
+
+                x1 = random.randint(0, w - box_w)
+                y1 = random.randint(0, h - box_h)
+                x2 = x1 + box_w
+                y2 = y1 + box_h
+
+                # Adicionar à lista de sugestões
+                suggested_boxes.append((class_id, x1, y1, x2, y2))
+
+            logger.info(f"{len(suggested_boxes)} sugestões geradas para {os.path.basename(image_path)}")
+            return suggested_boxes
+
+        except Exception as e:
+            logger.error(f"Erro ao gerar sugestões automáticas: {str(e)}")
+            return []
+
+    def apply_suggested_annotations(self):
+        """
+        Aplica as sugestões automáticas à imagem atual.
+        Chamada quando o usuário aceita as sugestões.
+        """
+        if not hasattr(self, 'suggested_boxes') or not self.suggested_boxes:
+            self.update_status("Não há sugestões para aplicar")
+            return False
+
+        # Adicionar cada caixa sugerida à lista de bounding boxes
+        for class_id, x1, y1, x2, y2 in self.suggested_boxes:
+            self.bounding_boxes.append((class_id, x1, y1, x2, y2))
+
+            # Adicionar ao histórico
+            self._add_to_history("add", {"index": len(self.bounding_boxes) - 1})
+
+        # Limpar as sugestões após aplicar
+        suggestions_count = len(self.suggested_boxes)
+        self.suggested_boxes = []
+
+        # Atualizar interface
+        self.redraw_all_boxes()
+        self.update_status(f"{suggestions_count} sugestões aplicadas com sucesso")
+
+        # Desabilitar botão de aplicar
+        if hasattr(self, 'apply_suggestions_button'):
+            self.apply_suggestions_button.config(state=tk.DISABLED)
+
+        return True
+
+    def toggle_suggestion_mode(self):
+        """
+        Alterna o modo de sugestão automática.
+        """
+        if not hasattr(self, 'suggestion_mode'):
+            self.suggestion_mode = False
+
+        self.suggestion_mode = not self.suggestion_mode
+
+        if self.suggestion_mode:
+            # Gerar sugestões para a imagem atual
+            if hasattr(self, 'current_image_path') and self.current_image_path:
+                img_path = self.current_image_path
+            else:
+                # Se não tiver o atributo, usar a variável local do método annotate_image
+                img_path = getattr(self, 'img_path', None)
+
+            if img_path:
+                self.suggested_boxes = self.suggest_annotations(img_path)
+
+                # Mostrar as sugestões na interface
+                self.show_suggestions()
+                self.update_status(f"Modo de sugestão ativado: {len(self.suggested_boxes)} sugestões disponíveis")
+
+                # Habilitar botão de aplicar
+                if hasattr(self, 'apply_suggestions_button'):
+                    self.apply_suggestions_button.config(state=tk.NORMAL)
+
+                # Atualizar botão de sugestão
+                if hasattr(self, 'suggestion_button'):
+                    self.suggestion_button.config(bg="lightblue", text="Desativar Sugestões (G)")
+            else:
+                self.update_status("Não foi possível gerar sugestões: imagem não encontrada")
+                self.suggestion_mode = False
+        else:
+            # Limpar sugestões
+            self.suggested_boxes = []
+            self.redraw_all_boxes()  # Remover visualização das sugestões
+            self.update_status("Modo de sugestão desativado")
+
+            # Desabilitar botão de aplicar
+            if hasattr(self, 'apply_suggestions_button'):
+                self.apply_suggestions_button.config(state=tk.DISABLED)
+
+            # Atualizar botão de sugestão
+            if hasattr(self, 'suggestion_button'):
+                self.suggestion_button.config(bg="#f0f0f0", text="Sugestões Automáticas (G)")
+
+    def show_suggestions(self):
+        """
+        Exibe visualmente as sugestões na interface.
+        """
+        if not hasattr(self, 'suggested_boxes') or not self.suggested_boxes:
+            return
+
+        # Garantir que temos acesso ao canvas
+        if not hasattr(self, 'canvas') or not self.canvas:
+            logger.error("Canvas não disponível para mostrar sugestões")
+            return
+
+        try:
+            # Limpar sugestões anteriores
+            self.canvas.delete("suggestion")
+            self.canvas.delete("suggestion_label")
+
+            # Desenhar cada sugestão
+            for i, (class_id, x1, y1, x2, y2) in enumerate(self.suggested_boxes):
+                # Converter para coordenadas do canvas
+                canvas_x1 = x1 * self.display_scale * self.scale_factor
+                canvas_y1 = y1 * self.display_scale * self.scale_factor
+                canvas_x2 = x2 * self.display_scale * self.scale_factor
+                canvas_y2 = y2 * self.display_scale * self.scale_factor
+
+                # Usar cor distinta para sugestões (laranja)
+                outline_color = "orange"
+
+                # Encontrar nome da classe para exibição
+                class_name = next(
+                    (c for c in self.classes if c.startswith(class_id)),
+                    f"{class_id}-desconhecido",
+                )
+
+                # Desenhar retângulo tracejado para indicar que é uma sugestão
+                self.canvas.create_rectangle(
+                    canvas_x1, canvas_y1, canvas_x2, canvas_y2,
+                    outline=outline_color, width=2, dash=(5, 3),  # Linha tracejada
+                    tags="suggestion"
+                )
+
+                # Desenhar rótulo
+                self.canvas.create_text(
+                    canvas_x1,
+                    canvas_y1 - 5,
+                    text=f"{class_name} (sugestão #{i + 1})",
+                    anchor=tk.SW,
+                    fill=outline_color,
+                    font=("Arial", 10, "bold"),
+                    tags="suggestion_label",
+                )
+        except Exception as e:
+            logger.error(f"Erro ao mostrar sugestões: {str(e)}")
+
+    def _add_suggestion_controls(self, button_frame, button_frame2):
+        """
+        Adiciona controles para sugestão automática.
+
+        Args:
+            button_frame: Frame para botões principais
+            button_frame2: Frame para botões secundários
+        """
+        # Adicionar botão para ativar/desativar sugestões automáticas
+        self.suggestion_button = tk.Button(
+            button_frame,
+            text="Sugestões Automáticas (G)",
+            command=self.toggle_suggestion_mode,
+            bg="#f0f0f0"  # Cor padrão
+        )
+        self.suggestion_button.pack(side=tk.LEFT, padx=5)
+
+        # Adicionar botão para aplicar todas as sugestões
+        self.apply_suggestions_button = tk.Button(
+            button_frame2,
+            text="Aplicar Sugestões (F)",
+            command=self.apply_suggested_annotations,
+            state=tk.DISABLED  # Inicialmente desabilitado
+        )
+        self.apply_suggestions_button.pack(side=tk.LEFT, padx=5)
+
+        # Atalho de teclado
+        self.root.bind("<g>", lambda e: self.toggle_suggestion_mode())
+        self.root.bind("<f>", lambda e: self.apply_suggested_annotations())
 
     def _check_auto_save(self, bounding_boxes, output_dir, base_name) -> bool:
         """
@@ -301,7 +569,12 @@ class ImageAnnotator:
 
             # Redimensionar imagem
             img_resized = cv2.resize(img_display, (new_w, new_h))
-            self.current_img_tk = ImageTk.PhotoImage(Image.fromarray(img_resized))
+
+            # Criar nova instância de PhotoImage e armazenar no dicionário de referências
+            # para evitar coleta de lixo prematura
+            key = f"main_image_{id(img_resized)}"
+            self.image_references[key] = ImageTk.PhotoImage(Image.fromarray(img_resized))
+            self.current_img_tk = self.image_references[key]
 
             # Atualizar imagem no canvas
             canvas.delete("background")
@@ -309,7 +582,6 @@ class ImageAnnotator:
             canvas.config(scrollregion=canvas.bbox(tk.ALL))
         except Exception as e:
             logger.error(f"Erro ao redesenhar imagem com zoom: {e}")
-            # Não definir window_closed aqui, apenas logar o erro
 
     def _count_annotations_by_class(self, output_dir: str) -> Tuple[dict, int]:
         """
@@ -414,7 +686,8 @@ class ImageAnnotator:
             option_buttons.append(radio)
 
         # Selecionar primeiro botão visualmente
-        option_buttons[0].select() if option_buttons else None
+        if option_buttons:
+            option_buttons[0].select()
 
         # Variável para armazenar o resultado
         result = [0]  # Usar lista para poder modificar dentro das funções internas
@@ -423,7 +696,8 @@ class ImageAnnotator:
         def move_selection(delta):
             new_index = (selected_option.get() + delta) % len(options)
             selected_option.set(new_index)
-            option_buttons[new_index].focus_set()
+            if option_buttons and new_index < len(option_buttons):
+                option_buttons[new_index].focus_set()
 
         # Função para confirmar a seleção
         def confirm_selection():
@@ -431,13 +705,14 @@ class ImageAnnotator:
             dialog.destroy()
 
         # Adicionar botão de confirmação
-        tk.Button(
+        confirm_button = tk.Button(
             dialog,
             text="Confirmar",
             command=confirm_selection,
             width=15,
             bg="lightgreen"
-        ).pack(pady=10)
+        )
+        confirm_button.pack(pady=10)
 
         # Configurar eventos de teclado para toda a janela
         dialog.bind("<Up>", lambda e: move_selection(-1))
@@ -446,13 +721,18 @@ class ImageAnnotator:
 
         # Também vincular eventos de teclado para números 1-9
         for i in range(min(9, len(options))):
-            dialog.bind(f"{i+1}", lambda e, idx=i: selected_option.set(idx) or confirm_selection())
+            dialog.bind(f"{i + 1}", lambda e, idx=i: (selected_option.set(idx), confirm_selection()))
 
         # Focar no primeiro botão ao iniciar
         if option_buttons:
             option_buttons[0].focus_set()
 
-        # Aguardar até que o diálogo seja fechado
+        # Evitar que a janela principal seja destruída enquanto o diálogo está aberto
+        # Isso é crítico para prevenir o erro de "image pyimage1 doesn't exist"
+        if hasattr(self, 'root') and self.root:
+            dialog.wm_transient(self.root)
+
+        # Aguardar até que o diálogo seja fechado de forma modal
         dialog.wait_window()
 
         return result[0]
@@ -815,6 +1095,9 @@ class ImageAnnotator:
                             fill=outline_color,
                             tags="handle",
                         )
+
+                if hasattr(self, 'suggestion_mode') and self.suggestion_mode and hasattr(self, 'suggested_boxes'):
+                    self.show_suggestions()
             except Exception as e:
                 logger.error(f"Erro ao redesenhar caixas: {e}")
                 # Não definir window_closed aqui
@@ -1329,6 +1612,9 @@ class ImageAnnotator:
                 if len(self.bounding_boxes) > 0:
                     if messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?"):
                         save()
+
+                # Limpar referências de imagem
+                self._cleanup_image_references()
             except:
                 pass  # Ignorar erros durante o fechamento
 
@@ -1343,7 +1629,7 @@ class ImageAnnotator:
             try:
                 root.destroy()
             except:
-                pass  # Ignorar erros durante a destruição da janela
+                pass
 
         def cycle_classes():
             """Alterna entre as classes disponíveis."""
@@ -1547,20 +1833,25 @@ class ImageAnnotator:
         )
         next_button.pack(side=tk.LEFT, padx=5)
 
-        # Adicionar informações de atalhos
-        shortcuts_frame = tk.Frame(main_frame)
-        shortcuts_frame.pack(fill=tk.X, pady=5)
+        self.suggested_boxes = []
+        self.suggestion_mode = False
+        self.current_image_path = image_path  # Armazenar o caminho da imagem atual
+        self._add_suggestion_controls(button_frame, button_frame2)
 
-        shortcuts_label = tk.Label(
-            shortcuts_frame,
-            text="Atalhos: "
-            + ", ".join([f"{k}={v}" for k, v in KEYBOARD_SHORTCUTS.items()])
-            + "\nNo modo Edição: Arraste as alças para redimensionar caixas, clique e arraste no centro para mover",
-            justify=tk.LEFT,
-            anchor=tk.W,
-            wraplength=780,
+        # 2. Adicione este botão no button_frame2 para acessar a interface de exportação/importação:
+        from microdetect.annotation.export_import import create_export_import_ui
+
+        # Botão para exportar/importar anotações
+        exportimport_button = tk.Button(
+            button_frame2,
+            text="Exportar/Importar",
+            command=lambda: create_export_import_ui(root, os.path.dirname(image_path), output_dir)
         )
-        shortcuts_label.pack(fill=tk.X, padx=5)
+        exportimport_button.pack(side=tk.LEFT, padx=5)
+
+        # 3. Adicione o seguinte atalho de teclado junto com os outros atalhos:
+        # Atalho para exportação/importação
+        root.bind("<i>", lambda e: create_export_import_ui(root, os.path.dirname(image_path), output_dir))
 
         # Vincular atalhos de teclado
         root.bind("<r>", lambda e: reset())
@@ -1716,8 +2007,8 @@ class ImageAnnotator:
                                 if os.path.basename(f) != self.progress_file]
             total_imagens_anotadas = len(annotation_files)
 
-            # Criar janela para o dashboard
-            stats_window = tk.Toplevel()
+            # Criar janela para o dashboard de forma segura
+            stats_window = self._create_secure_dialog()
             stats_window.title("Dashboard de Estatísticas de Anotação")
             stats_window.geometry("800x600")
             stats_window.minsize(600, 400)
@@ -1840,6 +2131,16 @@ class ImageAnnotator:
             logger.error(f"Erro ao exibir estatísticas: {e}")
             messagebox.showerror("Erro", f"Não foi possível exibir as estatísticas: {str(e)}")
 
+        def on_closing():
+            # Remover referência à janela temporária se existir
+            if hasattr(stats_window, '_temp_root') and stats_window._temp_root:
+                try:
+                    stats_window._temp_root.destroy()
+                except:
+                    pass
+            stats_window.destroy()
+
+        stats_window.protocol("WM_DELETE_WINDOW", on_closing)
         return
 
     def search_and_filter_images(self, image_dir: str, output_dir: str) -> List[str]:
@@ -1866,7 +2167,7 @@ class ImageAnnotator:
             return []
 
         # Criar janela de busca
-        search_window = tk.Toplevel()
+        search_window = self._create_secure_dialog()
         search_window.title("Buscar e Filtrar Imagens")
         search_window.geometry("800x600")
         search_window.minsize(600, 400)
@@ -2045,8 +2346,13 @@ class ImageAnnotator:
 
                 pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
 
-                # Converter para PhotoImage para Tkinter
-                preview_photo = ImageTk.PhotoImage(pil_img)
+                # Converter para PhotoImage para Tkinter - MODIFICADO
+                if not hasattr(self, 'image_references'):
+                    self.image_references = {}
+
+                preview_key = f"preview_{os.path.basename(img_path)}"
+                self.image_references[preview_key] = ImageTk.PhotoImage(pil_img)
+                preview_photo = self.image_references[preview_key]
 
                 # Atualizar label
                 preview_image.config(image=preview_photo, text='')
@@ -2123,6 +2429,21 @@ class ImageAnnotator:
         search_window.grab_set()
         search_window.wait_window()
 
+        def on_closing():
+            # Limpar referências de imagem
+            nonlocal preview_photo
+            preview_photo = None
+
+            # Remover referência à janela temporária se existir
+            if hasattr(search_window, '_temp_root') and search_window._temp_root:
+                try:
+                    search_window._temp_root.destroy()
+                except:
+                    pass
+            search_window.destroy()
+
+        search_window.protocol("WM_DELETE_WINDOW", on_closing)
+
         return result_images
 
     def batch_annotate(self, image_dir: str, output_dir: str) -> Tuple[int, int]:
@@ -2171,10 +2492,16 @@ class ImageAnnotator:
                     last_annotated_path = last_annotated
 
                     # Mostrar informações sobre o progresso
-                    logger.info(f"Anotação anterior encontrada. Última imagem anotada: {os.path.basename(last_annotated)}")
+                    logger.info(
+                        f"Anotação anterior encontrada. Última imagem anotada: {os.path.basename(last_annotated)}")
 
                     if last_index < len(image_files) - 1:
-                        # Oferecer opções de onde começar usando widget Tkinter ao invés de texto
+                        # Criar uma referência para o diálogo para garantir que não seja coletada pelo garbage collector
+                        import tkinter as tk
+                        root = tk.Tk()
+                        root.withdraw()  # Esconder a janela raiz
+
+                        # Oferecer opções de onde começar
                         option_selected = self._show_option_dialog(
                             "Opções de Anotação",
                             "Selecione uma opção para continuar:",
@@ -2185,19 +2512,11 @@ class ImageAnnotator:
                             ]
                         )
 
-                        if option_selected == 1:  # Recomeçar do início
-                            start_index = 0
-                            logger.info("Reiniciando anotação do início.")
-                        elif option_selected == 2:  # Revisar a última imagem anotada
-                            start_index = last_index
-                            logger.info(f"Revisando a última imagem anotada: {os.path.basename(last_annotated)}")
-                        else:  # Opção padrão: continuar da próxima (índice 0 ou qualquer outro valor)
-                            start_index = last_index + 1
-                            next_image = os.path.basename(image_files[start_index])
-                            logger.info(f"Continuando anotação a partir de: {next_image}")
-                    else:
-                        logger.info("Todas as imagens já foram anotadas. Reiniciando do início.")
-                        start_index = 0
+                        # Destruir a janela raiz após obter a seleção
+                        try:
+                            root.destroy()
+                        except:
+                            pass
             except Exception as e:
                 logger.warning(f"Erro ao carregar progresso: {str(e)}")
                 logger.info("Iniciando anotação do início.")
