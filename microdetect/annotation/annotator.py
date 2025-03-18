@@ -47,6 +47,8 @@ KEYBOARD_SHORTCUTS = {
     "r": "Reiniciar zoom e pan",
     "0-9": "Alternar visibilidade da classe",
     "s": "Salvar anotações",
+    "S": "Mostrar estatísticas",
+    "b": "Buscar imagens",
     "q": "Sair",
     "e": "Alternar modo de edição",
     "z": "Desfazer última ação",
@@ -1798,6 +1800,39 @@ class ImageAnnotator:
                 logger.debug(f"Erro ao limpar timers: {e}")
                 # Continuar mesmo com erro - garantir que não interrompa o fluxo
 
+        def _show_search_dialog(self, image_dir: str, output_dir: str):
+            """
+            Abre a interface de busca/filtro de imagens e permite navegar para uma imagem selecionada.
+
+            Args:
+                image_dir: Diretório de imagens
+                output_dir: Diretório de anotações
+            """
+            # Armazenar referência à janela atual para depois
+            current_window = self.root if hasattr(self, 'root') else None
+
+            # Obter imagens selecionadas
+            selected_images = self.search_and_filter_images(image_dir, output_dir)
+
+            # Se o usuário selecionou uma imagem, perguntar se deseja navegar para ela
+            if selected_images and len(selected_images) == 1 and current_window:
+                selected_path = selected_images[0]
+                try:
+                    if messagebox.askyesno("Imagem Selecionada",
+                                           f"Deseja navegar para a imagem selecionada?\n{os.path.basename(selected_path)}"):
+                        # Primeiro fechar a janela atual
+                        current_window.destroy()
+
+                        # Pequena pausa para garantir que a janela seja destruída corretamente
+                        import time
+                        time.sleep(0.2)
+
+                        # Depois abrir a nova janela com a imagem selecionada
+                        self.annotate_image(selected_path, output_dir)
+                except tk.TclError as e:
+                    # Em caso de erro de Tkinter (janela pode ter sido fechada), apenas logar
+                    logger.error(f"Erro ao navegar para imagem selecionada: {e}")
+
         # Bindings para zoom e pan
         canvas.bind("<MouseWheel>", zoom)  # Windows
         canvas.bind("<Button-4>", zoom)    # Linux: scroll up
@@ -1854,6 +1889,22 @@ class ImageAnnotator:
         )
         next_button.pack(side=tk.LEFT, padx=5)
 
+        stats_button = tk.Button(
+            button_frame2,
+            text="Estatísticas (S)",
+            command=lambda: self.show_statistics(output_dir)
+        )
+        stats_button.pack(side=tk.LEFT, padx=5)
+
+        # Adicionar botão de busca/filtro
+        search_button = tk.Button(
+            button_frame2,
+            text="Buscar Imagens (B)",
+            command=lambda: _show_search_dialog(os.path.dirname(image_path), output_dir)
+        )
+        search_button.pack(side=tk.LEFT, padx=5)
+
+
         # Adicionar controles de sugestão automática e armazenar o caminho da imagem
         self.suggested_boxes = []
         self.suggestion_mode = False
@@ -1884,6 +1935,8 @@ class ImageAnnotator:
         root.bind("<i>", lambda e: create_export_import_ui(root, os.path.dirname(image_path), output_dir))
         root.bind("<g>", lambda e: self.toggle_suggestion_mode())
         root.bind("<f>", lambda e: self.apply_suggested_annotations())
+        root.bind("<S>", lambda e: self.show_statistics(output_dir))
+        root.bind("<b>", lambda e: _show_search_dialog(os.path.dirname(image_path), output_dir))
 
         # Protocolo para fechar janela
         root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -2190,6 +2243,9 @@ class ImageAnnotator:
         search_window.geometry("800x600")
         search_window.minsize(600, 400)
 
+        # Criar um dicionário local para armazenar referências a imagens desta janela
+        search_image_refs = {}
+
         # Variáveis para armazenar resultados
         filtered_images = all_images.copy()
         result_images = []  # Para retornar
@@ -2326,12 +2382,8 @@ class ImageAnnotator:
         preview_image = tk.Label(preview_frame, text="Selecione uma imagem para visualizar")
         preview_image.pack(fill=tk.X, pady=5)
 
-        # Função para mostrar preview
-        preview_photo = None  # Referência global para a imagem
-
+        # Função para mostrar preview - MODIFICADA para resolver o problema de imagem
         def show_preview(*args):
-            nonlocal preview_photo
-
             # Limpar preview anterior
             preview_image.config(image='', text="Selecione uma imagem para visualizar")
 
@@ -2363,16 +2415,13 @@ class ImageAnnotator:
 
                 pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
 
-                # Converter para PhotoImage para Tkinter - MODIFICADO
-                if not hasattr(self, 'image_references'):
-                    self.image_references = {}
+                # MODIFICAÇÃO CRÍTICA: Usar o dicionário local de imagens
+                # Criar e armazenar a referência à imagem localmente
+                key = f"preview_{os.path.basename(img_path)}"
+                search_image_refs[key] = ImageTk.PhotoImage(pil_img)
 
-                preview_key = f"preview_{os.path.basename(img_path)}"
-                self.image_references[preview_key] = ImageTk.PhotoImage(pil_img)
-                preview_photo = self.image_references[preview_key]
-
-                # Atualizar label
-                preview_image.config(image=preview_photo, text='')
+                # Atualizar label com a imagem
+                preview_image.config(image=search_image_refs[key], text='')
 
                 # Obter informações do status de anotação
                 base_name = os.path.splitext(os.path.basename(img_path))[0]
@@ -2383,8 +2432,7 @@ class ImageAnnotator:
                     # Contar anotações
                     with open(annotation_path, 'r') as f:
                         annotations = f.readlines()
-                    preview_label.config(
-                        text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
+                    preview_label.config(text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
                 else:
                     preview_label.config(text=f"Preview: {os.path.basename(img_path)} - Não anotada")
 
@@ -2448,9 +2496,9 @@ class ImageAnnotator:
 
         # Limpar recursos ao fechar
         def on_closing():
-            # Limpar referências de imagem
-            nonlocal preview_photo
-            preview_photo = None
+            nonlocal search_image_refs
+            # Limpar explicitamente todas as referências de imagem
+            search_image_refs.clear()
 
             # Remover referência à janela temporária se existir
             if hasattr(search_window, '_temp_root') and search_window._temp_root:
@@ -2489,6 +2537,12 @@ class ImageAnnotator:
 
         # Ordenar imagens para consistência
         image_files.sort()
+
+        filtered_images = self.search_and_filter_images(image_dir, output_dir)
+        if filtered_images:  # Se o usuário selecionou imagens específicas
+            # Usar apenas as imagens filtradas/selecionadas pelo usuário
+            image_files = filtered_images
+            logger.info(f"Usando {len(image_files)} imagens selecionadas para anotação")
 
         # Criar backup antes de iniciar a anotação
         self.backup_annotations(output_dir)
@@ -2654,7 +2708,7 @@ class ImageAnnotator:
         print(f"\nTotal de objetos anotados: {total_objetos}")
 
         # Listar próximas imagens a anotar se houver
-        if imagens_restantes > 0 and ultimo_indice >= 0 and ultimo_indice < len(image_files) - 1:
+        if imagens_restantes > 0 and 0 <= ultimo_indice < len(image_files) - 1:
             proximas_imagens = [os.path.basename(image_files[ultimo_indice + 1])]
 
             # Mostrar até 3 imagens próximas se houver mais
@@ -2670,5 +2724,23 @@ class ImageAnnotator:
             print(f"\nRestam {imagens_restantes} imagens para anotar após a atual.")
 
         print("=" * 60)
+
+        if imagens_anotadas > 0:
+            try:
+                # Perguntar ao usuário se deseja ver as estatísticas
+                show_stats = messagebox.askyesno(
+                    "Anotação Concluída",
+                    f"Anotação finalizada!\n\n"
+                    f"Total de imagens: {len(image_files)}\n"
+                    f"Imagens anotadas: {imagens_anotadas}\n\n"
+                    f"Deseja visualizar o dashboard de estatísticas?"
+                )
+
+                if show_stats:
+                    # Mostrar estatísticas em janela gráfica
+                    self.show_statistics(output_dir)
+            except Exception as e:
+                # Em caso de erro com a interface gráfica, apenas logar o erro
+                logger.error(f"Erro ao exibir diálogo de estatísticas: {e}")
 
         return len(image_files), imagens_anotadas
