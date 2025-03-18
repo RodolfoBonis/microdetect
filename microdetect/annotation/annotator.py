@@ -7,12 +7,12 @@ import glob
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import time
 import tkinter as tk
 from datetime import datetime
-from random import random
 from tkinter import messagebox
 from typing import List, Optional, Tuple
 
@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
+from microdetect.annotation.export_import import create_export_import_ui
 from microdetect.utils.config import config
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,24 @@ HANDLE_N = 5   # Norte
 HANDLE_E = 6   # Leste
 HANDLE_S = 7   # Sul
 HANDLE_W = 8   # Oeste
+
+# Atalhos de teclado para anotação
+KEYBOARD_SHORTCUTS = {
+    "a": "Imagem anterior",
+    "d": "Próxima imagem",
+    "p": "Ativar/desativar modo navegação",
+    "r": "Reiniciar zoom e pan",
+    "0-9": "Alternar visibilidade da classe",
+    "s": "Salvar anotações",
+    "q": "Sair",
+    "e": "Alternar modo de edição",
+    "z": "Desfazer última ação",
+    "x": "Salvar e sair",
+    "n": "Salvar e próxima imagem",
+    "i": "Abrir diálogo de exportação/importação",
+    "g": "Ativar/desativar sugestões automáticas",
+    "f": "Aplicar sugestões automáticas"
+}
 
 
 class ImageAnnotator:
@@ -66,7 +85,10 @@ class ImageAnnotator:
         self.auto_save = auto_save
         self.auto_save_interval = auto_save_interval
         self.last_save_time = time.time()
+
+        # Armazenar referências a objetos PhotoImage para evitar coleta de lixo prematura
         self.image_references = {}
+
         # Inicializar variáveis utilizadas nas funções
         self.original_w = 0
         self.original_h = 0
@@ -77,6 +99,7 @@ class ImageAnnotator:
         self.user_cancelled = False
         self.canvas = None
         self.current_img_tk = None
+        self.root = None  # Referência para a janela principal
 
         # Flag para controlar a navegação para a próxima imagem
         self.next_image_requested = False
@@ -209,6 +232,118 @@ class ImageAnnotator:
             self.image_references = new_refs
         except Exception as e:
             logger.error(f"Erro ao limpar referências de imagem: {e}")
+
+    def _show_option_dialog(self, title: str, message: str, options: List[str]) -> int:
+        """
+        Exibe um diálogo com opções que o usuário pode selecionar usando as teclas de seta.
+
+        Args:
+            title: Título da janela de diálogo
+            message: Mensagem a ser exibida
+            options: Lista de opções a serem mostradas
+
+        Returns:
+            Índice da opção selecionada (0 a len(options)-1)
+        """
+        # Criar uma janela de diálogo
+        dialog = tk.Toplevel()
+        dialog.title(title)
+        dialog.geometry("500x300")
+        dialog.resizable(False, False)
+
+        # Tornar a janela modal (bloqueia interação com outras janelas)
+        dialog.transient()
+        dialog.grab_set()
+
+        # Centralizar a janela na tela
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
+        y = (dialog.winfo_screenheight() // 2) - (height // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Adicionar a mensagem
+        tk.Label(dialog, text=message, pady=10, wraplength=450).pack()
+
+        # Criar frame para as opções
+        options_frame = tk.Frame(dialog)
+        options_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Variável para armazenar a seleção atual
+        selected_option = tk.IntVar(value=0)  # Padrão: primeira opção
+
+        # Adicionar radiobuttons para as opções
+        option_buttons = []
+        for i, option in enumerate(options):
+            radio = tk.Radiobutton(
+                options_frame,
+                text=option,
+                variable=selected_option,
+                value=i,
+                font=("Arial", 12),
+                anchor=tk.W,
+                padx=10,
+                pady=5,
+                indicatoron=0,  # Fazer o botão ocupar toda a largura
+                relief=tk.GROOVE,
+                selectcolor="lightblue",
+                width=40
+            )
+            radio.pack(fill=tk.X, pady=2)
+            option_buttons.append(radio)
+
+        # Selecionar primeiro botão visualmente
+        if option_buttons:
+            option_buttons[0].select()
+
+        # Variável para armazenar o resultado
+        result = [0]  # Usar lista para poder modificar dentro das funções internas
+
+        # Função para atualizar a seleção ao navegar com as teclas
+        def move_selection(delta):
+            new_index = (selected_option.get() + delta) % len(options)
+            selected_option.set(new_index)
+            if option_buttons and new_index < len(option_buttons):
+                option_buttons[new_index].focus_set()
+
+        # Função para confirmar a seleção
+        def confirm_selection():
+            result[0] = selected_option.get()
+            dialog.destroy()
+
+        # Adicionar botão de confirmação
+        confirm_button = tk.Button(
+            dialog,
+            text="Confirmar",
+            command=confirm_selection,
+            width=15,
+            bg="lightgreen"
+        )
+        confirm_button.pack(pady=10)
+
+        # Configurar eventos de teclado para toda a janela
+        dialog.bind("<Up>", lambda e: move_selection(-1))
+        dialog.bind("<Down>", lambda e: move_selection(1))
+        dialog.bind("<Return>", lambda e: confirm_selection())
+
+        # Também vincular eventos de teclado para números 1-9
+        for i in range(min(9, len(options))):
+            dialog.bind(f"{i+1}", lambda e, idx=i: (selected_option.set(idx), confirm_selection()))
+
+        # Focar no primeiro botão ao iniciar
+        if option_buttons:
+            option_buttons[0].focus_set()
+
+        # Evitar que a janela principal seja destruída enquanto o diálogo está aberto
+        # Isso é crítico para prevenir o erro de "image pyimage1 doesn't exist"
+        if hasattr(self, 'root') and self.root:
+            dialog.wm_transient(self.root)
+
+        # Aguardar até que o diálogo seja fechado de forma modal
+        dialog.wait_window()
+
+        return result[0]
 
     def suggest_annotations(self, image_path: str, confidence: float = 0.5) -> List[Tuple[str, int, int, int, int]]:
         """
@@ -428,9 +563,8 @@ class ImageAnnotator:
         )
         self.apply_suggestions_button.pack(side=tk.LEFT, padx=5)
 
-        # Atalho de teclado
-        self.root.bind("<g>", lambda e: self.toggle_suggestion_mode())
-        self.root.bind("<f>", lambda e: self.apply_suggested_annotations())
+        # Atalhos são definidos no método annotate_image, pois precisamos do root
+        # que só é disponível nesse contexto
 
     def _check_auto_save(self, bounding_boxes, output_dir, base_name) -> bool:
         """
@@ -625,117 +759,172 @@ class ImageAnnotator:
         """
         return next((c for c in self.classes if c.startswith(class_id)), f"Classe {class_id}")
 
-    def _show_option_dialog(self, title: str, message: str, options: List[str]) -> int:
+    def update_status(self, msg=None):
         """
-        Exibe um diálogo com opções que o usuário pode selecionar usando as teclas de seta.
+        Atualiza o status na interface com proteção contra erros.
 
         Args:
-            title: Título da janela de diálogo
-            message: Mensagem a ser exibida
-            options: Lista de opções a serem mostradas
+            msg: Mensagem a ser exibida (opcional)
+        """
+        # Verificar se a janela ainda é válida e se temos o status_label
+        if not hasattr(self, 'status_label') or not self._is_window_valid(getattr(self, 'status_label', None)):
+            return
+
+        try:
+            if msg:
+                self.status_label.config(text=msg)
+        except Exception as e:
+            logger.error(f"Erro ao atualizar status: {e}")
+
+    def redraw_all_boxes(self, highlight_idx=None):
+        """
+        Redesenha todas as bounding boxes no canvas.
+
+        Args:
+            highlight_idx: Índice da caixa a ser destacada (opcional)
 
         Returns:
-            Índice da opção selecionada (0 a len(options)-1)
+            True se as caixas foram redesenhadas com sucesso, False caso contrário
         """
-        # Criar uma janela de diálogo
-        dialog = tk.Toplevel()
-        dialog.title(title)
-        dialog.geometry("500x300")
-        dialog.resizable(False, False)
+        # Verificar se a janela ainda é válida
+        if not self._is_window_valid(self.canvas):
+            return False
 
-        # Tornar a janela modal (bloqueia interação com outras janelas)
-        dialog.transient()
-        dialog.grab_set()
+        try:
+            # Limpar o canvas
+            self.canvas.delete("all")
 
-        # Centralizar a janela na tela
-        dialog.update_idletasks()
-        width = dialog.winfo_width()
-        height = dialog.winfo_height()
-        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-        y = (dialog.winfo_screenheight() // 2) - (height // 2)
-        dialog.geometry(f"{width}x{height}+{x}+{y}")
+            # Redesenhar a imagem de fundo
+            self.canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
 
-        # Adicionar a mensagem
-        tk.Label(dialog, text=message, pady=10, wraplength=450).pack()
+            # Redesenhar todas as boxes
+            for i, (class_id, x1, y1, x2, y2) in enumerate(self.bounding_boxes):
+                # Converter para coordenadas do canvas
+                canvas_x1 = x1 * self.display_scale * self.scale_factor
+                canvas_y1 = y1 * self.display_scale * self.scale_factor
+                canvas_x2 = x2 * self.display_scale * self.scale_factor
+                canvas_y2 = y2 * self.display_scale * self.scale_factor
 
-        # Criar frame para as opções
-        options_frame = tk.Frame(dialog)
-        options_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+                # Determinar cor (destacar se selecionado)
+                outline_color = "red" if i == highlight_idx else "green"
+                outline_width = 3 if i == highlight_idx else 2
 
-        # Variável para armazenar a seleção atual
-        selected_option = tk.IntVar(value=0)  # Padrão: primeira opção
+                # Encontrar nome da classe para exibição
+                class_name = next(
+                    (c for c in self.classes if c.startswith(class_id)),
+                    f"{class_id}-desconhecido",
+                )
 
-        # Adicionar radiobuttons para as opções
-        option_buttons = []
-        for i, option in enumerate(options):
-            radio = tk.Radiobutton(
-                options_frame,
-                text=option,
-                variable=selected_option,
-                value=i,
-                font=("Arial", 12),
-                anchor=tk.W,
-                padx=10,
-                pady=5,
-                indicatoron=0,  # Fazer o botão ocupar toda a largura
-                relief=tk.GROOVE,
-                selectcolor="lightblue",
-                width=40
-            )
-            radio.pack(fill=tk.X, pady=2)
-            option_buttons.append(radio)
+                # Desenhar retângulo
+                self.canvas.create_rectangle(
+                    canvas_x1, canvas_y1, canvas_x2, canvas_y2,
+                    outline=outline_color, width=outline_width, tags="box"
+                )
 
-        # Selecionar primeiro botão visualmente
-        if option_buttons:
-            option_buttons[0].select()
+                # Desenhar rótulo
+                self.canvas.create_text(
+                    canvas_x1,
+                    canvas_y1 - 5,
+                    text=f"{class_name} #{i + 1}",
+                    anchor=tk.SW,
+                    fill=outline_color,
+                    font=("Arial", 10, "bold"),
+                    tags="label",
+                )
 
-        # Variável para armazenar o resultado
-        result = [0]  # Usar lista para poder modificar dentro das funções internas
+                # Se esta caixa estiver selecionada, adicionar alças de redimensionamento
+                if i == highlight_idx:
+                    # Calcular pontos médios
+                    mid_x = (canvas_x1 + canvas_x2) / 2
+                    mid_y = (canvas_y1 + canvas_y2) / 2
 
-        # Função para atualizar a seleção ao navegar com as teclas
-        def move_selection(delta):
-            new_index = (selected_option.get() + delta) % len(options)
-            selected_option.set(new_index)
-            if option_buttons and new_index < len(option_buttons):
-                option_buttons[new_index].focus_set()
+                    # Tamanho das alças
+                    handle_size = self.handle_size
 
-        # Função para confirmar a seleção
-        def confirm_selection():
-            result[0] = selected_option.get()
-            dialog.destroy()
+                    # Desenhar alças nos cantos
+                    # NO (Noroeste)
+                    self.canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # NE (Nordeste)
+                    self.canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # SE (Sudeste)
+                    self.canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # SO (Sudoeste)
+                    self.canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
 
-        # Adicionar botão de confirmação
-        confirm_button = tk.Button(
-            dialog,
-            text="Confirmar",
-            command=confirm_selection,
-            width=15,
-            bg="lightgreen"
-        )
-        confirm_button.pack(pady=10)
+                    # Desenhar alças nos lados
+                    # Norte
+                    self.canvas.create_rectangle(
+                        mid_x - handle_size,
+                        canvas_y1 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Leste
+                    self.canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x2 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Sul
+                    self.canvas.create_rectangle(
+                        mid_x - handle_size,
+                        canvas_y2 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Oeste
+                    self.canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x1 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
 
-        # Configurar eventos de teclado para toda a janela
-        dialog.bind("<Up>", lambda e: move_selection(-1))
-        dialog.bind("<Down>", lambda e: move_selection(1))
-        dialog.bind("<Return>", lambda e: confirm_selection())
+            # Reexibir sugestões se o modo de sugestão estiver ativo
+            if hasattr(self, 'suggestion_mode') and self.suggestion_mode and hasattr(self, 'suggested_boxes'):
+                self.show_suggestions()
 
-        # Também vincular eventos de teclado para números 1-9
-        for i in range(min(9, len(options))):
-            dialog.bind(f"{i + 1}", lambda e, idx=i: (selected_option.set(idx), confirm_selection()))
-
-        # Focar no primeiro botão ao iniciar
-        if option_buttons:
-            option_buttons[0].focus_set()
-
-        # Evitar que a janela principal seja destruída enquanto o diálogo está aberto
-        # Isso é crítico para prevenir o erro de "image pyimage1 doesn't exist"
-        if hasattr(self, 'root') and self.root:
-            dialog.wm_transient(self.root)
-
-        # Aguardar até que o diálogo seja fechado de forma modal
-        dialog.wait_window()
-
-        return result[0]
+            return True
+        except Exception as e:
+            logger.error(f"Erro ao redesenhar caixas: {e}")
+            return False
 
     def annotate_image(self, image_path: str, output_dir: str) -> Optional[str]:
         """
@@ -828,6 +1017,7 @@ class ImageAnnotator:
 
         # Criar janela Tkinter
         root = tk.Tk()
+        self.root = root  # Armazenar a referência ao root como atributo da classe
         root.title(f"Anotação: {os.path.basename(image_path)}")
 
         # Criar frame principal
@@ -849,11 +1039,11 @@ class ImageAnnotator:
         class_menu.pack(side=tk.LEFT, padx=5)
 
         # Status label
-        status_label = tk.Label(
+        self.status_label = tk.Label(
             main_frame,
             text=f"Contagem: {len(self.bounding_boxes)} | Desenhe clicando e arrastando",
         )
-        status_label.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
         # Informações da imagem
         info_label = tk.Label(
@@ -895,6 +1085,7 @@ class ImageAnnotator:
         # Armazenar referências
         self.canvas = canvas
         self.current_img_tk = img_tk
+        self.image_references["main"] = img_tk  # Armazenar para evitar garbage collection
 
         # Resultado da anotação
         annotation_path = None
@@ -915,192 +1106,7 @@ class ImageAnnotator:
         def set_current_class(event=None):
             nonlocal current_class
             current_class = class_var.get()
-            update_status()
-
-        def update_status(msg=None):
-            """Atualiza o status na interface com proteção contra erros."""
-            # Verificar se a janela ainda é válida
-            if not self._is_window_valid(status_label):
-                return
-
-            try:
-                status_text = msg if msg else f"Classe: {current_class} | Contagem: {len(self.bounding_boxes)}"
-                if edit_mode:
-                    status_text += " | MODO EDIÇÃO: Selecione uma caixa para mover/redimensionar"
-                elif self.pan_mode:
-                    status_text += " | MODO NAVEGAÇÃO: Arraste para movimentar a imagem"
-                else:
-                    status_text += " | Desenhe clicando e arrastando"
-
-                status_label.config(text=status_text)
-
-                # Atualizar também os botões de modo
-                if edit_mode:
-                    edit_button.config(text="Modo Desenho (E)", bg="lightblue")
-                else:
-                    edit_button.config(text="Modo Edição (E)", bg="#f0f0f0")  # Substituir "SystemButtonFace"
-
-                if self.pan_mode:
-                    pan_button.config(text="Modo Desenho (P)", bg="lightblue")
-                else:
-                    pan_button.config(text="Modo Navegação (P)", bg="#f0f0f0")
-            except Exception as e:
-                logger.error(f"Erro ao atualizar status: {e}")
-                # Não definir window_closed aqui
-
-        def cleanup_timers():
-            """Cancela todos os timers pendentes da interface."""
-            try:
-                for timer_id in active_timer_ids[:]:
-                    try:
-                        if root.winfo_exists():
-                            root.after_cancel(timer_id)
-                        active_timer_ids.remove(timer_id)
-                    except Exception as e:
-                        logger.debug(f"Erro ao cancelar timer: {e}")
-                        # Continuar mesmo com erro
-            except Exception as e:
-                logger.debug(f"Erro ao limpar timers: {e}")
-                # Continuar mesmo com erro - garantir que não interrompa o fluxo
-
-        def redraw_all_boxes(highlight_idx=None):
-            """Redesenha todas as bounding boxes no canvas"""
-            # Verificar se a janela ainda é válida
-            if not self._is_window_valid(canvas):
-                return
-
-            try:
-                # Limpar o canvas
-                canvas.delete("all")
-
-                # Redesenhar a imagem de fundo
-                canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
-
-                # Redesenhar todas as boxes
-                for i, (class_id, x1, y1, x2, y2) in enumerate(self.bounding_boxes):
-                    # Converter para coordenadas do canvas
-                    canvas_x1 = x1 * self.display_scale * self.scale_factor
-                    canvas_y1 = y1 * self.display_scale * self.scale_factor
-                    canvas_x2 = x2 * self.display_scale * self.scale_factor
-                    canvas_y2 = y2 * self.display_scale * self.scale_factor
-
-                    # Determinar cor (destacar se selecionado)
-                    outline_color = "red" if i == highlight_idx else "green"
-                    outline_width = 3 if i == highlight_idx else 2
-
-                    # Encontrar nome da classe para exibição
-                    class_name = next(
-                        (c for c in self.classes if c.startswith(class_id)),
-                        f"{class_id}-desconhecido",
-                    )
-
-                    # Desenhar retângulo
-                    canvas.create_rectangle(
-                        canvas_x1, canvas_y1, canvas_x2, canvas_y2,
-                        outline=outline_color, width=outline_width, tags="box"
-                    )
-
-                    # Desenhar rótulo
-                    canvas.create_text(
-                        canvas_x1,
-                        canvas_y1 - 5,
-                        text=f"{class_name} #{i + 1}",
-                        anchor=tk.SW,
-                        fill=outline_color,
-                        font=("Arial", 10, "bold"),
-                        tags="label",
-                    )
-
-                    # Se esta caixa estiver selecionada, adicionar alças de redimensionamento
-                    if i == highlight_idx:
-                        # Calcular pontos médios
-                        mid_x = (canvas_x1 + canvas_x2) / 2
-                        mid_y = (canvas_y1 + canvas_y2) / 2
-
-                        # Tamanho das alças
-                        handle_size = self.handle_size
-
-                        # Desenhar alças nos cantos
-                        # NO (Noroeste)
-                        canvas.create_rectangle(
-                            canvas_x1 - handle_size,
-                            canvas_y1 - handle_size,
-                            canvas_x1 + handle_size,
-                            canvas_y1 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # NE (Nordeste)
-                        canvas.create_rectangle(
-                            canvas_x2 - handle_size,
-                            canvas_y1 - handle_size,
-                            canvas_x2 + handle_size,
-                            canvas_y1 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # SE (Sudeste)
-                        canvas.create_rectangle(
-                            canvas_x2 - handle_size,
-                            canvas_y2 - handle_size,
-                            canvas_x2 + handle_size,
-                            canvas_y2 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # SO (Sudoeste)
-                        canvas.create_rectangle(
-                            canvas_x1 - handle_size,
-                            canvas_y2 - handle_size,
-                            canvas_x1 + handle_size,
-                            canvas_y2 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-
-                        # Desenhar alças nos lados
-                        # Norte
-                        canvas.create_rectangle(
-                            mid_x - handle_size,
-                            canvas_y1 - handle_size,
-                            mid_x + handle_size,
-                            canvas_y1 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # Leste
-                        canvas.create_rectangle(
-                            canvas_x2 - handle_size,
-                            mid_y - handle_size,
-                            canvas_x2 + handle_size,
-                            mid_y + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # Sul
-                        canvas.create_rectangle(
-                            mid_x - handle_size,
-                            canvas_y2 - handle_size,
-                            mid_x + handle_size,
-                            canvas_y2 + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-                        # Oeste
-                        canvas.create_rectangle(
-                            canvas_x1 - handle_size,
-                            mid_y - handle_size,
-                            canvas_x1 + handle_size,
-                            mid_y + handle_size,
-                            fill=outline_color,
-                            tags="handle",
-                        )
-
-                if hasattr(self, 'suggestion_mode') and self.suggestion_mode and hasattr(self, 'suggested_boxes'):
-                    self.show_suggestions()
-            except Exception as e:
-                logger.error(f"Erro ao redesenhar caixas: {e}")
-                # Não definir window_closed aqui
+            self.update_status()
 
         def on_mouse_down(event):
             """Função chamada quando o botão do mouse é pressionado."""
@@ -1139,7 +1145,7 @@ class ImageAnnotator:
 
                             if selected_box_idx < len(self.bounding_boxes):
                                 self.original_box_state = tuple(self.bounding_boxes[selected_box_idx])
-                                update_status(f"Redimensionando caixa {selected_box_idx + 1}")
+                                self.update_status(f"Redimensionando caixa {selected_box_idx + 1}")
                             return
 
                     # Procurar se clicou em uma caixa para selecionar
@@ -1156,15 +1162,15 @@ class ImageAnnotator:
                             selected_box_idx = i
                             start_x, start_y = canvas_x, canvas_y
                             self.original_box_state = tuple(self.bounding_boxes[selected_box_idx])
-                            update_status(f"Caixa {i + 1} selecionada para edição")
-                            redraw_all_boxes(highlight_idx=selected_box_idx)
+                            self.update_status(f"Caixa {i + 1} selecionada para edição")
+                            self.redraw_all_boxes(highlight_idx=selected_box_idx)
                             found_box = True
                             break
 
                     # Se não selecionou nenhuma caixa, desselecionar
                     if not found_box:
                         selected_box_idx = None
-                        redraw_all_boxes()
+                        self.redraw_all_boxes()
                         # Importante: ainda salvar as coordenadas iniciais mesmo no modo de edição
                         start_x, start_y = canvas_x, canvas_y
                 else:
@@ -1257,7 +1263,7 @@ class ImageAnnotator:
                     start_x, start_y = canvas_x, canvas_y
 
                     # Redesenhar
-                    redraw_all_boxes(highlight_idx=selected_box_idx)
+                    self.redraw_all_boxes(highlight_idx=selected_box_idx)
                 else:
                     # Desenhar retângulo temporário
                     if current_rect:
@@ -1305,7 +1311,7 @@ class ImageAnnotator:
                                 "resize",
                                 {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
                             )
-                        update_status(f"Caixa {selected_box_idx + 1} redimensionada")
+                        self.update_status(f"Caixa {selected_box_idx + 1} redimensionada")
                         self.resize_handle = HANDLE_NONE
                     else:
                         # Foi movimento simples
@@ -1315,7 +1321,7 @@ class ImageAnnotator:
                                 "move",
                                 {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
                             )
-                        update_status(f"Caixa {selected_box_idx + 1} reposicionada")
+                        self.update_status(f"Caixa {selected_box_idx + 1} reposicionada")
 
                     # Reset estado para novas ações
                     self.original_box_state = None
@@ -1344,12 +1350,12 @@ class ImageAnnotator:
                     self._add_to_history("add", {"index": len(self.bounding_boxes) - 1})
 
                     # Atualizar status
-                    update_status(f"Box adicionada: {current_class_str}")
+                    self.update_status(f"Box adicionada: {current_class_str}")
 
                     # Auto-save se necessário
                     if self.auto_save:
                         if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
-                            update_status("Auto-save realizado")
+                            self.update_status("Auto-save realizado")
 
                 # Limpar o retângulo temporário
                 if current_rect:
@@ -1357,7 +1363,7 @@ class ImageAnnotator:
                     current_rect = None
 
                 # Redesenhar todas as caixas
-                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+                self.redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
                 # CRUCIAL: Redefinir os pontos iniciais para permitir novas boxes
                 start_x = None
@@ -1400,8 +1406,8 @@ class ImageAnnotator:
                     bg="lightblue" if edit_mode else "#f0f0f0"
                 )
 
-                update_status()
-                redraw_all_boxes()
+                self.update_status()
+                self.redraw_all_boxes()
             except Exception as e:
                 logger.error(f"Erro ao alternar modo de edição: {e}")
                 # Não definir window_closed aqui
@@ -1429,7 +1435,7 @@ class ImageAnnotator:
                     bg="lightblue" if self.pan_mode else "#f0f0f0"
                 )
 
-                update_status()
+                self.update_status()
             except Exception as e:
                 logger.error(f"Erro ao alternar modo de navegação: {e}")
                 # Não definir window_closed aqui
@@ -1443,7 +1449,7 @@ class ImageAnnotator:
                 return
 
             if not self.action_history:
-                update_status("Nada para desfazer.")
+                self.update_status("Nada para desfazer.")
                 return
 
             try:
@@ -1454,16 +1460,16 @@ class ImageAnnotator:
                 if action_type == "add":
                     if data.get("index") < len(self.bounding_boxes):
                         self.bounding_boxes.pop(data.get("index"))
-                        update_status("Desfez: Adição de caixa")
+                        self.update_status("Desfez: Adição de caixa")
                 elif action_type == "move" or action_type == "resize":
                     if data.get("index") < len(self.bounding_boxes):
                         self.bounding_boxes[data.get("index")] = data.get("before")
-                        update_status(f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa")
+                        self.update_status(f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa")
                 elif action_type == "delete":
                     self.bounding_boxes.insert(data.get("index"), data.get("box"))
-                    update_status("Desfez: Exclusão de caixa")
+                    self.update_status("Desfez: Exclusão de caixa")
 
-                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+                self.redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1488,7 +1494,7 @@ class ImageAnnotator:
 
                     # Remover caixa
                     self.bounding_boxes.pop(selected_box_idx)
-                    update_status(f"Caixa {selected_box_idx + 1} excluída")
+                    self.update_status(f"Caixa {selected_box_idx + 1} excluída")
 
                     # Resetar seleção
                     selected_box_idx = None
@@ -1500,13 +1506,13 @@ class ImageAnnotator:
 
                     # Remover caixa
                     self.bounding_boxes.pop()
-                    update_status(f"Última caixa excluída. Restantes: {len(self.bounding_boxes)}")
+                    self.update_status(f"Última caixa excluída. Restantes: {len(self.bounding_boxes)}")
                 else:
-                    update_status("Nenhuma caixa para excluir")
+                    self.update_status("Nenhuma caixa para excluir")
                     return
 
                 # Redesenhar
-                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+                self.redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1520,7 +1526,7 @@ class ImageAnnotator:
                 return
 
             if not self.bounding_boxes:
-                update_status("Nenhuma caixa para limpar.")
+                self.update_status("Nenhuma caixa para limpar.")
                 return
 
             try:
@@ -1538,8 +1544,8 @@ class ImageAnnotator:
                 # Atualizar interface
                 nonlocal selected_box_idx
                 selected_box_idx = None
-                redraw_all_boxes()
-                update_status("Todas as caixas foram removidas.")
+                self.redraw_all_boxes()
+                self.update_status("Todas as caixas foram removidas.")
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1556,7 +1562,7 @@ class ImageAnnotator:
 
             try:
                 annotation_path = self._save_annotations(self.bounding_boxes, output_dir, base_name)
-                update_status(f"Anotações salvas em {annotation_path}")
+                self.update_status(f"Anotações salvas em {annotation_path}")
                 self.last_save_time = time.time()  # Atualizar timestamp de último salvamento
 
                 # CRUCIAL: Garantir que window_closed está como False
@@ -1656,8 +1662,8 @@ class ImageAnnotator:
 
             try:
                 selected_box_idx = None
-                redraw_all_boxes()
-                update_status()
+                self.redraw_all_boxes()
+                self.update_status()
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1686,7 +1692,7 @@ class ImageAnnotator:
                     # Redimensionar a imagem
                     self._redraw_with_zoom(img_display, canvas)
                     # Redesenhar as caixas com o novo zoom
-                    redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+                    self.redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1730,8 +1736,8 @@ class ImageAnnotator:
             try:
                 self.scale_factor = 1.0
                 self._redraw_with_zoom(img_display, canvas)
-                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
-                update_status("Zoom reiniciado")
+                self.redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+                self.update_status("Zoom reiniciado")
 
                 # CRUCIAL: Garantir que window_closed está como False
                 reset_window_closed()
@@ -1761,7 +1767,7 @@ class ImageAnnotator:
 
             try:
                 if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
-                    update_status("Auto-save realizado")
+                    self.update_status("Auto-save realizado")
 
                 if root.winfo_exists():
                     timer_id = root.after(10000, check_auto_save)
@@ -1776,6 +1782,21 @@ class ImageAnnotator:
                         active_timer_ids.append(timer_id)
                 except:
                     pass
+
+        def cleanup_timers():
+            """Cancela todos os timers pendentes da interface."""
+            try:
+                for timer_id in active_timer_ids[:]:
+                    try:
+                        if root.winfo_exists():
+                            root.after_cancel(timer_id)
+                        active_timer_ids.remove(timer_id)
+                    except Exception as e:
+                        logger.debug(f"Erro ao cancelar timer: {e}")
+                        # Continuar mesmo com erro
+            except Exception as e:
+                logger.debug(f"Erro ao limpar timers: {e}")
+                # Continuar mesmo com erro - garantir que não interrompa o fluxo
 
         # Bindings para zoom e pan
         canvas.bind("<MouseWheel>", zoom)  # Windows
@@ -1833,25 +1854,19 @@ class ImageAnnotator:
         )
         next_button.pack(side=tk.LEFT, padx=5)
 
+        # Adicionar controles de sugestão automática e armazenar o caminho da imagem
         self.suggested_boxes = []
         self.suggestion_mode = False
-        self.current_image_path = image_path  # Armazenar o caminho da imagem atual
+        self.current_image_path = image_path
         self._add_suggestion_controls(button_frame, button_frame2)
-
-        # 2. Adicione este botão no button_frame2 para acessar a interface de exportação/importação:
-        from microdetect.annotation.export_import import create_export_import_ui
 
         # Botão para exportar/importar anotações
         exportimport_button = tk.Button(
             button_frame2,
-            text="Exportar/Importar",
+            text="Exportar/Importar (I)",
             command=lambda: create_export_import_ui(root, os.path.dirname(image_path), output_dir)
         )
         exportimport_button.pack(side=tk.LEFT, padx=5)
-
-        # 3. Adicione o seguinte atalho de teclado junto com os outros atalhos:
-        # Atalho para exportação/importação
-        root.bind("<i>", lambda e: create_export_import_ui(root, os.path.dirname(image_path), output_dir))
 
         # Vincular atalhos de teclado
         root.bind("<r>", lambda e: reset())
@@ -1862,10 +1877,13 @@ class ImageAnnotator:
         root.bind("<p>", lambda e: toggle_pan_mode())
         root.bind("<c>", lambda e: cycle_classes())
         root.bind("<x>", lambda e: save_and_exit())
-        root.bind("<n>", lambda e: save_and_next())  # Novo atalho
+        root.bind("<n>", lambda e: save_and_next())
         root.bind("<Delete>", lambda e: delete_selected())
         root.bind("<Escape>", lambda e: select_none())
         root.bind("<w>", lambda e: reset_zoom())
+        root.bind("<i>", lambda e: create_export_import_ui(root, os.path.dirname(image_path), output_dir))
+        root.bind("<g>", lambda e: self.toggle_suggestion_mode())
+        root.bind("<f>", lambda e: self.apply_suggested_annotations())
 
         # Protocolo para fechar janela
         root.protocol("WM_DELETE_WINDOW", on_closing)
@@ -1879,7 +1897,7 @@ class ImageAnnotator:
         root.geometry("{}x{}+{}+{}".format(width, height, x, y))
 
         # Desenhar as bounding boxes existentes
-        redraw_all_boxes()
+        self.redraw_all_boxes()
 
         # Iniciar o monitoramento do estado da janela e auto-save
         # Armazenar IDs dos timers para poder cancelá-los depois
@@ -2125,23 +2143,23 @@ class ImageAnnotator:
             # Tornar modal
             stats_window.transient()
             stats_window.grab_set()
+
+            # Limpar recursos ao fechar
+            def on_closing():
+                # Remover referência à janela temporária se existir
+                if hasattr(stats_window, '_temp_root') and stats_window._temp_root:
+                    try:
+                        stats_window._temp_root.destroy()
+                    except:
+                        pass
+                stats_window.destroy()
+
+            stats_window.protocol("WM_DELETE_WINDOW", on_closing)
             stats_window.wait_window()
 
         except Exception as e:
             logger.error(f"Erro ao exibir estatísticas: {e}")
             messagebox.showerror("Erro", f"Não foi possível exibir as estatísticas: {str(e)}")
-
-        def on_closing():
-            # Remover referência à janela temporária se existir
-            if hasattr(stats_window, '_temp_root') and stats_window._temp_root:
-                try:
-                    stats_window._temp_root.destroy()
-                except:
-                    pass
-            stats_window.destroy()
-
-        stats_window.protocol("WM_DELETE_WINDOW", on_closing)
-        return
 
     def search_and_filter_images(self, image_dir: str, output_dir: str) -> List[str]:
         """
@@ -2166,7 +2184,7 @@ class ImageAnnotator:
             messagebox.showinfo("Informação", "Nenhuma imagem encontrada no diretório.")
             return []
 
-        # Criar janela de busca
+        # Criar janela de busca de forma segura
         search_window = self._create_secure_dialog()
         search_window.title("Buscar e Filtrar Imagens")
         search_window.geometry("800x600")
@@ -2174,7 +2192,6 @@ class ImageAnnotator:
 
         # Variáveis para armazenar resultados
         filtered_images = all_images.copy()
-        selected_images = []
         result_images = []  # Para retornar
 
         # Frame principal
@@ -2366,7 +2383,8 @@ class ImageAnnotator:
                     # Contar anotações
                     with open(annotation_path, 'r') as f:
                         annotations = f.readlines()
-                    preview_label.config(text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
+                    preview_label.config(
+                        text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
                 else:
                     preview_label.config(text=f"Preview: {os.path.basename(img_path)} - Não anotada")
 
@@ -2427,8 +2445,8 @@ class ImageAnnotator:
         # Tornar modal
         search_window.transient()
         search_window.grab_set()
-        search_window.wait_window()
 
+        # Limpar recursos ao fechar
         def on_closing():
             # Limpar referências de imagem
             nonlocal preview_photo
@@ -2443,6 +2461,7 @@ class ImageAnnotator:
             search_window.destroy()
 
         search_window.protocol("WM_DELETE_WINDOW", on_closing)
+        search_window.wait_window()
 
         return result_images
 
@@ -2480,6 +2499,7 @@ class ImageAnnotator:
         total_annotated = 0
         imagens_existentes = 0
         last_annotated_path = None
+        option_selected = 0  # Padrão: continuar de onde parou
 
         if os.path.exists(progress_path):
             try:
@@ -2517,6 +2537,14 @@ class ImageAnnotator:
                             root.destroy()
                         except:
                             pass
+
+                    # Configurar índice inicial com base na escolha do usuário
+                    if option_selected == 0:  # Continuar de onde parou
+                        start_index = last_index + 1
+                    elif option_selected == 1:  # Recomeçar do início
+                        start_index = 0
+                    else:  # Revisar a última imagem anotada
+                        start_index = last_index
             except Exception as e:
                 logger.warning(f"Erro ao carregar progresso: {str(e)}")
                 logger.info("Iniciando anotação do início.")
@@ -2637,7 +2665,7 @@ class ImageAnnotator:
 
             print(f"\nPróxima(s) imagem(ns) para anotar:")
             for i, img in enumerate(proximas_imagens):
-                print(f"  {i+1}. {img}")
+                print(f"  {i + 1}. {img}")
 
             print(f"\nRestam {imagens_restantes} imagens para anotar após a atual.")
 
