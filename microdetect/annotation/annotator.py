@@ -1,14 +1,18 @@
 """
 Módulo para anotação manual de imagens.
+Implementação com todas as funcionalidades avançadas preservando o núcleo funcional.
 """
 
 import glob
+import json
 import logging
 import os
+import re
+import shutil
 import time
 import tkinter as tk
 from datetime import datetime
-from tkinter import messagebox  # Importação explícita do messagebox
+from tkinter import messagebox
 from typing import Dict, List, Optional, Tuple
 
 import cv2
@@ -38,16 +42,16 @@ KEYBOARD_SHORTCUTS = {
 DEFAULT_AUTO_SAVE = True
 DEFAULT_AUTO_SAVE_INTERVAL = 300  # 5 minutos
 
-# Constantes para identificar alças de redimensionamento
+# Constantes para alças de redimensionamento
 HANDLE_NONE = 0
-HANDLE_NW = 1  # Noroeste (canto superior esquerdo)
-HANDLE_NE = 2  # Nordeste (canto superior direito)
-HANDLE_SE = 3  # Sudeste (canto inferior direito)
-HANDLE_SW = 4  # Sudoeste (canto inferior esquerdo)
-HANDLE_N = 5  # Norte (meio superior)
-HANDLE_E = 6  # Leste (meio direito)
-HANDLE_S = 7  # Sul (meio inferior)
-HANDLE_W = 8  # Oeste (meio esquerdo)
+HANDLE_NW = 1  # Noroeste
+HANDLE_NE = 2  # Nordeste
+HANDLE_SE = 3  # Sudeste
+HANDLE_SW = 4  # Sudoeste
+HANDLE_N = 5   # Norte
+HANDLE_E = 6   # Leste
+HANDLE_S = 7   # Sul
+HANDLE_W = 8   # Oeste
 
 
 class ImageAnnotator:
@@ -82,21 +86,24 @@ class ImageAnnotator:
         self.display_h = 0
         self.display_scale = 1.0
         self.scale_factor = 1.0
+        self.user_cancelled = False
         self.canvas = None
         self.current_img_tk = None
 
-        # Atributos para controle de estado
-        self.window_closed = False
+        # Lista para armazenar bounding boxes
         self.bounding_boxes = []
-        self.pan_mode = False
-        self.user_cancelled = False  # Flag para indicar se o usuário cancelou explicitamente o processo
 
-        # Novos atributos para histórico e redimensionamento
-        self.action_history = []  # Lista para armazenar o histórico de ações
-        self.max_history = 50  # Limitar o tamanho do histórico
-        self.resize_handle = HANDLE_NONE  # Para controlar qual alça de redimensionamento está ativa
-        self.handle_size = 6  # Tamanho das alças de redimensionamento
-        self.original_box_state = None  # Para armazenar estado original de uma caixa antes de mover/redimensionar
+        # Histórico para desfazer ações
+        self.action_history = []
+
+        # Estado para redimensionamento
+        self.resize_handle = HANDLE_NONE
+        self.handle_size = 6
+        self.original_box_state = None
+
+        # Controle de modos
+        self.pan_mode = False
+        self.window_closed = False
 
     def _load_image(self, image_path: str) -> Optional[Tuple[np.ndarray, int, int]]:
         """
@@ -179,11 +186,10 @@ class ImageAnnotator:
             action_type: Tipo da ação ('add', 'move', 'resize', 'delete')
             data: Dados específicos da ação
         """
-        # Limitar o tamanho do histórico
-        if len(self.action_history) >= self.max_history:
-            self.action_history.pop(0)
-
         self.action_history.append({"type": action_type, "data": data})
+        # Limitar tamanho do histórico
+        if len(self.action_history) > 50:
+            self.action_history.pop(0)
 
     def _detect_resize_handle(self, canvas_x, canvas_y, box_idx):
         """
@@ -238,196 +244,36 @@ class ImageAnnotator:
 
         return HANDLE_NONE
 
-    def _redraw_all_boxes(self, highlight_idx=None):
-        """
-        Redesenha todas as caixas delimitadoras no canvas com
-        opcional destaque para a caixa selecionada.
-
-        Args:
-            highlight_idx: Índice da caixa a ser destacada (opcional)
-        """
-        if self.window_closed:
-            return
-
-        try:
-            # Remover todos os retângulos, rótulos e alças existentes
-            self.canvas.delete("box")
-            self.canvas.delete("label")
-            self.canvas.delete("handle")
-
-            # Se não houver bounding_boxes, estamos provavelmente em outro contexto
-            if not self.bounding_boxes:
-                return
-
-            # Redesenhar as caixas
-            for i, (class_id, x1, y1, x2, y2) in enumerate(self.bounding_boxes):
-                # Converter coordenadas absolutas da imagem para coordenadas do canvas
-                canvas_x1 = x1 * self.display_scale * self.scale_factor
-                canvas_y1 = y1 * self.display_scale * self.scale_factor
-                canvas_x2 = x2 * self.display_scale * self.scale_factor
-                canvas_y2 = y2 * self.display_scale * self.scale_factor
-
-                # Determinar cor (destacar se selecionado)
-                outline_color = "red" if i == highlight_idx else "green"
-                outline_width = 3 if i == highlight_idx else 2
-
-                # Encontrar nome da classe para exibição
-                class_name = next(
-                    (c for c in self.classes if c.startswith(class_id)),
-                    f"{class_id}-desconhecido",
-                )
-
-                # Desenhar retângulo
-                self.canvas.create_rectangle(
-                    canvas_x1, canvas_y1, canvas_x2, canvas_y2, outline=outline_color, width=outline_width, tags="box"
-                )
-
-                # Desenhar rótulo
-                self.canvas.create_text(
-                    canvas_x1,
-                    canvas_y1 - 5,
-                    text=f"{class_name} #{i + 1}",
-                    anchor=tk.SW,
-                    fill=outline_color,
-                    font=("Arial", 10, "bold"),
-                    tags="label",
-                )
-
-                # Se esta caixa estiver selecionada, adicionar alças de redimensionamento
-                if i == highlight_idx:
-                    # Calcular pontos médios
-                    mid_x = (canvas_x1 + canvas_x2) / 2
-                    mid_y = (canvas_y1 + canvas_y2) / 2
-
-                    # Tamanho das alças
-                    handle_size = self.handle_size
-
-                    # Desenhar alças nos cantos
-                    # NO (Noroeste)
-                    self.canvas.create_rectangle(
-                        canvas_x1 - handle_size,
-                        canvas_y1 - handle_size,
-                        canvas_x1 + handle_size,
-                        canvas_y1 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # NE (Nordeste)
-                    self.canvas.create_rectangle(
-                        canvas_x2 - handle_size,
-                        canvas_y1 - handle_size,
-                        canvas_x2 + handle_size,
-                        canvas_y1 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # SE (Sudeste)
-                    self.canvas.create_rectangle(
-                        canvas_x2 - handle_size,
-                        canvas_y2 - handle_size,
-                        canvas_x2 + handle_size,
-                        canvas_y2 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # SO (Sudoeste)
-                    self.canvas.create_rectangle(
-                        canvas_x1 - handle_size,
-                        canvas_y2 - handle_size,
-                        canvas_x1 + handle_size,
-                        canvas_y2 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-
-                    # Desenhar alças nos lados
-                    # Norte
-                    self.canvas.create_rectangle(
-                        mid_x - handle_size,
-                        canvas_y1 - handle_size,
-                        mid_x + handle_size,
-                        canvas_y1 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # Leste
-                    self.canvas.create_rectangle(
-                        canvas_x2 - handle_size,
-                        mid_y - handle_size,
-                        canvas_x2 + handle_size,
-                        mid_y + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # Sul
-                    self.canvas.create_rectangle(
-                        mid_x - handle_size,
-                        canvas_y2 - handle_size,
-                        mid_x + handle_size,
-                        canvas_y2 + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-                    # Oeste
-                    self.canvas.create_rectangle(
-                        canvas_x1 - handle_size,
-                        mid_y - handle_size,
-                        canvas_x1 + handle_size,
-                        mid_y + handle_size,
-                        fill=outline_color,
-                        tags="handle",
-                    )
-        except tk.TclError:
-            self.window_closed = True
-
-    def _redraw_with_zoom(self, img_display):
+    def _redraw_with_zoom(self, img_display, canvas):
         """
         Redesenha a imagem com o zoom atual.
 
         Args:
             img_display: Imagem original para exibição
+            canvas: Canvas onde a imagem será desenhada
         """
-        # Calcular novas dimensões
-        new_w = int(self.display_w * self.scale_factor)
-        new_h = int(self.display_h * self.scale_factor)
+        if self.window_closed:
+            return
 
-        # Redimensionar imagem
-        img_resized = cv2.resize(img_display, (new_w, new_h))
-        self.current_img_tk = ImageTk.PhotoImage(Image.fromarray(img_resized))
+        try:
+            # Calcular novas dimensões
+            new_w = int(self.display_w * self.scale_factor)
+            new_h = int(self.display_h * self.scale_factor)
 
-        # Atualizar imagem no canvas
-        self.canvas.delete("background")
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
-        self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
+            # Redimensionar imagem
+            img_resized = cv2.resize(img_display, (new_w, new_h))
+            self.current_img_tk = ImageTk.PhotoImage(Image.fromarray(img_resized))
 
-    def _cycle_class_selection(self, class_var):
-        """
-        Alterna entre as classes disponíveis.
-
-        Args:
-            class_var: Variável Tkinter que armazena a classe atual
-        """
-        current_class = class_var.get()
-        idx = self.classes.index(current_class) if current_class in self.classes else 0
-        next_idx = (idx + 1) % len(self.classes)
-        class_var.set(self.classes[next_idx])
+            # Atualizar imagem no canvas
+            canvas.delete("background")
+            canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
+            canvas.config(scrollregion=canvas.bbox(tk.ALL))
+        except tk.TclError:
+            self.window_closed = True
 
     def annotate_image(self, image_path: str, output_dir: str) -> Optional[str]:
         """
         Ferramenta para anotar manualmente células de levedura em imagens de microscopia com bounding boxes.
-        Instruções:
-        - Clique e arraste para desenhar bounding boxes
-        - Selecione uma classe antes de desenhar cada caixa
-        - Pressione 'r' para reiniciar
-        - Pressione 'q' para sair sem salvar
-        - Pressione 's' para salvar
-        - Pressione 'z' para desfazer a última ação
-        - Pressione 'e' para alternar modo edição
-        - Pressione 'p' para alternar modo navegação
-        - Pressione 'x' para salvar e sair
-        - Use scroll do mouse para zoom
-        - Navegue pela imagem usando trackpad, botão direito ou modo navegação
-        - 'c' para alternar entre classes
 
         Args:
             image_path: Caminho para a imagem a ser anotada
@@ -439,13 +285,14 @@ class ImageAnnotator:
         # Assegurar que o diretório de saída existe
         os.makedirs(output_dir, exist_ok=True)
 
-        # Resetar flag de cancelamento do usuário
+        # Resetar flags e estado
         self.user_cancelled = False
-
-        # Limpar histórico de ações
+        self.window_closed = False
+        self.bounding_boxes = []
         self.action_history = []
         self.resize_handle = HANDLE_NONE
         self.original_box_state = None
+        self.pan_mode = False
 
         # Carregar imagem
         loaded_data = self._load_image(image_path)
@@ -466,8 +313,8 @@ class ImageAnnotator:
             img_display = img.copy()
             self.display_scale = 1.0
 
-        # Armazenar bounding boxes como (class_id, x1, y1, x2, y2) em coordenadas da imagem original
-        self.bounding_boxes = []
+        # Reiniciar scale factor
+        self.scale_factor = 1.0
 
         # Verificar se já existem anotações para esta imagem
         base_name = os.path.splitext(os.path.basename(image_path))[0]
@@ -499,8 +346,7 @@ class ImageAnnotator:
                         self.bounding_boxes.append((class_id, x1, y1, x2, y2))
 
         # Variáveis para a sessão de anotação atual
-        start_x = None
-        start_y = None
+        start_x, start_y = None, None
         current_rect = None
         selected_box_idx = None
 
@@ -509,10 +355,6 @@ class ImageAnnotator:
 
         # Modo de edição
         edit_mode = False
-        self.pan_mode = False
-
-        # Flag para controlar se a janela já foi destruída
-        self.window_closed = False
 
         # Criar janela Tkinter
         root = tk.Tk()
@@ -550,9 +392,6 @@ class ImageAnnotator:
         )
         info_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-        # Converter para PhotoImage para o Tkinter
-        img_tk = ImageTk.PhotoImage(Image.fromarray(img_display))
-
         # Criar canvas com barras de rolagem
         canvas_frame = tk.Frame(main_frame)
         canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -576,13 +415,16 @@ class ImageAnnotator:
         h_scrollbar.config(command=canvas.xview)
         v_scrollbar.config(command=canvas.yview)
 
+        # Converter para PhotoImage para o Tkinter
+        img_tk = ImageTk.PhotoImage(Image.fromarray(img_display))
+
         # Criar imagem no canvas
         canvas.create_image(0, 0, anchor=tk.NW, image=img_tk, tags="background")
         canvas.config(scrollregion=canvas.bbox(tk.ALL))
 
-        # Configurar zoom e pan
+        # Armazenar referências
         self.canvas = canvas
-        self.scale_factor = 1.0
+        self.current_img_tk = img_tk
 
         # Resultado da anotação
         annotation_path = None
@@ -614,39 +456,170 @@ class ImageAnnotator:
             except tk.TclError:
                 self.window_closed = True
 
+        def redraw_all_boxes(highlight_idx=None):
+            """Redesenha todas as bounding boxes no canvas"""
+            # Limpar o canvas
+            canvas.delete("all")
+
+            # Redesenhar a imagem de fundo
+            canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
+
+            # Redesenhar todas as boxes
+            for i, (class_id, x1, y1, x2, y2) in enumerate(self.bounding_boxes):
+                # Converter para coordenadas do canvas
+                canvas_x1 = x1 * self.display_scale * self.scale_factor
+                canvas_y1 = y1 * self.display_scale * self.scale_factor
+                canvas_x2 = x2 * self.display_scale * self.scale_factor
+                canvas_y2 = y2 * self.display_scale * self.scale_factor
+
+                # Determinar cor (destacar se selecionado)
+                outline_color = "red" if i == highlight_idx else "green"
+                outline_width = 3 if i == highlight_idx else 2
+
+                # Encontrar nome da classe para exibição
+                class_name = next(
+                    (c for c in self.classes if c.startswith(class_id)),
+                    f"{class_id}-desconhecido",
+                )
+
+                # Desenhar retângulo
+                canvas.create_rectangle(
+                    canvas_x1, canvas_y1, canvas_x2, canvas_y2,
+                    outline=outline_color, width=outline_width, tags="box"
+                )
+
+                # Desenhar rótulo
+                canvas.create_text(
+                    canvas_x1,
+                    canvas_y1 - 5,
+                    text=f"{class_name} #{i + 1}",
+                    anchor=tk.SW,
+                    fill=outline_color,
+                    font=("Arial", 10, "bold"),
+                    tags="label",
+                )
+
+                # Se esta caixa estiver selecionada, adicionar alças de redimensionamento
+                if i == highlight_idx:
+                    # Calcular pontos médios
+                    mid_x = (canvas_x1 + canvas_x2) / 2
+                    mid_y = (canvas_y1 + canvas_y2) / 2
+
+                    # Tamanho das alças
+                    handle_size = self.handle_size
+
+                    # Desenhar alças nos cantos
+                    # NO (Noroeste)
+                    canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # NE (Nordeste)
+                    canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        canvas_y1 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # SE (Sudeste)
+                    canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x2 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # SO (Sudoeste)
+                    canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        canvas_y2 - handle_size,
+                        canvas_x1 + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+
+                    # Desenhar alças nos lados
+                    # Norte
+                    canvas.create_rectangle(
+                        mid_x - handle_size,
+                        canvas_y1 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y1 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Leste
+                    canvas.create_rectangle(
+                        canvas_x2 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x2 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Sul
+                    canvas.create_rectangle(
+                        mid_x - handle_size,
+                        canvas_y2 - handle_size,
+                        mid_x + handle_size,
+                        canvas_y2 + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+                    # Oeste
+                    canvas.create_rectangle(
+                        canvas_x1 - handle_size,
+                        mid_y - handle_size,
+                        canvas_x1 + handle_size,
+                        mid_y + handle_size,
+                        fill=outline_color,
+                        tags="handle",
+                    )
+
         def on_mouse_down(event):
             nonlocal start_x, start_y, current_rect, selected_box_idx
             if self.window_closed:
                 return
 
-            # Em modo de navegação, iniciar o pan
+            # Modo de navegação: iniciar o pan
             if self.pan_mode:
                 canvas.scan_mark(event.x, event.y)
                 return
 
+            # Limpar qualquer retângulo temporário existente
+            if current_rect:
+                canvas.delete(current_rect)
+                current_rect = None
+
+            # Obter coordenadas do canvas
             canvas_x = canvas.canvasx(event.x)
             canvas_y = canvas.canvasy(event.y)
 
+            # Modo de edição
             if edit_mode:
-                # Em modo de edição, verificar primeiro se clicou em uma alça de redimensionamento
+                # Verificar se clicou em uma alça de redimensionamento
                 if selected_box_idx is not None:
                     self.resize_handle = self._detect_resize_handle(canvas_x, canvas_y, selected_box_idx)
                     if self.resize_handle != HANDLE_NONE:
-                        # Salvamos o estado original para o histórico
+                        # Salvar posição inicial para histórico
                         start_x, start_y = canvas_x, canvas_y
-                        # Guardar estado original para histórico
+
                         if selected_box_idx < len(self.bounding_boxes):
-                            # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
                             self.original_box_state = tuple(self.bounding_boxes[selected_box_idx])
                             update_status(f"Redimensionando caixa {selected_box_idx + 1}")
                         return
 
-                # Se não clicou em uma alça, procurar por uma caixa para selecionar
-                selected_box_idx = None
-
-                # Obter todas as coordenadas das caixas em coordenadas do canvas (considerando zoom)
+                # Procurar se clicou em uma caixa para selecionar
                 for i, (_, x1, y1, x2, y2) in enumerate(self.bounding_boxes):
-                    # Converter coordenadas absolutas da imagem para coordenadas do canvas
+                    # Converter para coordenadas do canvas
                     canvas_x1 = x1 * self.display_scale * self.scale_factor
                     canvas_y1 = y1 * self.display_scale * self.scale_factor
                     canvas_x2 = x2 * self.display_scale * self.scale_factor
@@ -656,41 +629,44 @@ class ImageAnnotator:
                     if canvas_x1 <= canvas_x <= canvas_x2 and canvas_y1 <= canvas_y <= canvas_y2:
                         selected_box_idx = i
                         start_x, start_y = canvas_x, canvas_y
-
-                        # Guardar estado original para histórico
-                        # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
                         self.original_box_state = tuple(self.bounding_boxes[selected_box_idx])
-
                         update_status(f"Caixa {i + 1} selecionada para edição")
-                        self._redraw_all_boxes(highlight_idx=selected_box_idx)
-                        break
-            else:
-                # Em modo de desenho normal
-                start_x, start_y = canvas_x, canvas_y
+                        redraw_all_boxes(highlight_idx=selected_box_idx)
+                        return
+
+                # Se não selecionou nenhuma caixa, desselecionar
+                selected_box_idx = None
+                redraw_all_boxes()
+
+            # Modo de desenho normal - salvar posição inicial
+            start_x, start_y = canvas_x, canvas_y
 
         def on_mouse_move(event):
             nonlocal start_x, start_y, current_rect, selected_box_idx
             if self.window_closed:
                 return
 
-            # Em modo de navegação, mover o canvas
+            # Pan mode
             if self.pan_mode:
                 canvas.scan_dragto(event.x, event.y, gain=1)
                 return
 
+            # Precisamos ter uma posição inicial
             if start_x is None or start_y is None:
                 return
 
+            # Obter coordenadas do canvas
             canvas_x = canvas.canvasx(event.x)
             canvas_y = canvas.canvasy(event.y)
 
+            # Modo de edição
             if edit_mode and selected_box_idx is not None:
-                # Verificar se estamos redimensionando
+                # Redimensionamento
                 if self.resize_handle != HANDLE_NONE:
                     # Obter caixa atual
                     cls_id, x1, y1, x2, y2 = self.bounding_boxes[selected_box_idx]
 
-                    # Calcular diferença em coordenadas originais
+                    # Calcular diferença
                     orig_dx = (canvas_x - start_x) / (self.display_scale * self.scale_factor)
                     orig_dy = (canvas_y - start_y) / (self.display_scale * self.scale_factor)
 
@@ -719,29 +695,10 @@ class ImageAnnotator:
                     # Garantir que x1 < x2 e y1 < y2
                     if x1 > x2:
                         x1, x2 = x2, x1
-                        # Atualizar handle para o canto oposto se necessário
-                        if self.resize_handle == HANDLE_NW:
-                            self.resize_handle = HANDLE_NE
-                        elif self.resize_handle == HANDLE_NE:
-                            self.resize_handle = HANDLE_NW
-                        elif self.resize_handle == HANDLE_SE:
-                            self.resize_handle = HANDLE_SW
-                        elif self.resize_handle == HANDLE_SW:
-                            self.resize_handle = HANDLE_SE
-
                     if y1 > y2:
                         y1, y2 = y2, y1
-                        # Atualizar handle para o canto oposto se necessário
-                        if self.resize_handle == HANDLE_NW:
-                            self.resize_handle = HANDLE_SW
-                        elif self.resize_handle == HANDLE_NE:
-                            self.resize_handle = HANDLE_SE
-                        elif self.resize_handle == HANDLE_SE:
-                            self.resize_handle = HANDLE_NE
-                        elif self.resize_handle == HANDLE_SW:
-                            self.resize_handle = HANDLE_NW
 
-                    # Garantir que a caixa esteja dentro dos limites da imagem
+                    # Garantir limites da imagem
                     x1 = max(0, min(x1, self.original_w))
                     y1 = max(0, min(y1, self.original_h))
                     x2 = max(0, min(x2, self.original_w))
@@ -750,23 +707,23 @@ class ImageAnnotator:
                     # Atualizar a caixa
                     self.bounding_boxes[selected_box_idx] = (cls_id, x1, y1, x2, y2)
 
-                    # Atualizar posição inicial para próximo movimento
+                    # Atualizar posição inicial
                     start_x, start_y = canvas_x, canvas_y
 
                     # Redesenhar
-                    self._redraw_all_boxes(highlight_idx=selected_box_idx)
+                    redraw_all_boxes(highlight_idx=selected_box_idx)
                 else:
-                    # Modo de edição normal: mover a caixa selecionada
+                    # Movimentação normal
                     dx = canvas_x - start_x
                     dy = canvas_y - start_y
 
-                    # Atualizar a posição inicial para o próximo movimento
+                    # Atualizar posição inicial
                     start_x, start_y = canvas_x, canvas_y
 
                     # Obter a caixa selecionada
                     cls_id, x1, y1, x2, y2 = self.bounding_boxes[selected_box_idx]
 
-                    # Converter o deslocamento para coordenadas originais da imagem
+                    # Converter deslocamento
                     orig_dx = dx / (self.display_scale * self.scale_factor)
                     orig_dy = dy / (self.display_scale * self.scale_factor)
 
@@ -776,63 +733,107 @@ class ImageAnnotator:
                     x2 += orig_dx
                     y2 += orig_dy
 
-                    # Garantir que a caixa esteja dentro dos limites da imagem
+                    # Garantir limites da imagem
                     x1 = max(0, min(x1, self.original_w))
                     y1 = max(0, min(y1, self.original_h))
                     x2 = max(0, min(x2, self.original_w))
                     y2 = max(0, min(y2, self.original_h))
 
-                    # Atualizar a caixa na lista
+                    # Atualizar a caixa
                     self.bounding_boxes[selected_box_idx] = (cls_id, x1, y1, x2, y2)
 
-                    # Redesenhar todas as caixas
-                    self._redraw_all_boxes(highlight_idx=selected_box_idx)
+                    # Redesenhar
+                    redraw_all_boxes(highlight_idx=selected_box_idx)
             elif not edit_mode:
-                # Modo de desenho: criar ou atualizar o retângulo atual
+                # Modo de desenho normal - desenhar retângulo temporário
                 if current_rect:
                     canvas.delete(current_rect)
-                current_rect = canvas.create_rectangle(start_x, start_y, canvas_x, canvas_y, outline="green", width=2)
+                current_rect = canvas.create_rectangle(
+                    start_x, start_y, canvas_x, canvas_y,
+                    outline="green", width=2
+                )
 
         def on_mouse_up(event):
             nonlocal start_x, start_y, current_rect, selected_box_idx
             if self.window_closed or self.pan_mode:
                 return
 
+            # Precisamos ter uma posição inicial
             if start_x is None or start_y is None:
                 return
 
+            # Obter coordenadas do canvas
             canvas_x = canvas.canvasx(event.x)
             canvas_y = canvas.canvasy(event.y)
 
-            if edit_mode:
-                # Em modo de edição, finalizar a movimentação ou redimensionamento
-                if selected_box_idx is not None:
-                    # Se foi redimensionamento
-                    if self.resize_handle != HANDLE_NONE:
-                        # Registrar ação no histórico
-                        if self.original_box_state:
-                            # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
-                            current_box = tuple(self.bounding_boxes[selected_box_idx])
-                            self._add_to_history(
-                                "resize", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
-                            )
+            # Modo de edição
+            if edit_mode and selected_box_idx is not None:
+                # Finalizar redimensionamento ou movimentação
+                if self.resize_handle != HANDLE_NONE:
+                    # Registrar ação no histórico
+                    if self.original_box_state:
+                        current_box = tuple(self.bounding_boxes[selected_box_idx])
+                        self._add_to_history(
+                            "resize", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
+                        )
+                    update_status(f"Caixa {selected_box_idx + 1} redimensionada")
+                    self.resize_handle = HANDLE_NONE
+                else:
+                    # Foi movimento simples
+                    if self.original_box_state:
+                        current_box = tuple(self.bounding_boxes[selected_box_idx])
+                        self._add_to_history(
+                            "move", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
+                        )
+                    update_status(f"Caixa {selected_box_idx + 1} reposicionada")
 
-                        update_status(f"Caixa {selected_box_idx + 1} redimensionada")
-                        self.resize_handle = HANDLE_NONE
-                    else:
-                        # Foi movimento simples
-                        if self.original_box_state:
-                            # MUDANÇA: Usar tuple() em vez de .copy() para tuplas
-                            current_box = tuple(self.bounding_boxes[selected_box_idx])
-                            self._add_to_history(
-                                "move", {"index": selected_box_idx, "before": self.original_box_state, "after": current_box}
-                            )
+                # Reset estado para novas ações
+                self.original_box_state = None
+            else:
+                # MODO NORMAL (DESENHO) - este é o código que SABEMOS que funciona
+                # Verificar se tem tamanho mínimo
+                if abs(start_x - canvas_x) > 5 and abs(start_y - canvas_y) > 5:
+                    # Converter coordenadas para escala original
+                    x1 = min(start_x, canvas_x) / (self.display_scale * self.scale_factor)
+                    y1 = min(start_y, canvas_y) / (self.display_scale * self.scale_factor)
+                    x2 = max(start_x, canvas_x) / (self.display_scale * self.scale_factor)
+                    y2 = max(start_y, canvas_y) / (self.display_scale * self.scale_factor)
 
-                        update_status(f"Caixa {selected_box_idx + 1} reposicionada")
+                    # Garantir limites da imagem
+                    x1 = max(0, min(x1, self.original_w))
+                    y1 = max(0, min(y1, self.original_h))
+                    x2 = max(0, min(x2, self.original_w))
+                    y2 = max(0, min(y2, self.original_h))
 
-                    # Não resetar o selected_box_idx para permitir continuar editando
-                    # Apenas resetamos state para novas ações
-                    self.original_box_state = None
+                    # Obter índice da classe
+                    current_class_str = class_var.get()
+                    class_id = current_class_str.split("-")[0]
+
+                    # Adicionar à lista de bounding boxes
+                    self.bounding_boxes.append((class_id, int(x1), int(y1), int(x2), int(y2)))
+
+                    # Adicionar ao histórico
+                    self._add_to_history("add", {"index": len(self.bounding_boxes) - 1})
+
+                    # Atualizar status
+                    update_status(f"Box adicionada: {current_class_str}")
+
+                    # Auto-save se necessário
+                    if self.auto_save:
+                        if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
+                            update_status("Auto-save realizado")
+
+            # Limpar retângulo temporário
+            if current_rect:
+                canvas.delete(current_rect)
+                current_rect = None
+
+            # Redesenhar todas as caixas
+            redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+
+            # Redefinir pontos iniciais - CRUCIAL para permitir novas boxes
+            start_x = None
+            start_y = None
 
         def toggle_edit_mode():
             nonlocal edit_mode, selected_box_idx
@@ -840,23 +841,18 @@ class ImageAnnotator:
                 return
 
             edit_mode = not edit_mode
-            self.pan_mode = False  # Desativar modo navegação ao ativar edição
-            selected_box_idx = None
-            self.resize_handle = HANDLE_NONE
+            self.pan_mode = False  # Desativar navegação ao ativar edição
 
-            # Atualizar o texto do botão
-            try:
-                if edit_mode:
-                    edit_button.config(text="Modo Desenho (E)")
-                    update_status("Modo de edição ativado. Selecione uma caixa para mover/redimensionar.")
-                else:
-                    edit_button.config(text="Modo Edição (E)")
-                    update_status("Modo de desenho ativado.")
-            except tk.TclError:
-                self.window_closed = True
-                return
+            if edit_mode:
+                selected_box_idx = None  # Resetar seleção
+                self.resize_handle = HANDLE_NONE
+                edit_button.config(text="Modo Desenho (E)", bg="lightblue")
+                update_status("Modo de edição ativado. Selecione uma caixa para mover/redimensionar.")
+            else:
+                edit_button.config(text="Modo Edição (E)", bg="SystemButtonFace")
+                update_status("Modo de desenho ativado.")
 
-            self._redraw_all_boxes()
+            redraw_all_boxes()
 
         def toggle_pan_mode():
             if self.window_closed:
@@ -864,134 +860,112 @@ class ImageAnnotator:
 
             self.pan_mode = not self.pan_mode
             nonlocal edit_mode
+
             if self.pan_mode:
                 edit_mode = False  # Desativar edição ao ativar navegação
-                edit_button.config(text="Modo Edição (E)")
+                edit_button.config(text="Modo Edição (E)", bg="SystemButtonFace")
+                pan_button.config(text="Modo Desenho (P)", bg="lightblue")
+            else:
+                pan_button.config(text="Modo Navegação (P)", bg="SystemButtonFace")
 
             update_status()
 
         def undo():
-            """
-            Desfaz a última ação (adicionar, mover, redimensionar ou excluir).
-            """
-            if self.window_closed or not self.action_history:
+            """Desfaz a última ação."""
+            if not self.action_history:
+                update_status("Nada para desfazer.")
                 return
 
-            # Obter última ação
             last_action = self.action_history.pop()
-            action_type = last_action["type"]
-            data = last_action["data"]
+            action_type = last_action.get("type")
+            data = last_action.get("data", {})
 
-            # Processar baseado no tipo de ação
             if action_type == "add":
-                # Remover a caixa adicionada
-                if data["index"] < len(self.bounding_boxes):
-                    self.bounding_boxes.pop(data["index"])
+                if data.get("index") < len(self.bounding_boxes):
+                    self.bounding_boxes.pop(data.get("index"))
                     update_status("Desfez: Adição de caixa")
-
             elif action_type == "move" or action_type == "resize":
-                # Restaurar caixa para posição original
-                if data["index"] < len(self.bounding_boxes):
-                    self.bounding_boxes[data["index"]] = data["before"]
+                if data.get("index") < len(self.bounding_boxes):
+                    self.bounding_boxes[data.get("index")] = data.get("before")
                     update_status(f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa")
-
             elif action_type == "delete":
-                # Restaurar caixa excluída
-                self.bounding_boxes.insert(data["index"], data["box"])
+                self.bounding_boxes.insert(data.get("index"), data.get("box"))
                 update_status("Desfez: Exclusão de caixa")
 
-            # Redesenhar todas as caixas
-            self._redraw_all_boxes(highlight_idx=selected_box_idx)
+            redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
         def delete_last():
-            if self.window_closed:
-                return
-
+            """Remove a última bounding box."""
             if self.bounding_boxes:
-                # Guardar a caixa antes de remover para o histórico
-                removed_box = self.bounding_boxes[-1]  # Já é uma tupla, não precisa de .copy()
+                # Guardar para histórico
+                removed_box = self.bounding_boxes[-1]
                 removed_index = len(self.bounding_boxes) - 1
-
                 self._add_to_history("delete", {"index": removed_index, "box": removed_box})
 
+                # Remover a última caixa
                 self.bounding_boxes.pop()
-                self._redraw_all_boxes()
+                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
                 update_status(f"Última caixa excluída. Restantes: {len(self.bounding_boxes)}")
 
         def reset():
-            if self.window_closed:
+            """Remove todas as caixas."""
+            if not self.bounding_boxes:
+                update_status("Nenhuma caixa para limpar.")
                 return
 
-            # Registrar todas as caixas no histórico antes de limpar
-            for i, box in enumerate(self.bounding_boxes):
+            # Guardar todas para histórico
+            for i, box in enumerate(self.bounding_boxes.copy()):
                 self._add_to_history("delete", {"index": i, "box": box})
 
+            # Limpar lista
             self.bounding_boxes.clear()
-            self._redraw_all_boxes()
-            update_status(f"Todas as caixas limpas")
 
-        def safe_destroy():
-            if not self.window_closed:
-                try:
-                    root.destroy()
-                    self.window_closed = True
-                except tk.TclError:
-                    self.window_closed = True
+            # Atualizar interface
+            nonlocal selected_box_idx
+            selected_box_idx = None
+            redraw_all_boxes()
+            update_status("Todas as caixas foram removidas.")
 
         def save():
+            """Salva as anotações."""
             nonlocal annotation_path
             annotation_path = self._save_annotations(self.bounding_boxes, output_dir, base_name)
-            # Sempre definir user_cancelled como True quando salvar ao sair
+            update_status(f"Anotações salvas em {annotation_path}")
+            self.last_save_time = time.time()  # Atualizar timestamp de último salvamento
+
+        def save_and_exit():
+            """Salva as anotações e sai."""
+            save()
             self.user_cancelled = True
-            safe_destroy()
+            root.destroy()
 
         def on_closing():
-            if self.window_closed:
-                return
-
-            # Perguntar ao usuário se quer salvar antes de sair
-            try:
-                if len(self.bounding_boxes) > 0:
-                    save_before_exit = messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?")
-                    if save_before_exit:
-                        save()  # Agora define self.user_cancelled = True e destroi a janela
-                        return
-
-                # Se não salvar ou não houver nada para salvar
-                self.user_cancelled = True
-                safe_destroy()
-            except tk.TclError:
-                self.window_closed = True
-                self.user_cancelled = True
-                return
-
-        def exit_and_save():
-            if self.window_closed:
-                return
-
-            # Sempre definir user_cancelled como True, independentemente de ter algo para salvar
-            self.user_cancelled = True
-
+            """Manipula o evento de fechamento da janela."""
             if len(self.bounding_boxes) > 0:
-                save()  # Isso vai salvar e também definir user_cancelled = True
-            else:
-                safe_destroy()
+                if messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?"):
+                    save()
 
-        def cycle_classes(event=None):
-            if self.window_closed:
-                return
+            self.user_cancelled = True
+            self.window_closed = True
+            root.destroy()
 
-            self._cycle_class_selection(class_var)
-            set_current_class()
+        def cycle_classes():
+            """Alterna entre as classes disponíveis."""
+            current_idx = self.classes.index(class_var.get()) if class_var.get() in self.classes else 0
+            next_idx = (current_idx + 1) % len(self.classes)
+            class_var.set(self.classes[next_idx])
 
-        # Configurar zoom e pan
+        def select_none():
+            """Desseleciona qualquer caixa selecionada."""
+            nonlocal selected_box_idx
+            selected_box_idx = None
+            redraw_all_boxes()
+            update_status()
+
         def zoom(event):
+            """Manipula eventos de zoom com a roda do mouse."""
             if self.window_closed:
                 return
-
-            # Determinar o ponto central do zoom (posição do mouse)
-            x = canvas.canvasx(event.x)
-            y = canvas.canvasy(event.y)
 
             # Calcular o novo fator de escala
             old_scale = self.scale_factor
@@ -1006,52 +980,47 @@ class ImageAnnotator:
             # Aplicar zoom apenas se houve alteração
             if old_scale != self.scale_factor:
                 # Redimensionar a imagem
-                new_w = int(self.display_w * self.scale_factor)
-                new_h = int(self.display_h * self.scale_factor)
-                img_resized = cv2.resize(img_display, (new_w, new_h))
-
-                try:
-                    # Atualizar a imagem no canvas
-                    canvas.img_tk = ImageTk.PhotoImage(Image.fromarray(img_resized))
-                    canvas.delete("background")
-                    canvas.create_image(0, 0, anchor=tk.NW, image=canvas.img_tk, tags="background")
-                    canvas.config(scrollregion=canvas.bbox(tk.ALL))
-
-                    # Redesenhar as caixas com o novo zoom
-                    self._redraw_all_boxes(highlight_idx=selected_box_idx)
-                except tk.TclError:
-                    self.window_closed = True
+                self._redraw_with_zoom(img_display, canvas)
+                # Redesenhar as caixas com o novo zoom
+                redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
 
         def start_pan(event):
+            """Inicia o movimento de arrastar."""
             if self.window_closed:
                 return
             canvas.scan_mark(event.x, event.y)
 
         def do_pan(event):
+            """Executa o movimento de arrastar."""
             if self.window_closed:
                 return
             canvas.scan_dragto(event.x, event.y, gain=1)
 
+        def reset_zoom():
+            """Reinicia o zoom para escala normal."""
+            self.scale_factor = 1.0
+            self._redraw_with_zoom(img_display, canvas)
+            redraw_all_boxes(highlight_idx=selected_box_idx if edit_mode else None)
+            update_status("Zoom reiniciado")
+
         # Bindings para zoom e pan
         canvas.bind("<MouseWheel>", zoom)  # Windows
-        canvas.bind("<Button-4>", zoom)  # Linux: scroll up
-        canvas.bind("<Button-5>", zoom)  # Linux: scroll down
+        canvas.bind("<Button-4>", zoom)    # Linux: scroll up
+        canvas.bind("<Button-5>", zoom)    # Linux: scroll down
 
         # Pan com botão do meio e direito
         canvas.bind("<ButtonPress-2>", start_pan)
         canvas.bind("<B2-Motion>", do_pan)
-
         canvas.bind("<ButtonPress-3>", start_pan)
         canvas.bind("<B3-Motion>", do_pan)
 
-        # Suporte para trackpad em modo de navegação
-        canvas.bind("<ButtonPress-1>", on_mouse_down)  # Também usado para pan quando self.pan_mode=True
-        canvas.bind("<B1-Motion>", on_mouse_move)  # Também usado para pan quando self.pan_mode=True
+        # Eventos de mouse principais
+        canvas.bind("<ButtonPress-1>", on_mouse_down)
+        canvas.bind("<B1-Motion>", on_mouse_move)
         canvas.bind("<ButtonRelease-1>", on_mouse_up)
 
-        # Trackpad com dois dedos (se suportado pelo sistema)
+        # Trackpad com dois dedos (se suportado)
         try:
-            # Tentar vincular eventos de trackpad específicos (funciona em alguns sistemas)
             canvas.bind("<TouchpadPan>", do_pan)
         except:
             pass  # Ignorar se o evento não for suportado
@@ -1070,6 +1039,7 @@ class ImageAnnotator:
         edit_button.pack(side=tk.LEFT, padx=5)
         pan_button = tk.Button(button_frame, text="Modo Navegação (P)", command=toggle_pan_mode)
         pan_button.pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Reset Zoom (W)", command=reset_zoom).pack(side=tk.LEFT, padx=5)
 
         # Segunda linha de botões
         button_frame2 = tk.Frame(main_frame)
@@ -1077,7 +1047,8 @@ class ImageAnnotator:
 
         tk.Button(button_frame2, text="Alternar Classe (C)", command=cycle_classes).pack(side=tk.LEFT, padx=5)
         tk.Button(button_frame2, text="Sair (Q)", command=on_closing).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame2, text="Salvar e Sair (X)", command=exit_and_save).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame2, text="Salvar e Sair (X)", command=save_and_exit).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame2, text="Excluir Última (Del)", command=delete_last).pack(side=tk.LEFT, padx=5)
 
         # Adicionar informações de atalhos
         shortcuts_frame = tk.Frame(main_frame)
@@ -1102,22 +1073,13 @@ class ImageAnnotator:
         root.bind("<e>", lambda e: toggle_edit_mode())
         root.bind("<p>", lambda e: toggle_pan_mode())
         root.bind("<c>", lambda e: cycle_classes())
-        root.bind("<x>", lambda e: exit_and_save())  # Atalho para salvar e sair
+        root.bind("<x>", lambda e: save_and_exit())
         root.bind("<Delete>", lambda e: delete_last())
         root.bind("<Escape>", lambda e: select_none())
+        root.bind("<w>", lambda e: reset_zoom())
 
         # Protocolo para fechar janela
         root.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # Selecionar nenhuma caixa
-        def select_none():
-            nonlocal selected_box_idx
-            if self.window_closed:
-                return
-
-            selected_box_idx = None
-            self._redraw_all_boxes()
-            update_status()
 
         # Centralizar janela na tela
         root.update_idletasks()
@@ -1128,17 +1090,108 @@ class ImageAnnotator:
         root.geometry("{}x{}+{}+{}".format(width, height, x, y))
 
         # Desenhar as bounding boxes existentes
-        if self.bounding_boxes:
-            self._redraw_all_boxes()
+        redraw_all_boxes()
+
+        # Auto-save timer
+        if self.auto_save:
+            def check_auto_save():
+                if self.window_closed:
+                    return
+                if self._check_auto_save(self.bounding_boxes, output_dir, base_name):
+                    update_status("Auto-save realizado")
+                try:
+                    root.after(10000, check_auto_save)  # Verificar a cada 10 segundos
+                except tk.TclError:
+                    pass  # Janela fechada
+
+            # Iniciar o timer de auto-save
+            root.after(10000, check_auto_save)
 
         # Iniciar loop principal
         root.mainloop()
 
-        # Se o usuário cancelou, retorne None para interromper o batch_annotate
-        if self.user_cancelled:
-            return annotation_path  # Retorna annotation_path mesmo se cancelado
-
         return annotation_path
+
+    def _save_progress(self, progress_path: str, current_image: str) -> None:
+        """
+        Salva o progresso atual da anotação.
+
+        Args:
+            progress_path: Caminho para o arquivo de progresso
+            current_image: Caminho da imagem atual
+        """
+        try:
+            progress_data = {
+                "last_annotated": current_image,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            with open(progress_path, "w") as f:
+                json.dump(progress_data, f)
+
+        except Exception as e:
+            logger.warning(f"Não foi possível salvar o progresso: {str(e)}")
+
+    def backup_annotations(self, label_dir: str) -> Optional[str]:
+        """
+        Cria um backup com timestamp das anotações atuais e mantém apenas os 5 mais recentes.
+
+        Args:
+            label_dir: Diretório contendo os arquivos de anotação
+
+        Returns:
+            Caminho para o diretório de backup ou None se falhar
+        """
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        parent_dir = os.path.dirname(f"{label_dir}/backups")
+        backup_dir = os.path.join(parent_dir, f"backup_annotations_{timestamp}")
+
+        try:
+            if os.path.exists(label_dir):
+                os.makedirs(backup_dir, exist_ok=True)
+                count = 0
+
+                for file in glob.glob(os.path.join(label_dir, "*.txt")):
+                    if os.path.basename(file) != self.progress_file:
+                        shutil.copy2(file, backup_dir)
+                        count += 1
+
+                if count > 0:
+                    logger.info(f"Backup criado em {backup_dir} com {count} arquivos de anotação")
+
+                    # Limitar para manter apenas os 5 backups mais recentes
+                    # Encontrar diretórios de backup existentes
+                    backup_pattern = re.compile(r"backup_annotations_\d{8}_\d{6}$")
+                    backup_dirs = []
+
+                    for dirname in os.listdir(parent_dir):
+                        dir_path = os.path.join(parent_dir, dirname)
+                        if os.path.isdir(dir_path) and backup_pattern.match(dirname):
+                            backup_dirs.append(dir_path)
+
+                    # Ordenar por timestamp no nome (mais recentes primeiro)
+                    backup_dirs.sort(reverse=True)
+
+                    # Manter apenas os 5 mais recentes, excluir os demais
+                    if len(backup_dirs) > 5:
+                        for old_backup in backup_dirs[5:]:
+                            try:
+                                shutil.rmtree(old_backup)
+                                logger.info(f"Removido backup antigo: {os.path.basename(old_backup)}")
+                            except Exception as e:
+                                logger.warning(
+                                    f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}"
+                                )
+
+                    return backup_dir
+                else:
+                    os.rmdir(backup_dir)
+                    logger.info("Nenhum arquivo de anotação encontrado para backup")
+
+        except Exception as e:
+            logger.error(f"Erro ao criar backup: {str(e)}")
+
+        return None
 
     def batch_annotate(self, image_dir: str, output_dir: str) -> Tuple[int, int]:
         """
@@ -1151,9 +1204,6 @@ class ImageAnnotator:
         Returns:
             Tupla com (total de imagens, total de imagens anotadas)
         """
-        import json
-        import os.path as osp
-
         os.makedirs(output_dir, exist_ok=True)
 
         # Obter todos os arquivos de imagem
@@ -1282,91 +1332,3 @@ class ImageAnnotator:
         print("=" * 50)
 
         return len(image_files), total_annotated + imagens_existentes
-
-    def _save_progress(self, progress_path: str, current_image: str) -> None:
-        """
-        Salva o progresso atual da anotação.
-
-        Args:
-            progress_path: Caminho para o arquivo de progresso
-            current_image: Caminho da imagem atual
-        """
-        import json
-
-        try:
-            progress_data = {
-                "last_annotated": current_image,
-                "timestamp": datetime.now().isoformat(),
-            }
-
-            with open(progress_path, "w") as f:
-                json.dump(progress_data, f)
-
-        except Exception as e:
-            logger.warning(f"Não foi possível salvar o progresso: {str(e)}")
-
-    def backup_annotations(self, label_dir: str) -> Optional[str]:
-        """
-        Cria um backup com timestamp das anotações atuais e mantém apenas os 5 mais recentes.
-
-        Args:
-            label_dir: Diretório contendo os arquivos de anotação
-
-        Returns:
-            Caminho para o diretório de backup ou None se falhar
-        """
-        import os
-        import re
-        import shutil
-        import time
-
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        parent_dir = os.path.dirname(f"{label_dir}/backups")
-        backup_dir = os.path.join(parent_dir, f"backup_annotations_{timestamp}")
-
-        try:
-            if os.path.exists(label_dir):
-                os.makedirs(backup_dir, exist_ok=True)
-                count = 0
-
-                for file in glob.glob(os.path.join(label_dir, "*.txt")):
-                    if os.path.basename(file) != self.progress_file:
-                        shutil.copy2(file, backup_dir)
-                        count += 1
-
-                if count > 0:
-                    logger.info(f"Backup criado em {backup_dir} com {count} arquivos de anotação")
-
-                    # Limitar para manter apenas os 5 backups mais recentes
-                    # Encontrar diretórios de backup existentes
-                    backup_pattern = re.compile(r"backup_annotations_\d{8}_\d{6}$")
-                    backup_dirs = []
-
-                    for dirname in os.listdir(parent_dir):
-                        dir_path = os.path.join(parent_dir, dirname)
-                        if os.path.isdir(dir_path) and backup_pattern.match(dirname):
-                            backup_dirs.append(dir_path)
-
-                    # Ordenar por timestamp no nome (mais recentes primeiro)
-                    backup_dirs.sort(reverse=True)
-
-                    # Manter apenas os 5 mais recentes, excluir os demais
-                    if len(backup_dirs) > 5:
-                        for old_backup in backup_dirs[5:]:
-                            try:
-                                shutil.rmtree(old_backup)
-                                logger.info(f"Removido backup antigo: {os.path.basename(old_backup)}")
-                            except Exception as e:
-                                logger.warning(
-                                    f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}"
-                                )
-
-                    return backup_dir
-                else:
-                    os.rmdir(backup_dir)
-                    logger.info("Nenhum arquivo de anotação encontrado para backup")
-
-        except Exception as e:
-            logger.error(f"Erro ao criar backup: {str(e)}")
-
-        return None
