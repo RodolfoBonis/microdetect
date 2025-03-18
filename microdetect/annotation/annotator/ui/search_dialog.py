@@ -2,16 +2,16 @@
 Diálogo para busca e seleção de imagens para anotação.
 """
 
-import os
 import glob
+import logging
+import os
 import tkinter as tk
 from tkinter import messagebox
+from typing import List, Tuple, Optional
+
 from PIL import Image, ImageTk
-from typing import List, Tuple, Dict, Optional
 
 from microdetect.annotation.annotator.ui.base import create_secure_dialog, center_window
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ class SearchDialog:
         self.filtered_images = []
         self.result_images = []
         self.result_mode = 0  # 0=Continuar, 1=Reiniciar, 2=Revisar, 3=Específica
+        self.start_index = 0  # Índice inicial para navegação contínua
 
     def get_all_images(self) -> List[str]:
         """
@@ -289,8 +290,16 @@ class SearchDialog:
             if index >= len(self.filtered_images):
                 return
 
-            self.result_images = [self.filtered_images[index]]
+            # MODIFICAÇÃO: Retornar a lista filtrada a partir do índice selecionado
+            selected_image = self.filtered_images[index]
+            self.start_index = index
+            self.result_images = self.filtered_images
             self.result_mode = 3  # Modo especial: imagem específica selecionada
+
+            # Log para debug
+            logger.info(f"Selecionada imagem {os.path.basename(selected_image)} (índice {index}). "
+                       f"Total de {len(self.filtered_images)} imagens na lista filtrada.")
+
             search_window.destroy()
 
         # Botões de ação
@@ -427,11 +436,17 @@ class SearchDialog:
 
             if mode == 0:  # Continuar de onde parou
                 next_index = last_index + 1 if last_index < len(self.all_images) - 1 else 0
-                self.result_images = [self.all_images[next_index]]
+                # MODIFICAÇÃO: Manter toda a lista e definir o índice inicial
+                self.start_index = next_index
+                self.result_images = self.all_images
             elif mode == 1:  # Recomeçar do início
-                self.result_images = [self.all_images[0]]
+                # MODIFICAÇÃO: Manter toda a lista e começar do início
+                self.start_index = 0
+                self.result_images = self.all_images
             else:  # Revisar a última imagem
-                self.result_images = [self.last_annotated_path]
+                # MODIFICAÇÃO: Manter toda a lista e definir o índice para a última imagem anotada
+                self.start_index = last_index if last_index >= 0 else 0
+                self.result_images = self.all_images
 
             # Obter a janela pai e destruir
             parent = progress_frame.master.master

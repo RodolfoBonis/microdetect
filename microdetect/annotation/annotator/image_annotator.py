@@ -791,6 +791,12 @@ class ImageAnnotator:
             if hasattr(self, 'image_loader'):
                 self.image_loader.cleanup_references()
 
+            # Exibir mensagem de sucesso
+            messagebox.showinfo(
+                "Anotação Salva",
+                "Anotação salva com sucesso! Avançando para a próxima imagem."
+            )
+
             # Fechar a janela - CRÍTICO: fechar a janela, não o programa
             if hasattr(self, 'root') and self.root:
                 self.root.destroy()
@@ -1003,14 +1009,19 @@ class ImageAnnotator:
         selected_images, mode = search_dialog.show()
 
         # Log para depuração
-        logger.info(f"_show_search_dialog: selected_images={selected_images}")
+        logger.info(f"_show_search_dialog: {len(selected_images)} imagens selecionadas, modo={mode}")
 
-        # Se o usuário selecionou uma imagem, perguntar se deseja navegar para ela
-        if selected_images and len(selected_images) == 1:
-            selected_path = selected_images[0]
+        # MODIFICAÇÃO: Obter o índice inicial definido no diálogo de busca
+        start_index = getattr(search_dialog, 'start_index', 0)
+
+        # Se o usuário selecionou imagens, verificar se podemos navegar para elas
+        if selected_images and len(selected_images) >= 1:
+            # Obter o caminho da primeira imagem a ser aberta
+            selected_path = selected_images[start_index]
 
             # Log para depuração
-            logger.info(f"_show_search_dialog: selected_path={selected_path}")
+            logger.info(
+                f"_show_search_dialog: iniciando pela imagem {os.path.basename(selected_path)} (índice {start_index})")
 
             # Se a imagem selecionada for a mesma que já está aberta, não faz nada
             if current_image_path and os.path.normpath(selected_path) == os.path.normpath(current_image_path):
@@ -1155,19 +1166,12 @@ class ImageAnnotator:
         logger.info(f"Usando {len(image_files)} imagens selecionadas para anotação")
 
         # Determinar o índice inicial com base no modo de continuação e última imagem anotada
-        start_index = 0
+        # MODIFICAÇÃO: Usar o start_index definido no SearchDialog
+        start_index = getattr(search_dialog, 'start_index', 0)
+        logger.info(f"Índice inicial para anotação: {start_index} de {len(image_files)} imagens")
+
         total_annotated = 0
         imagens_existentes = 0
-
-        if last_annotated_path and last_annotated_path in image_files:
-            last_index = image_files.index(last_annotated_path)
-
-            if continuation_mode == 0:  # Continuar de onde parou
-                start_index = last_index + 1 if last_index < len(image_files) - 1 else 0
-            elif continuation_mode == 1:  # Recomeçar do início
-                start_index = 0
-            else:  # Revisar a última imagem anotada
-                start_index = last_index
 
         # Contar anotações já existentes antes do ponto de retomada
         for i in range(start_index):
