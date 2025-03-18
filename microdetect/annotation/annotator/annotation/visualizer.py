@@ -36,10 +36,7 @@ class AnnotationVisualizer:
         Returns:
             Nome completo da classe (ex: "0-levedura")
         """
-        return next(
-            (c for c in self.classes if c.startswith(class_id)),
-            f"{class_id}-desconhecido"
-        )
+        return next((c for c in self.classes if c.startswith(class_id)), f"{class_id}-desconhecido")
 
     def draw_bounding_boxes(self, boxes, highlight_idx=None, display_scale=1.0, scale_factor=1.0):
         """
@@ -77,8 +74,7 @@ class AnnotationVisualizer:
 
                 # Desenhar retângulo
                 self.canvas.create_rectangle(
-                    canvas_x1, canvas_y1, canvas_x2, canvas_y2,
-                    outline=outline_color, width=outline_width, tags="box"
+                    canvas_x1, canvas_y1, canvas_x2, canvas_y2, outline=outline_color, width=outline_width, tags="box"
                 )
 
                 # Desenhar rótulo
@@ -119,53 +115,77 @@ class AnnotationVisualizer:
         # Desenhar alças nos cantos
         # NO (Noroeste)
         self.canvas.create_rectangle(
-            x1 - handle_size, y1 - handle_size,
-            x1 + handle_size, y1 + handle_size,
-            fill=color, tags="handle",
+            x1 - handle_size,
+            y1 - handle_size,
+            x1 + handle_size,
+            y1 + handle_size,
+            fill=color,
+            tags="handle",
         )
         # NE (Nordeste)
         self.canvas.create_rectangle(
-            x2 - handle_size, y1 - handle_size,
-            x2 + handle_size, y1 + handle_size,
-            fill=color, tags="handle",
+            x2 - handle_size,
+            y1 - handle_size,
+            x2 + handle_size,
+            y1 + handle_size,
+            fill=color,
+            tags="handle",
         )
         # SE (Sudeste)
         self.canvas.create_rectangle(
-            x2 - handle_size, y2 - handle_size,
-            x2 + handle_size, y2 + handle_size,
-            fill=color, tags="handle",
+            x2 - handle_size,
+            y2 - handle_size,
+            x2 + handle_size,
+            y2 + handle_size,
+            fill=color,
+            tags="handle",
         )
         # SO (Sudoeste)
         self.canvas.create_rectangle(
-            x1 - handle_size, y2 - handle_size,
-            x1 + handle_size, y2 + handle_size,
-            fill=color, tags="handle",
+            x1 - handle_size,
+            y2 - handle_size,
+            x1 + handle_size,
+            y2 + handle_size,
+            fill=color,
+            tags="handle",
         )
 
         # Desenhar alças nos lados
         # Norte
         self.canvas.create_rectangle(
-            mid_x - handle_size, y1 - handle_size,
-            mid_x + handle_size, y1 + handle_size,
-            fill=color, tags="handle",
+            mid_x - handle_size,
+            y1 - handle_size,
+            mid_x + handle_size,
+            y1 + handle_size,
+            fill=color,
+            tags="handle",
         )
         # Leste
         self.canvas.create_rectangle(
-            x2 - handle_size, mid_y - handle_size,
-            x2 + handle_size, mid_y + handle_size,
-            fill=color, tags="handle",
+            x2 - handle_size,
+            mid_y - handle_size,
+            x2 + handle_size,
+            mid_y + handle_size,
+            fill=color,
+            tags="handle",
         )
         # Sul
         self.canvas.create_rectangle(
-            mid_x - handle_size, y2 - handle_size,
-            mid_x + handle_size, y2 + handle_size,
-            fill=color, tags="handle",
+            mid_x - handle_size,
+            y2 - handle_size,
+            mid_x + handle_size,
+            y2 + handle_size,
+            fill=color,
+            tags="handle",
         )
         # Oeste
         self.canvas.create_rectangle(
-            x1 - handle_size, mid_y - handle_size,
-            x1 + handle_size, mid_y + handle_size,
-            fill=color, tags="handle",
+            x1 - handle_size,
+            mid_y - handle_size,
+            x1 + handle_size,
+            mid_y + handle_size,
+            fill=color,
+            tags="handle",
         )
 
     def draw_temporary_box(self, start_x, start_y, end_x, end_y, temp_id=None):
@@ -185,10 +205,7 @@ class AnnotationVisualizer:
             self.canvas.delete(temp_id)
 
         # Criar novo retângulo temporário
-        return self.canvas.create_rectangle(
-            start_x, start_y, end_x, end_y,
-            outline="green", width=2, tags="temp_box"
-        )
+        return self.canvas.create_rectangle(start_x, start_y, end_x, end_y, outline="green", width=2, tags="temp_box")
 
     def draw_suggestions(self, suggestions, display_scale, scale_factor):
         """
@@ -219,9 +236,14 @@ class AnnotationVisualizer:
 
             # Desenhar retângulo tracejado para indicar que é uma sugestão
             self.canvas.create_rectangle(
-                canvas_x1, canvas_y1, canvas_x2, canvas_y2,
-                outline=outline_color, width=2, dash=(5, 3),  # Linha tracejada
-                tags="suggestion"
+                canvas_x1,
+                canvas_y1,
+                canvas_x2,
+                canvas_y2,
+                outline=outline_color,
+                width=2,
+                dash=(5, 3),  # Linha tracejada
+                tags="suggestion",
             )
 
             # Desenhar rótulo

@@ -7,11 +7,11 @@ import logging
 import os
 import tkinter as tk
 from tkinter import messagebox
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from PIL import Image, ImageTk
 
-from microdetect.annotation.annotator.ui.base import create_secure_dialog, center_window
+from microdetect.annotation.annotator.ui.base import center_window, create_secure_dialog
 
 logger = logging.getLogger(__name__)
 
@@ -106,18 +106,14 @@ class SearchDialog:
         # Opção para mostrar apenas imagens anotadas
         show_annotated_var = tk.BooleanVar(value=False)
         show_annotated_check = tk.Checkbutton(
-            filter_frame,
-            text="Mostrar apenas imagens anotadas",
-            variable=show_annotated_var
+            filter_frame, text="Mostrar apenas imagens anotadas", variable=show_annotated_var
         )
         show_annotated_check.pack(side=tk.LEFT, padx=5)
 
         # Opção para mostrar apenas imagens não anotadas
         show_unannotated_var = tk.BooleanVar(value=False)
         show_unannotated_check = tk.Checkbutton(
-            filter_frame,
-            text="Mostrar apenas imagens não anotadas",
-            variable=show_unannotated_var
+            filter_frame, text="Mostrar apenas imagens não anotadas", variable=show_unannotated_var
         )
         show_unannotated_check.pack(side=tk.LEFT, padx=20)
 
@@ -136,12 +132,7 @@ class SearchDialog:
         scrollbar = tk.Scrollbar(list_subframe)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        image_listbox = tk.Listbox(
-            list_subframe,
-            selectmode=tk.SINGLE,
-            yscrollcommand=scrollbar.set,
-            font=("Arial", 11)
-        )
+        image_listbox = tk.Listbox(list_subframe, selectmode=tk.SINGLE, yscrollcommand=scrollbar.set, font=("Arial", 11))
         image_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         scrollbar.config(command=image_listbox.yview)
@@ -221,7 +212,7 @@ class SearchDialog:
         # Função para mostrar preview
         def show_preview(*args):
             # Limpar preview anterior
-            preview_image.config(image='', text="Selecione uma imagem para visualizar")
+            preview_image.config(image="", text="Selecione uma imagem para visualizar")
 
             # Obter seleção
             selection = image_listbox.curselection()
@@ -256,7 +247,7 @@ class SearchDialog:
                 self.search_image_refs[key] = ImageTk.PhotoImage(pil_img)
 
                 # Atualizar label com a imagem
-                preview_image.config(image=self.search_image_refs[key], text='')
+                preview_image.config(image=self.search_image_refs[key], text="")
 
                 # Obter informações do status de anotação
                 base_name = os.path.splitext(os.path.basename(img_path))[0]
@@ -265,7 +256,7 @@ class SearchDialog:
 
                 if is_annotated:
                     # Contar anotações
-                    with open(annotation_path, 'r') as f:
+                    with open(annotation_path, "r") as f:
                         annotations = f.readlines()
                     preview_label.config(text=f"Preview: {os.path.basename(img_path)} - {len(annotations)} anotações")
                 else:
@@ -275,7 +266,7 @@ class SearchDialog:
                 preview_image.config(text=f"Erro ao carregar preview: {str(e)}")
 
         # Vincular evento de seleção para mostrar preview
-        image_listbox.bind('<<ListboxSelect>>', show_preview)
+        image_listbox.bind("<<ListboxSelect>>", show_preview)
 
         # Função para anotar imagem selecionada
         def annotate_selected():
@@ -297,8 +288,10 @@ class SearchDialog:
             self.result_mode = 3  # Modo especial: imagem específica selecionada
 
             # Log para debug
-            logger.info(f"Selecionada imagem {os.path.basename(selected_image)} (índice {index}). "
-                       f"Total de {len(self.filtered_images)} imagens na lista filtrada.")
+            logger.info(
+                f"Selecionada imagem {os.path.basename(selected_image)} (índice {index}). "
+                f"Total de {len(self.filtered_images)} imagens na lista filtrada."
+            )
 
             search_window.destroy()
 
@@ -311,27 +304,13 @@ class SearchDialog:
             image_listbox.selection_clear(0, tk.END)
 
         # Adicionar botões
-        tk.Button(
-            button_frame,
-            text="Cancelar",
-            command=search_window.destroy,
-            width=15
-        ).pack(side=tk.RIGHT, padx=5)
+        tk.Button(button_frame, text="Cancelar", command=search_window.destroy, width=15).pack(side=tk.RIGHT, padx=5)
 
-        tk.Button(
-            button_frame,
-            text="Anotar Imagem Selecionada",
-            command=annotate_selected,
-            bg="lightgreen",
-            width=25
-        ).pack(side=tk.RIGHT, padx=5)
+        tk.Button(button_frame, text="Anotar Imagem Selecionada", command=annotate_selected, bg="lightgreen", width=25).pack(
+            side=tk.RIGHT, padx=5
+        )
 
-        tk.Button(
-            button_frame,
-            text="Limpar Seleção",
-            command=clear_selection,
-            width=15
-        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Limpar Seleção", command=clear_selection, width=15).pack(side=tk.LEFT, padx=5)
 
         # Iniciar busca com os valores padrão
         update_image_list()
@@ -372,7 +351,7 @@ class SearchDialog:
             self.search_image_refs.clear()
 
             # Remover referência à janela temporária se existir
-            if hasattr(search_window, '_temp_root') and search_window._temp_root:
+            if hasattr(search_window, "_temp_root") and search_window._temp_root:
                 try:
                     search_window._temp_root.destroy()
                 except:
@@ -396,35 +375,27 @@ class SearchDialog:
 
         # Exibir informação sobre o último arquivo anotado
         last_file_name = os.path.basename(self.last_annotated_path)
-        last_index = self.all_images.index(
-            self.last_annotated_path) if self.last_annotated_path in self.all_images else -1
+        last_index = self.all_images.index(self.last_annotated_path) if self.last_annotated_path in self.all_images else -1
 
         progress_info = tk.Frame(progress_frame)
         progress_info.pack(fill=tk.X, padx=5, pady=5)
 
-        tk.Label(
-            progress_info,
-            text=f"Última imagem anotada: {last_file_name}",
-            font=("Arial", 10, "bold")
-        ).pack(side=tk.LEFT, padx=5)
+        tk.Label(progress_info, text=f"Última imagem anotada: {last_file_name}", font=("Arial", 10, "bold")).pack(
+            side=tk.LEFT, padx=5
+        )
 
         # Exibir progresso total
         if last_index >= 0:
             progress_percent = (last_index + 1) / len(self.all_images) * 100
-            tk.Label(
-                progress_info,
-                text=f"Progresso: {last_index + 1}/{len(self.all_images)} ({progress_percent:.1f}%)"
-            ).pack(side=tk.LEFT, padx=20)
+            tk.Label(progress_info, text=f"Progresso: {last_index + 1}/{len(self.all_images)} ({progress_percent:.1f}%)").pack(
+                side=tk.LEFT, padx=20
+            )
 
         # Botões de acesso rápido para opções de navegação
         quick_frame = tk.Frame(progress_frame)
         quick_frame.pack(fill=tk.X, padx=5, pady=10)
 
-        tk.Label(
-            quick_frame,
-            text="Opções rápidas de navegação:",
-            font=("Arial", 10, "bold")
-        ).pack(anchor="w", padx=5, pady=5)
+        tk.Label(quick_frame, text="Opções rápidas de navegação:", font=("Arial", 10, "bold")).pack(anchor="w", padx=5, pady=5)
 
         # Botões para cada opção de navegação
         button_frame = tk.Frame(quick_frame)
@@ -460,7 +431,7 @@ class SearchDialog:
             bg="lightgreen",
             padx=10,
             pady=5,
-            width=25
+            width=25,
         ).pack(side=tk.LEFT, padx=5, pady=5)
 
         # Recomeçar do início
@@ -471,7 +442,7 @@ class SearchDialog:
             bg="#FFD580",  # Light orange
             padx=10,
             pady=5,
-            width=25
+            width=25,
         ).pack(side=tk.LEFT, padx=5, pady=5)
 
         # Revisar última imagem
@@ -482,19 +453,12 @@ class SearchDialog:
             bg="#ADD8E6",  # Light blue
             padx=10,
             pady=5,
-            width=25
+            width=25,
         ).pack(side=tk.LEFT, padx=5, pady=5)
 
         # Adicionar separador
-        tk.Frame(
-            progress_frame,
-            height=2,
-            bd=1,
-            relief=tk.SUNKEN
-        ).pack(fill=tk.X, padx=5, pady=10)
+        tk.Frame(progress_frame, height=2, bd=1, relief=tk.SUNKEN).pack(fill=tk.X, padx=5, pady=10)
 
-        tk.Label(
-            progress_frame,
-            text="Ou selecione uma imagem específica abaixo:",
-            font=("Arial", 10)
-        ).pack(anchor="w", padx=5, pady=5)
+        tk.Label(progress_frame, text="Ou selecione uma imagem específica abaixo:", font=("Arial", 10)).pack(
+            anchor="w", padx=5, pady=5
+        )

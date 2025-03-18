@@ -2,12 +2,12 @@
 Salvamento e carregamento de anotações.
 """
 
-import os
-import logging
 import glob
 import json
+import logging
+import os
 from datetime import datetime
-from typing import List, Tuple, Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ class AnnotationStorage:
             Tupla com (dicionário de contagem por classe, total de anotações)
         """
         # Inicializar contagem de classes com todas as classes conhecidas
-        class_counts = {class_id.split('-')[0]: 0 for class_id in classes}
+        class_counts = {class_id.split("-")[0]: 0 for class_id in classes}
         total_boxes = 0
 
         # Percorrer todos os arquivos de anotação

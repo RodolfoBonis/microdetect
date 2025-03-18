@@ -2,13 +2,13 @@
 Diálogo para exibição de estatísticas de anotação.
 """
 
-import tkinter as tk
-import logging
 import glob
+import logging
 import os
+import tkinter as tk
 from typing import List
 
-from microdetect.annotation.annotator.ui.base import create_secure_dialog, center_window
+from microdetect.annotation.annotator.ui.base import center_window, create_secure_dialog
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ class StatisticsDialog:
             import matplotlib.pyplot as plt
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
             from matplotlib.figure import Figure
+
             self.mpl_available = True
             self.Figure = Figure
             self.FigureCanvasTkAgg = FigureCanvasTkAgg
@@ -63,7 +64,7 @@ class StatisticsDialog:
             Tupla com (dicionário de contagem por classe, total de anotações)
         """
         # Inicializar contagem de classes com todas as classes conhecidas
-        class_counts = {class_id.split('-')[0]: 0 for class_id in self.classes}
+        class_counts = {class_id.split("-")[0]: 0 for class_id in self.classes}
         total_boxes = 0
 
         # Percorrer todos os arquivos de anotação
@@ -89,8 +90,9 @@ class StatisticsDialog:
             class_counts, total_objetos = self._count_annotations_by_class()
 
             # Contar arquivos de anotação
-            annotation_files = [f for f in glob.glob(os.path.join(self.output_dir, "*.txt"))
-                                if os.path.basename(f) != self.progress_file]
+            annotation_files = [
+                f for f in glob.glob(os.path.join(self.output_dir, "*.txt")) if os.path.basename(f) != self.progress_file
+            ]
             total_imagens_anotadas = len(annotation_files)
 
             # Criar janela para o dashboard de forma segura
@@ -104,36 +106,22 @@ class StatisticsDialog:
             main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
             # Título
-            tk.Label(
-                main_frame,
-                text="Estatísticas de Anotação",
-                font=("Arial", 16, "bold")
-            ).pack(pady=10)
+            tk.Label(main_frame, text="Estatísticas de Anotação", font=("Arial", 16, "bold")).pack(pady=10)
 
             # Frame para estatísticas gerais
             stats_frame = tk.Frame(main_frame)
             stats_frame.pack(fill=tk.X, pady=10)
 
             # Estatísticas gerais
-            tk.Label(
-                stats_frame,
-                text=f"Total de imagens anotadas: {total_imagens_anotadas}",
-                font=("Arial", 12)
-            ).pack(anchor="w")
+            tk.Label(stats_frame, text=f"Total de imagens anotadas: {total_imagens_anotadas}", font=("Arial", 12)).pack(
+                anchor="w"
+            )
 
-            tk.Label(
-                stats_frame,
-                text=f"Total de objetos anotados: {total_objetos}",
-                font=("Arial", 12)
-            ).pack(anchor="w")
+            tk.Label(stats_frame, text=f"Total de objetos anotados: {total_objetos}", font=("Arial", 12)).pack(anchor="w")
 
             # Média de objetos por imagem
             avg_objects = total_objetos / total_imagens_anotadas if total_imagens_anotadas > 0 else 0
-            tk.Label(
-                stats_frame,
-                text=f"Média de objetos por imagem: {avg_objects:.2f}",
-                font=("Arial", 12)
-            ).pack(anchor="w")
+            tk.Label(stats_frame, text=f"Média de objetos por imagem: {avg_objects:.2f}", font=("Arial", 12)).pack(anchor="w")
 
             # Frame para gráficos
             graph_frame = tk.Frame(main_frame)
@@ -142,7 +130,7 @@ class StatisticsDialog:
             # Preparar dados para o gráfico
             classes = []
             counts = []
-            colors = ['#4CAF50', '#2196F3', '#FFC107', '#F44336', '#9C27B0', '#00BCD4', '#FF9800', '#795548']
+            colors = ["#4CAF50", "#2196F3", "#FFC107", "#F44336", "#9C27B0", "#00BCD4", "#FF9800", "#795548"]
 
             for i, (class_id, count) in enumerate(sorted(class_counts.items())):
                 if count > 0:
@@ -158,10 +146,10 @@ class StatisticsDialog:
                 ax1 = figure.add_subplot(121)  # 1 linha, 2 colunas, posição 1
 
                 # Criar gráfico de barras
-                ax1.bar(classes, counts, color=colors[:len(classes)])
-                ax1.set_title('Distribuição de Classes')
-                ax1.set_ylabel('Quantidade')
-                ax1.tick_params(axis='x', rotation=45)
+                ax1.bar(classes, counts, color=colors[: len(classes)])
+                ax1.set_title("Distribuição de Classes")
+                ax1.set_ylabel("Quantidade")
+                ax1.tick_params(axis="x", rotation=45)
 
                 # Gráfico de pizza com porcentagens
                 ax2 = figure.add_subplot(122)  # 1 linha, 2 colunas, posição 2
@@ -169,9 +157,8 @@ class StatisticsDialog:
                 # Calcular porcentagens
                 if sum(counts) > 0:
                     percentages = [count / sum(counts) * 100 for count in counts]
-                    ax2.pie(percentages, labels=classes, autopct='%1.1f%%',
-                            startangle=90, colors=colors[:len(classes)])
-                    ax2.set_title('Porcentagem por Classe')
+                    ax2.pie(percentages, labels=classes, autopct="%1.1f%%", startangle=90, colors=colors[: len(classes)])
+                    ax2.set_title("Porcentagem por Classe")
 
                 figure.tight_layout()
 
@@ -195,74 +182,41 @@ class StatisticsDialog:
             details_frame.pack(fill=tk.X, pady=10)
 
             # Título da seção
-            tk.Label(
-                details_frame,
-                text="Detalhes por Classe",
-                font=("Arial", 12, "bold")
-            ).pack(anchor="w", pady=5)
+            tk.Label(details_frame, text="Detalhes por Classe", font=("Arial", 12, "bold")).pack(anchor="w", pady=5)
 
             # Tabela de detalhes
             class_details = tk.Frame(details_frame)
             class_details.pack(fill=tk.X)
 
             # Cabeçalhos
-            tk.Label(
-                class_details,
-                text="Classe",
-                width=20,
-                font=("Arial", 10, "bold"),
-                relief=tk.RIDGE
-            ).grid(row=0, column=0, sticky="ew")
+            tk.Label(class_details, text="Classe", width=20, font=("Arial", 10, "bold"), relief=tk.RIDGE).grid(
+                row=0, column=0, sticky="ew"
+            )
 
-            tk.Label(
-                class_details,
-                text="Quantidade",
-                width=10,
-                font=("Arial", 10, "bold"),
-                relief=tk.RIDGE
-            ).grid(row=0, column=1, sticky="ew")
+            tk.Label(class_details, text="Quantidade", width=10, font=("Arial", 10, "bold"), relief=tk.RIDGE).grid(
+                row=0, column=1, sticky="ew"
+            )
 
-            tk.Label(
-                class_details,
-                text="Porcentagem",
-                width=15,
-                font=("Arial", 10, "bold"),
-                relief=tk.RIDGE
-            ).grid(row=0, column=2, sticky="ew")
+            tk.Label(class_details, text="Porcentagem", width=15, font=("Arial", 10, "bold"), relief=tk.RIDGE).grid(
+                row=0, column=2, sticky="ew"
+            )
 
             # Preencher dados da tabela
             for i, (class_name, count) in enumerate(zip(classes, counts)):
                 percentage = count / total_objetos * 100 if total_objetos > 0 else 0
 
-                tk.Label(
-                    class_details,
-                    text=class_name,
-                    width=20,
-                    anchor="w",
-                    relief=tk.RIDGE
-                ).grid(row=i + 1, column=0, sticky="ew")
+                tk.Label(class_details, text=class_name, width=20, anchor="w", relief=tk.RIDGE).grid(
+                    row=i + 1, column=0, sticky="ew"
+                )
 
-                tk.Label(
-                    class_details,
-                    text=str(count),
-                    width=10,
-                    relief=tk.RIDGE
-                ).grid(row=i + 1, column=1, sticky="ew")
+                tk.Label(class_details, text=str(count), width=10, relief=tk.RIDGE).grid(row=i + 1, column=1, sticky="ew")
 
-                tk.Label(
-                    class_details,
-                    text=f"{percentage:.1f}%",
-                    width=15,
-                    relief=tk.RIDGE
-                ).grid(row=i + 1, column=2, sticky="ew")
+                tk.Label(class_details, text=f"{percentage:.1f}%", width=15, relief=tk.RIDGE).grid(
+                    row=i + 1, column=2, sticky="ew"
+                )
 
             # Botão para fechar
-            tk.Button(
-                main_frame,
-                text="Fechar",
-                command=stats_window.destroy,
-                width=10
-            ).pack(pady=10)
+            tk.Button(main_frame, text="Fechar", command=stats_window.destroy, width=10).pack(pady=10)
 
             # Centralizar janela
             center_window(stats_window)
@@ -274,7 +228,7 @@ class StatisticsDialog:
             # Limpar recursos ao fechar
             def on_closing():
                 # Remover referência à janela temporária se existir
-                if hasattr(stats_window, '_temp_root') and stats_window._temp_root:
+                if hasattr(stats_window, "_temp_root") and stats_window._temp_root:
                     try:
                         stats_window._temp_root.destroy()
                     except:

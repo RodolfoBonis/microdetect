@@ -2,12 +2,12 @@
 Funções de backup para anotações.
 """
 
-import os
 import glob
+import logging
+import os
+import re
 import shutil
 import time
-import re
-import logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -98,13 +98,11 @@ class AnnotationBackup:
 
             # Manter apenas os N mais recentes, excluir os demais
             if len(backup_dirs) > self.max_backups:
-                for old_backup in backup_dirs[self.max_backups:]:
+                for old_backup in backup_dirs[self.max_backups :]:
                     try:
                         shutil.rmtree(old_backup)
                         logger.info(f"Removido backup antigo: {os.path.basename(old_backup)}")
                     except Exception as e:
-                        logger.warning(
-                            f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}"
-                        )
+                        logger.warning(f"Não foi possível remover backup antigo {os.path.basename(old_backup)}: {str(e)}")
         except Exception as e:
             logger.error(f"Erro ao limpar backups antigos: {str(e)}")

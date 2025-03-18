@@ -2,12 +2,12 @@
 Gerenciamento de progresso para anotação de imagens.
 """
 
-import os
-import json
 import glob
+import json
 import logging
+import os
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class ProgressManager:
             progress_data = {
                 "last_annotated": current_image,
                 "timestamp": datetime.now().isoformat(),
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
             }
 
             # Adicionar dados extras se fornecidos
@@ -64,14 +64,13 @@ class ProgressManager:
                         existing_data["annotation_history"] = []
 
                     # Adicionar entrada atual ao histórico
-                    history_entry = {
-                        "image": current_image,
-                        "timestamp": datetime.now().isoformat()
-                    }
+                    history_entry = {"image": current_image, "timestamp": datetime.now().isoformat()}
 
                     # Evitar duplicatas no histórico
-                    if not existing_data["annotation_history"] or existing_data["annotation_history"][-1][
-                        "image"] != current_image:
+                    if (
+                        not existing_data["annotation_history"]
+                        or existing_data["annotation_history"][-1]["image"] != current_image
+                    ):
                         existing_data["annotation_history"].append(history_entry)
 
                     # Limitar tamanho do histórico
@@ -213,19 +212,11 @@ class ProgressManager:
         progress_data = self.load_progress(output_dir)
 
         if not progress_data:
-            return {
-                "session_active": False,
-                "session_duration": 0,
-                "images_annotated_session": 0
-            }
+            return {"session_active": False, "session_duration": 0, "images_annotated_session": 0}
 
         # Verificar se há dados de sessão
         if "session_start" not in progress_data:
-            return {
-                "session_active": False,
-                "session_duration": 0,
-                "images_annotated_session": 0
-            }
+            return {"session_active": False, "session_duration": 0, "images_annotated_session": 0}
 
         # Calcular duração da sessão
         try:
@@ -238,16 +229,11 @@ class ProgressManager:
                 "session_active": True,
                 "session_start": session_start.isoformat(),
                 "session_duration": duration_seconds,
-                "images_annotated_session": progress_data.get("images_annotated_session", 0)
+                "images_annotated_session": progress_data.get("images_annotated_session", 0),
             }
         except Exception as e:
             logger.error(f"Erro ao calcular estatísticas de sessão: {e}")
-            return {
-                "session_active": False,
-                "session_duration": 0,
-                "images_annotated_session": 0,
-                "error": str(e)
-            }
+            return {"session_active": False, "session_duration": 0, "images_annotated_session": 0, "error": str(e)}
 
     def start_session(self, output_dir: str) -> bool:
         """
@@ -307,7 +293,7 @@ class ProgressManager:
             "start_time": progress_data.get("session_start"),
             "end_time": datetime.now().isoformat(),
             "duration_seconds": session_stats["session_duration"],
-            "images_annotated": progress_data.get("images_annotated_session", 0)
+            "images_annotated": progress_data.get("images_annotated_session", 0),
         }
 
         # Adicionar ao histórico
@@ -334,16 +320,10 @@ class ProgressManager:
             logger.info(f"Sessão de anotação finalizada: {session_summary['end_time']}")
 
             # Retornar resumo da sessão
-            return {
-                "session_active": False,
-                "session_summary": session_summary
-            }
+            return {"session_active": False, "session_summary": session_summary}
         except Exception as e:
             logger.error(f"Erro ao finalizar sessão: {str(e)}")
-            return {
-                "session_active": False,
-                "error": str(e)
-            }
+            return {"session_active": False, "error": str(e)}
 
     def increment_session_count(self, output_dir: str) -> bool:
         """

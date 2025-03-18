@@ -46,33 +46,33 @@ class KeyboardHandler:
 
         try:
             # Navegação e visualização
-            self.root.bind("<r>", lambda e: self._call_callback('reset_zoom'))
-            self.root.bind("<p>", lambda e: self._call_callback('toggle_pan_mode'))
-            self.root.bind("<w>", lambda e: self._call_callback('reset_zoom'))
+            self.root.bind("<r>", lambda e: self._call_callback("reset_zoom"))
+            self.root.bind("<p>", lambda e: self._call_callback("toggle_pan_mode"))
+            self.root.bind("<w>", lambda e: self._call_callback("reset_zoom"))
 
             # Edição
-            self.root.bind("<e>", lambda e: self._call_callback('toggle_edit_mode'))
-            self.root.bind("<z>", lambda e: self._call_callback('undo'))
-            self.root.bind("<Delete>", lambda e: self._call_callback('delete_selected'))
-            self.root.bind("<Escape>", lambda e: self._call_callback('select_none'))
-            self.root.bind("<c>", lambda e: self._call_callback('cycle_classes'))
+            self.root.bind("<e>", lambda e: self._call_callback("toggle_edit_mode"))
+            self.root.bind("<z>", lambda e: self._call_callback("undo"))
+            self.root.bind("<Delete>", lambda e: self._call_callback("delete_selected"))
+            self.root.bind("<Escape>", lambda e: self._call_callback("select_none"))
+            self.root.bind("<c>", lambda e: self._call_callback("cycle_classes"))
 
             # Salvamento
-            self.root.bind("<s>", lambda e: self._call_callback('save'))
-            self.root.bind("<x>", lambda e: self._call_callback('save_and_exit'))
-            self.root.bind("<n>", lambda e: self._call_callback('save_and_next'))
+            self.root.bind("<s>", lambda e: self._call_callback("save"))
+            self.root.bind("<x>", lambda e: self._call_callback("save_and_exit"))
+            self.root.bind("<n>", lambda e: self._call_callback("save_and_next"))
 
             # Ferramentas
-            self.root.bind("<S>", lambda e: self._call_callback('show_statistics'))
-            self.root.bind("<b>", lambda e: self._call_callback('show_search_dialog'))
-            self.root.bind("<i>", lambda e: self._call_callback('show_export_import'))
+            self.root.bind("<S>", lambda e: self._call_callback("show_statistics"))
+            self.root.bind("<b>", lambda e: self._call_callback("show_search_dialog"))
+            self.root.bind("<i>", lambda e: self._call_callback("show_export_import"))
 
             # Sugestões automáticas
-            self.root.bind("<g>", lambda e: self._call_callback('toggle_suggestion_mode'))
-            self.root.bind("<f>", lambda e: self._call_callback('apply_suggestions'))
+            self.root.bind("<g>", lambda e: self._call_callback("toggle_suggestion_mode"))
+            self.root.bind("<f>", lambda e: self._call_callback("apply_suggestions"))
 
             # Sair
-            self.root.bind("<q>", lambda e: self._call_callback('on_closing'))
+            self.root.bind("<q>", lambda e: self._call_callback("on_closing"))
 
         except Exception as e:
             logger.error(f"Erro ao configurar atalhos de teclado: {e}")

@@ -31,16 +31,16 @@ class ErrorAnalyzer:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def analyze_errors(
-            self,
-            model_path: str,
-            data_yaml: str,
-            dataset_dir: str,
-            error_type: Literal[
-                "false_positives", "false_negatives", "classification_errors", "localization_errors", "all"
-            ] = "all",
-            conf_threshold: float = 0.25,
-            iou_threshold: float = 0.5,
-            max_samples: int = 20,
+        self,
+        model_path: str,
+        data_yaml: str,
+        dataset_dir: str,
+        error_type: Literal[
+            "false_positives", "false_negatives", "classification_errors", "localization_errors", "all"
+        ] = "all",
+        conf_threshold: float = 0.25,
+        iou_threshold: float = 0.5,
+        max_samples: int = 20,
     ) -> Dict[str, Any]:
         """
         Analisa e visualiza erros de detecção específicos.

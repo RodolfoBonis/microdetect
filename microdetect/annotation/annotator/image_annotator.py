@@ -3,36 +3,30 @@ Classe principal para anotação manual de imagens.
 Orquestra todos os componentes do sistema de anotação.
 """
 
-import os
 import glob
 import logging
+import os
 import time
 import tkinter as tk
 from tkinter import messagebox
-from typing import List, Optional, Tuple, Dict, Any, Callable
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from microdetect.annotation.annotator.annotation import AnnotationStorage, AnnotationVisualizer, BoundingBoxManager
+from microdetect.annotation.annotator.handlers import ActionHistory, KeyboardHandler, MouseHandler
+from microdetect.annotation.annotator.image import ImageLoader, ImageProcessor
+from microdetect.annotation.annotator.suggestions import SuggestionGenerator
+from microdetect.annotation.annotator.ui import MainWindow, SearchDialog, StatisticsDialog, is_window_valid
+from microdetect.annotation.annotator.utils import (
+    DEFAULT_AUTO_SAVE,
+    DEFAULT_AUTO_SAVE_INTERVAL,
+    AnnotationBackup,
+    ProgressManager,
+)
 from microdetect.annotation.export_import import create_export_import_ui
 from microdetect.utils.config import config
 
-from microdetect.annotation.annotator.ui import (
-    MainWindow, SearchDialog, StatisticsDialog, is_window_valid
-)
-from microdetect.annotation.annotator.handlers import (
-    ActionHistory, KeyboardHandler, MouseHandler
-)
-from microdetect.annotation.annotator.image import (
-    ImageLoader, ImageProcessor
-)
-from microdetect.annotation.annotator.annotation import (
-    BoundingBoxManager, AnnotationStorage, AnnotationVisualizer
-)
-from microdetect.annotation.annotator.suggestions import SuggestionGenerator
-from microdetect.annotation.annotator.utils import (
-    DEFAULT_AUTO_SAVE, DEFAULT_AUTO_SAVE_INTERVAL,
-    AnnotationBackup, ProgressManager
-)
-
 logger = logging.getLogger(__name__)
+
 
 class ImageAnnotator:
     """
@@ -40,10 +34,10 @@ class ImageAnnotator:
     """
 
     def __init__(
-            self,
-            classes: List[str] = None,
-            auto_save: bool = DEFAULT_AUTO_SAVE,
-            auto_save_interval: int = DEFAULT_AUTO_SAVE_INTERVAL,
+        self,
+        classes: List[str] = None,
+        auto_save: bool = DEFAULT_AUTO_SAVE,
+        auto_save_interval: int = DEFAULT_AUTO_SAVE_INTERVAL,
     ):
         """
         Inicializa o anotador de imagens.
@@ -65,7 +59,6 @@ class ImageAnnotator:
         self.window_closed = False
         self.user_cancelled = False
         self.next_image_requested = False
-
 
         # Estado para controle de fluxo
         self.window_closed = False
@@ -137,44 +130,37 @@ class ImageAnnotator:
         """
         return {
             # Estados e modos
-            'reset_window_closed': self._reset_window_closed,
-            'get_current_class': self._get_current_class,
-            'set_current_class': self._set_current_class,
-            'toggle_edit_mode': self.toggle_edit_mode,
-            'toggle_pan_mode': self.toggle_pan_mode,
-            'select_none': self._select_none,
-
+            "reset_window_closed": self._reset_window_closed,
+            "get_current_class": self._get_current_class,
+            "set_current_class": self._set_current_class,
+            "toggle_edit_mode": self.toggle_edit_mode,
+            "toggle_pan_mode": self.toggle_pan_mode,
+            "select_none": self._select_none,
             # Ações de edição
-            'undo': self.undo,
-            'delete_selected': self.delete_selected,
-            'reset': self.reset_boxes,
-            'add_to_history': self._add_to_history,
-
+            "undo": self.undo,
+            "delete_selected": self.delete_selected,
+            "reset": self.reset_boxes,
+            "add_to_history": self._add_to_history,
             # Ações de zoom e visualização
-            'reset_zoom': self.reset_zoom,
-            'redraw_with_zoom': self._redraw_with_zoom,
-
+            "reset_zoom": self.reset_zoom,
+            "redraw_with_zoom": self._redraw_with_zoom,
             # Salvamento
-            'save': self.save,
-            'save_and_exit': self.save_and_exit,
-            'save_and_next': self.save_and_next,
-            'check_auto_save': self._check_auto_save,
-
+            "save": self.save,
+            "save_and_exit": self.save_and_exit,
+            "save_and_next": self.save_and_next,
+            "check_auto_save": self._check_auto_save,
             # Navegação de classes
-            'cycle_classes': self.cycle_classes,
-
+            "cycle_classes": self.cycle_classes,
             # Diálogos
-            'show_statistics': self.show_statistics,
-            'show_search_dialog': self._show_search_dialog,
-            'show_export_import': self._show_export_import,
-
+            "show_statistics": self.show_statistics,
+            "show_search_dialog": self._show_search_dialog,
+            "show_export_import": self._show_export_import,
             # Sugestões automáticas
-            'toggle_suggestion_mode': self.toggle_suggestion_mode,
-            'apply_suggestions': self.apply_suggested_annotations,
-
+            "toggle_suggestion_mode": self.toggle_suggestion_mode,
+            "apply_suggestions": self.apply_suggested_annotations,
             # Interface
-            'update_status': self.update_status,
-            'on_closing': self.on_closing
+            "update_status": self.update_status,
+            "on_closing": self.on_closing,
         }
 
     def _reset_window_closed(self):
@@ -247,9 +233,7 @@ class ImageAnnotator:
 
         # Carregar anotações existentes
         boxes = self.annotation_storage.load_annotations(
-            os.path.join(output_dir, f"{base_name}.txt"),
-            self.original_w,
-            self.original_h
+            os.path.join(output_dir, f"{base_name}.txt"), self.original_w, self.original_h
         )
 
         # Adicionar as caixas carregadas ao gerenciador
@@ -268,10 +252,7 @@ class ImageAnnotator:
 
         # Criar e configurar manipuladores de eventos
         self.mouse_handler = MouseHandler(
-            self.canvas,
-            self.box_manager,
-            AnnotationVisualizer(self.canvas, self.classes),
-            callbacks
+            self.canvas, self.box_manager, AnnotationVisualizer(self.canvas, self.classes), callbacks
         )
 
         # Configurar escalas no manipulador de mouse
@@ -288,9 +269,7 @@ class ImageAnnotator:
         # Desenhar as bounding boxes existentes
         redraw = AnnotationVisualizer(self.canvas, self.classes)
         redraw.draw_bounding_boxes(
-            self.box_manager.get_all_boxes(),
-            display_scale=self.display_scale,
-            scale_factor=self.scale_factor
+            self.box_manager.get_all_boxes(), display_scale=self.display_scale, scale_factor=self.scale_factor
         )
 
         # Atualizar contador na interface
@@ -398,19 +377,11 @@ class ImageAnnotator:
 
             # Salvar anotações
             self.annotation_storage.save_annotations(
-                self.box_manager.get_all_boxes(),
-                output_dir,
-                base_name,
-                self.original_w,
-                self.original_h
+                self.box_manager.get_all_boxes(), output_dir, base_name, self.original_w, self.original_h
             )
 
             # Registrar progresso
-            self.progress_manager.save_progress(
-                output_dir,
-                self.current_image_path,
-                {"last_auto_save": current_time}
-            )
+            self.progress_manager.save_progress(output_dir, self.current_image_path, {"last_auto_save": current_time})
 
             self.last_save_time = current_time
             self.update_status("Auto-save realizado")
@@ -436,11 +407,11 @@ class ImageAnnotator:
             box_count: Número de caixas (opcional)
         """
         # Se box_count não for fornecido, usar contagem atual
-        if box_count is None and hasattr(self, 'box_manager'):
+        if box_count is None and hasattr(self, "box_manager"):
             box_count = self.box_manager.get_box_count()
 
         # Atualizar interface
-        if hasattr(self, 'main_window'):
+        if hasattr(self, "main_window"):
             self.main_window.update_status(msg, box_count)
 
     def toggle_edit_mode(self):
@@ -449,31 +420,29 @@ class ImageAnnotator:
         self.pan_mode = False  # Desativar navegação ao ativar edição
 
         # Resetar estado
-        if hasattr(self, 'box_manager'):
+        if hasattr(self, "box_manager"):
             self.box_manager.select_box(None)
             self.box_manager.resize_handle = 0
 
         # Atualizar interface
         button_manager = self.main_window.get_button_manager()
         button_manager.update_button_state(
-            'edit_mode',
+            "edit_mode",
             text="Modo Desenho (E)" if self.edit_mode else "Modo Edição (E)",
-            bg="lightblue" if self.edit_mode else "#f0f0f0"
+            bg="lightblue" if self.edit_mode else "#f0f0f0",
         )
 
         # Atualizar modo no manipulador de mouse
-        if hasattr(self, 'mouse_handler'):
+        if hasattr(self, "mouse_handler"):
             self.mouse_handler.set_mode(self.edit_mode, self.pan_mode)
 
         self.update_status()
 
         # Redesenhar caixas
-        if hasattr(self, 'canvas') and hasattr(self, 'box_manager'):
+        if hasattr(self, "canvas") and hasattr(self, "box_manager"):
             visualizer = AnnotationVisualizer(self.canvas, self.classes)
             visualizer.draw_bounding_boxes(
-                self.box_manager.get_all_boxes(),
-                display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                self.box_manager.get_all_boxes(), display_scale=self.display_scale, scale_factor=self.scale_factor
             )
 
     def toggle_pan_mode(self):
@@ -486,35 +455,33 @@ class ImageAnnotator:
         # Atualizar interface
         button_manager = self.main_window.get_button_manager()
         button_manager.update_button_state(
-            'pan_mode',
+            "pan_mode",
             text="Modo Desenho (P)" if self.pan_mode else "Modo Navegação (P)",
-            bg="lightblue" if self.pan_mode else "#f0f0f0"
+            bg="lightblue" if self.pan_mode else "#f0f0f0",
         )
 
         # Atualizar modo no manipulador de mouse
-        if hasattr(self, 'mouse_handler'):
+        if hasattr(self, "mouse_handler"):
             self.mouse_handler.set_mode(self.edit_mode, self.pan_mode)
 
         self.update_status()
 
     def _select_none(self, event=None):
         """Desseleciona qualquer caixa selecionada."""
-        if hasattr(self, 'box_manager') and hasattr(self, 'canvas'):
+        if hasattr(self, "box_manager") and hasattr(self, "canvas"):
             self.box_manager.select_box(None)
 
             # Redesenhar
             visualizer = AnnotationVisualizer(self.canvas, self.classes)
             visualizer.draw_bounding_boxes(
-                self.box_manager.get_all_boxes(),
-                display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                self.box_manager.get_all_boxes(), display_scale=self.display_scale, scale_factor=self.scale_factor
             )
 
             self.update_status()
 
     def cycle_classes(self, event=None):
         """Alterna entre as classes disponíveis."""
-        if hasattr(self, 'class_var') and self.classes:
+        if hasattr(self, "class_var") and self.classes:
             current_idx = self.classes.index(self.class_var.get()) if self.class_var.get() in self.classes else 0
             next_idx = (current_idx + 1) % len(self.classes)
             self.class_var.set(self.classes[next_idx])
@@ -522,7 +489,7 @@ class ImageAnnotator:
 
     def undo(self, event=None):
         """Desfaz a última ação."""
-        if not hasattr(self, 'action_history') or not hasattr(self, 'box_manager'):
+        if not hasattr(self, "action_history") or not hasattr(self, "box_manager"):
             return
 
         if self.action_history.is_empty():
@@ -545,12 +512,9 @@ class ImageAnnotator:
                 before_box = data.get("before")
                 if before_box:
                     self.box_manager.update_box(
-                        data.get("index"),
-                        before_box[0], before_box[1], before_box[2], before_box[3], before_box[4]
+                        data.get("index"), before_box[0], before_box[1], before_box[2], before_box[3], before_box[4]
                     )
-                    self.update_status(
-                        f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa"
-                    )
+                    self.update_status(f"Desfez: {'Movimentação' if action_type == 'move' else 'Redimensionamento'} de caixa")
         elif action_type == "delete":
             box = data.get("box")
             if box:
@@ -559,18 +523,18 @@ class ImageAnnotator:
                     self.update_status("Desfez: Exclusão de caixa")
 
         # Redesenhar
-        if hasattr(self, 'canvas'):
+        if hasattr(self, "canvas"):
             visualizer = AnnotationVisualizer(self.canvas, self.classes)
             visualizer.draw_bounding_boxes(
                 self.box_manager.get_all_boxes(),
                 highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                 display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
             )
 
     def delete_selected(self, event=None):
         """Remove a caixa selecionada ou a última caixa."""
-        if not hasattr(self, 'box_manager'):
+        if not hasattr(self, "box_manager"):
             return
 
         # Remover caixa selecionada ou a última
@@ -601,18 +565,18 @@ class ImageAnnotator:
             return
 
         # Redesenhar
-        if hasattr(self, 'canvas'):
+        if hasattr(self, "canvas"):
             visualizer = AnnotationVisualizer(self.canvas, self.classes)
             visualizer.draw_bounding_boxes(
                 self.box_manager.get_all_boxes(),
                 highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                 display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
             )
 
     def reset_boxes(self):
         """Remove todas as caixas."""
-        if not hasattr(self, 'box_manager'):
+        if not hasattr(self, "box_manager"):
             return
 
         if self.box_manager.get_box_count() == 0:
@@ -631,7 +595,7 @@ class ImageAnnotator:
         self.box_manager.clear_all()
 
         # Atualizar interface
-        if hasattr(self, 'canvas'):
+        if hasattr(self, "canvas"):
             visualizer = AnnotationVisualizer(self.canvas, self.classes)
             visualizer.clear_all()
 
@@ -639,7 +603,7 @@ class ImageAnnotator:
 
     def reset_zoom(self, event=None):
         """Reinicia o zoom para escala normal."""
-        if not hasattr(self, 'image_processor') or not hasattr(self, 'canvas'):
+        if not hasattr(self, "image_processor") or not hasattr(self, "canvas"):
             return
 
         self.scale_factor = 1.0
@@ -653,7 +617,7 @@ class ImageAnnotator:
         Args:
             scale_factor: Novo fator de escala
         """
-        if not hasattr(self, 'canvas') or not hasattr(self, 'image_loader'):
+        if not hasattr(self, "canvas") or not hasattr(self, "image_loader"):
             return
 
         # Atualizar variável de instância
@@ -680,7 +644,7 @@ class ImageAnnotator:
         self.canvas.config(scrollregion=self.canvas.bbox(tk.ALL))
 
         # Atualizar manipulador de mouse com novas escalas
-        if hasattr(self, 'mouse_handler'):
+        if hasattr(self, "mouse_handler"):
             self.mouse_handler.set_config(self.display_scale, self.scale_factor, self.original_w, self.original_h)
 
         # Redesenhar caixas
@@ -689,20 +653,16 @@ class ImageAnnotator:
             self.box_manager.get_all_boxes(),
             highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
             display_scale=self.display_scale,
-            scale_factor=self.scale_factor
+            scale_factor=self.scale_factor,
         )
 
         # Redesenhar sugestões se necessário
         if self.suggestion_mode and self.suggested_boxes:
-            visualizer.draw_suggestions(
-                self.suggested_boxes,
-                self.display_scale,
-                self.scale_factor
-            )
+            visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
 
     def save(self, event=None):
         """Salva as anotações."""
-        if not hasattr(self, 'box_manager') or not hasattr(self, 'current_image_path'):
+        if not hasattr(self, "box_manager") or not hasattr(self, "current_image_path"):
             return
 
         try:
@@ -716,21 +676,12 @@ class ImageAnnotator:
 
             # Salvar anotações
             annotation_path = self.annotation_storage.save_annotations(
-                self.box_manager.get_all_boxes(),
-                output_dir,
-                base_name,
-                self.original_w,
-                self.original_h
+                self.box_manager.get_all_boxes(), output_dir, base_name, self.original_w, self.original_h
             )
 
             # Registrar progresso com dados adicionais
             self.progress_manager.save_progress(
-                output_dir,
-                self.current_image_path,
-                {
-                    "last_save": time.time(),
-                    "box_count": self.box_manager.get_box_count()
-                }
+                output_dir, self.current_image_path, {"last_save": time.time(), "box_count": self.box_manager.get_box_count()}
             )
 
             self.last_save_time = time.time()
@@ -753,7 +704,7 @@ class ImageAnnotator:
             # Finalizar sessão e registrar estatísticas
             self.progress_manager.end_session(os.path.dirname(self.current_image_path))
 
-            if hasattr(self, 'root') and self.root:
+            if hasattr(self, "root") and self.root:
                 self.root.destroy()
         except Exception as e:
             logger.error(f"Erro ao salvar e sair: {e}")
@@ -762,7 +713,7 @@ class ImageAnnotator:
 
             try:
                 self._cleanup_timers()  # Limpar timers como última tentativa
-                if hasattr(self, 'root') and self.root:
+                if hasattr(self, "root") and self.root:
                     self.root.destroy()
             except:
                 pass
@@ -774,7 +725,7 @@ class ImageAnnotator:
             self.save()
 
             # Registrar progresso
-            if hasattr(self, 'progress_manager'):
+            if hasattr(self, "progress_manager"):
                 self.progress_manager.increment_session_count(os.path.dirname(self.current_image_path))
 
             # Definir flags - FUNDAMENTAL para o funcionamento correto
@@ -788,17 +739,14 @@ class ImageAnnotator:
             self._cleanup_timers()
 
             # Limpar referências de imagem
-            if hasattr(self, 'image_loader'):
+            if hasattr(self, "image_loader"):
                 self.image_loader.cleanup_references()
 
             # Exibir mensagem de sucesso
-            messagebox.showinfo(
-                "Anotação Salva",
-                "Anotação salva com sucesso! Avançando para a próxima imagem."
-            )
+            messagebox.showinfo("Anotação Salva", "Anotação salva com sucesso! Avançando para a próxima imagem.")
 
             # Fechar a janela - CRÍTICO: fechar a janela, não o programa
-            if hasattr(self, 'root') and self.root:
+            if hasattr(self, "root") and self.root:
                 self.root.destroy()
 
             logger.info("save_and_next: Janela fechada com sucesso!")
@@ -811,7 +759,7 @@ class ImageAnnotator:
 
             # Tentar fechar as janelas
             try:
-                if hasattr(self, 'root') and self.root:
+                if hasattr(self, "root") and self.root:
                     self.root.destroy()
             except:
                 pass
@@ -819,12 +767,12 @@ class ImageAnnotator:
     def on_closing(self, event=None):
         """Manipula o evento de fechamento da janela."""
         try:
-            if hasattr(self, 'box_manager') and self.box_manager.get_box_count() > 0:
+            if hasattr(self, "box_manager") and self.box_manager.get_box_count() > 0:
                 if messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?"):
                     self.save()
 
             # Limpar referências de imagem
-            if hasattr(self, 'image_loader'):
+            if hasattr(self, "image_loader"):
                 self.image_loader.cleanup_references()
         except:
             pass  # Ignorar erros durante o fechamento
@@ -838,7 +786,7 @@ class ImageAnnotator:
 
         # Fechar a janela
         try:
-            if hasattr(self, 'root') and self.root:
+            if hasattr(self, "root") and self.root:
                 self.root.destroy()
         except:
             pass
@@ -851,27 +799,21 @@ class ImageAnnotator:
 
         if self.suggestion_mode:
             # Gerar sugestões para a imagem atual
-            if hasattr(self, 'current_image_path') and self.current_image_path:
+            if hasattr(self, "current_image_path") and self.current_image_path:
                 self.suggested_boxes = self.suggestion_generator.generate_suggestions(self.current_image_path)
 
                 # Mostrar as sugestões na interface
-                if hasattr(self, 'canvas'):
+                if hasattr(self, "canvas"):
                     visualizer = AnnotationVisualizer(self.canvas, self.classes)
-                    visualizer.draw_suggestions(
-                        self.suggested_boxes,
-                        self.display_scale,
-                        self.scale_factor
-                    )
+                    visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
 
                 self.update_status(f"Modo de sugestão ativado: {len(self.suggested_boxes)} sugestões disponíveis")
 
                 # Habilitar botão de aplicar
-                if hasattr(self, 'main_window'):
+                if hasattr(self, "main_window"):
                     button_manager = self.main_window.get_button_manager()
-                    button_manager.update_button_state('apply_suggestions', state=tk.NORMAL)
-                    button_manager.update_button_state('suggestion',
-                                                      bg="lightblue",
-                                                      text="Desativar Sugestões (G)")
+                    button_manager.update_button_state("apply_suggestions", state=tk.NORMAL)
+                    button_manager.update_button_state("suggestion", bg="lightblue", text="Desativar Sugestões (G)")
             else:
                 self.update_status("Não foi possível gerar sugestões: imagem não encontrada")
                 self.suggestion_mode = False
@@ -880,7 +822,7 @@ class ImageAnnotator:
             self.suggested_boxes = []
 
             # Remover visualização das sugestões
-            if hasattr(self, 'canvas'):
+            if hasattr(self, "canvas"):
                 self.canvas.delete("suggestion")
                 self.canvas.delete("suggestion_label")
 
@@ -890,25 +832,23 @@ class ImageAnnotator:
                     self.box_manager.get_all_boxes(),
                     highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                     display_scale=self.display_scale,
-                    scale_factor=self.scale_factor
+                    scale_factor=self.scale_factor,
                 )
 
             self.update_status("Modo de sugestão desativado")
 
             # Desabilitar botão de aplicar
-            if hasattr(self, 'main_window'):
+            if hasattr(self, "main_window"):
                 button_manager = self.main_window.get_button_manager()
-                button_manager.update_button_state('apply_suggestions', state=tk.DISABLED)
-                button_manager.update_button_state('suggestion',
-                                                   bg="#f0f0f0",
-                                                   text="Sugestões Automáticas (G)")
+                button_manager.update_button_state("apply_suggestions", state=tk.DISABLED)
+                button_manager.update_button_state("suggestion", bg="#f0f0f0", text="Sugestões Automáticas (G)")
 
     def apply_suggested_annotations(self):
         """
         Aplica as sugestões automáticas à imagem atual.
         Chamada quando o usuário aceita as sugestões.
         """
-        if not hasattr(self, 'suggested_boxes') or not self.suggested_boxes:
+        if not hasattr(self, "suggested_boxes") or not self.suggested_boxes:
             self.update_status("Não há sugestões para aplicar")
             return False
 
@@ -924,7 +864,7 @@ class ImageAnnotator:
         self.suggested_boxes = []
 
         # Atualizar interface
-        if hasattr(self, 'canvas'):
+        if hasattr(self, "canvas"):
             # Limpar sugestões visuais
             self.canvas.delete("suggestion")
             self.canvas.delete("suggestion_label")
@@ -935,15 +875,15 @@ class ImageAnnotator:
                 self.box_manager.get_all_boxes(),
                 highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                 display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
             )
 
         self.update_status(f"{suggestions_count} sugestões aplicadas com sucesso")
 
         # Desabilitar botão de aplicar
-        if hasattr(self, 'main_window'):
+        if hasattr(self, "main_window"):
             button_manager = self.main_window.get_button_manager()
-            button_manager.update_button_state('apply_suggestions', state=tk.DISABLED)
+            button_manager.update_button_state("apply_suggestions", state=tk.DISABLED)
 
         return True
 
@@ -955,7 +895,7 @@ class ImageAnnotator:
             output_dir: Diretório contendo as anotações (usa diretório da imagem atual se None)
         """
         # Se output_dir não for fornecido, usar diretório da imagem atual
-        if output_dir is None and hasattr(self, 'current_image_path'):
+        if output_dir is None and hasattr(self, "current_image_path"):
             output_dir = os.path.dirname(self.current_image_path)
 
         if not output_dir:
@@ -964,16 +904,14 @@ class ImageAnnotator:
 
         # Obter dados de progresso para as estatísticas
         progress_data = {}
-        if hasattr(self, 'progress_manager'):
+        if hasattr(self, "progress_manager"):
             stats = self.progress_manager.get_session_statistics(output_dir)
-            annotated, total, percentage = self.progress_manager.calculate_progress(
-                os.path.dirname(output_dir), output_dir
-            )
+            annotated, total, percentage = self.progress_manager.calculate_progress(os.path.dirname(output_dir), output_dir)
             progress_data = {
                 "session_stats": stats,
                 "annotated_count": annotated,
                 "total_images": total,
-                "percentage": percentage
+                "percentage": percentage,
             }
 
         # Criar e mostrar o diálogo de estatísticas
@@ -984,16 +922,16 @@ class ImageAnnotator:
         """
         Abre a interface de busca/filtro de imagens e permite navegar para uma imagem selecionada.
         """
-        if not hasattr(self, 'current_image_path'):
+        if not hasattr(self, "current_image_path"):
             return
 
         # Armazenar referência à janela atual para depois
-        current_window = self.root if hasattr(self, 'root') else None
+        current_window = self.root if hasattr(self, "root") else None
         current_image_path = self.current_image_path
 
         # Verificar se há anotações não salvas na janela atual
         has_unsaved_annotations = False
-        if hasattr(self, 'box_manager') and self.box_manager.get_box_count() > 0:
+        if hasattr(self, "box_manager") and self.box_manager.get_box_count() > 0:
             has_unsaved_annotations = True
 
         # Obter imagens selecionadas
@@ -1002,7 +940,7 @@ class ImageAnnotator:
 
         # Carregar último progresso
         last_annotated_path = None
-        if hasattr(self, 'progress_manager'):
+        if hasattr(self, "progress_manager"):
             last_annotated_path = self.progress_manager.get_last_annotated_image(output_dir)
 
         search_dialog = SearchDialog(image_dir, output_dir, last_annotated_path or current_image_path)
@@ -1012,7 +950,7 @@ class ImageAnnotator:
         logger.info(f"_show_search_dialog: {len(selected_images)} imagens selecionadas, modo={mode}")
 
         # MODIFICAÇÃO: Obter o índice inicial definido no diálogo de busca
-        start_index = getattr(search_dialog, 'start_index', 0)
+        start_index = getattr(search_dialog, "start_index", 0)
 
         # Se o usuário selecionou imagens, verificar se podemos navegar para elas
         if selected_images and len(selected_images) >= 1:
@@ -1020,8 +958,7 @@ class ImageAnnotator:
             selected_path = selected_images[start_index]
 
             # Log para depuração
-            logger.info(
-                f"_show_search_dialog: iniciando pela imagem {os.path.basename(selected_path)} (índice {start_index})")
+            logger.info(f"_show_search_dialog: iniciando pela imagem {os.path.basename(selected_path)} (índice {start_index})")
 
             # Se a imagem selecionada for a mesma que já está aberta, não faz nada
             if current_image_path and os.path.normpath(selected_path) == os.path.normpath(current_image_path):
@@ -1055,7 +992,7 @@ class ImageAnnotator:
                         self.save()
                     else:
                         # Mesmo não salvando, finalizar sessão corretamente
-                        if hasattr(self, 'progress_manager'):
+                        if hasattr(self, "progress_manager"):
                             self.progress_manager.end_session(output_dir)
 
                     # CRÍTICO: Cancelar todos os timers ativos antes de fechar a janela
@@ -1066,7 +1003,7 @@ class ImageAnnotator:
                     path_to_open = selected_path
 
                     # Limpar referências antes de fechar a janela atual
-                    if hasattr(self, 'image_loader'):
+                    if hasattr(self, "image_loader"):
                         self.image_loader.cleanup_references()
 
                     # Definir flag para encerrar a anotação atual
@@ -1084,6 +1021,7 @@ class ImageAnnotator:
 
                     # Pequena pausa para garantir que recursos sejam liberados
                     import time
+
                     time.sleep(0.2)
 
                     # Abrir a nova janela com a imagem selecionada
@@ -1105,7 +1043,7 @@ class ImageAnnotator:
         """
         Abre o diálogo de exportação/importação de anotações.
         """
-        if not hasattr(self, 'current_image_path') or not hasattr(self, 'root'):
+        if not hasattr(self, "current_image_path") or not hasattr(self, "root"):
             return
 
         # Obter diretórios
@@ -1167,7 +1105,7 @@ class ImageAnnotator:
 
         # Determinar o índice inicial com base no modo de continuação e última imagem anotada
         # MODIFICAÇÃO: Usar o start_index definido no SearchDialog
-        start_index = getattr(search_dialog, 'start_index', 0)
+        start_index = getattr(search_dialog, "start_index", 0)
         logger.info(f"Índice inicial para anotação: {start_index} de {len(image_files)} imagens")
 
         total_annotated = 0
@@ -1206,7 +1144,7 @@ class ImageAnnotator:
                     "Esta imagem já possui anotação. O que deseja fazer?\n\n"
                     "Sim = Editar a anotação existente\n"
                     "Não = Pular esta imagem\n"
-                    "Cancelar = Interromper a anotação"
+                    "Cancelar = Interromper a anotação",
                 )
 
                 if option_selected is None:  # Cancelar
@@ -1228,7 +1166,8 @@ class ImageAnnotator:
 
             # Log de depuração para verificar flags
             logger.info(
-                f"Após annotate_image: next_image_requested={self.next_image_requested}, user_cancelled={self.user_cancelled}")
+                f"Após annotate_image: next_image_requested={self.next_image_requested}, user_cancelled={self.user_cancelled}"
+            )
 
             # Se o usuário cancelou, interromper
             if self.user_cancelled:
@@ -1252,10 +1191,7 @@ class ImageAnnotator:
                 # Se chegou ao final, avisar usuário
                 if i >= len(image_files):
                     logger.info("Chegou ao final da lista de imagens selecionadas.")
-                    messagebox.showinfo(
-                        "Anotação Completa",
-                        "Todas as imagens selecionadas foram anotadas!"
-                    )
+                    messagebox.showinfo("Anotação Completa", "Todas as imagens selecionadas foram anotadas!")
                     break
             else:
                 # Usuário não pediu para ir para próxima, então sair do loop
@@ -1281,8 +1217,8 @@ class ImageAnnotator:
         print(f"Imagens anotadas nesta sessão: {total_annotated}")
 
         # Mostrar estatísticas de sessão, se disponíveis
-        if 'session_summary' in session_stats:
-            summary = session_stats['session_summary']
+        if "session_summary" in session_stats:
+            summary = session_stats["session_summary"]
             print(f"\nTempo da sessão: {summary.get('duration_seconds', 0) // 60} minutos")
             print(f"Início: {summary.get('start_time', 'N/A')}")
             print(f"Término: {summary.get('end_time', 'N/A')}")
@@ -1296,7 +1232,7 @@ class ImageAnnotator:
                     f"Anotação finalizada!\n\n"
                     f"Total de imagens anotadas: {imagens_anotadas}\n"
                     f"Total de objetos anotados: {total_objetos}\n\n"
-                    f"Deseja visualizar o dashboard de estatísticas?"
+                    f"Deseja visualizar o dashboard de estatísticas?",
                 )
 
                 if show_stats:
@@ -1321,7 +1257,7 @@ class ImageAnnotator:
         Returns:
             True se as melhorias foram aplicadas com sucesso
         """
-        if not hasattr(self, 'image_processor') or not hasattr(self, 'image_loader'):
+        if not hasattr(self, "image_processor") or not hasattr(self, "image_loader"):
             return False
 
         try:
@@ -1350,7 +1286,7 @@ class ImageAnnotator:
             # Atualizar imagem no canvas
             self.image_loader.create_tkinter_image(img_display)
 
-            if hasattr(self, 'canvas'):
+            if hasattr(self, "canvas"):
                 self.canvas.delete("background")
                 self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image_loader.current_img_tk, tags="background")
 
@@ -1360,16 +1296,12 @@ class ImageAnnotator:
                     self.box_manager.get_all_boxes(),
                     highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                     display_scale=self.display_scale,
-                    scale_factor=self.scale_factor
+                    scale_factor=self.scale_factor,
                 )
 
                 # Redesenhar sugestões se necessário
                 if self.suggestion_mode and self.suggested_boxes:
-                    visualizer.draw_suggestions(
-                        self.suggested_boxes,
-                        self.display_scale,
-                        self.scale_factor
-                    )
+                    visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
 
             self.update_status("Imagem aprimorada aplicada")
             return True
@@ -1386,7 +1318,7 @@ class ImageAnnotator:
         Returns:
             True se as melhorias foram aplicadas com sucesso
         """
-        if not hasattr(self, 'image_processor') or not hasattr(self, 'image_loader'):
+        if not hasattr(self, "image_processor") or not hasattr(self, "image_loader"):
             return False
 
         try:
@@ -1411,7 +1343,7 @@ class ImageAnnotator:
             # Atualizar imagem no canvas
             self.image_loader.create_tkinter_image(img_display)
 
-            if hasattr(self, 'canvas'):
+            if hasattr(self, "canvas"):
                 self.canvas.delete("background")
                 self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image_loader.current_img_tk, tags="background")
 
@@ -1421,16 +1353,12 @@ class ImageAnnotator:
                     self.box_manager.get_all_boxes(),
                     highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                     display_scale=self.display_scale,
-                    scale_factor=self.scale_factor
+                    scale_factor=self.scale_factor,
                 )
 
                 # Redesenhar sugestões se necessário
                 if self.suggestion_mode and self.suggested_boxes:
-                    visualizer.draw_suggestions(
-                        self.suggested_boxes,
-                        self.display_scale,
-                        self.scale_factor
-                    )
+                    visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
 
             self.update_status("Melhoria para microscopia aplicada")
             return True

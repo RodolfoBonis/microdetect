@@ -2,10 +2,11 @@
 Módulo para carregamento e manipulação de imagens.
 """
 
-import cv2
-import numpy as np
 import logging
 from typing import Optional, Tuple
+
+import cv2
+import numpy as np
 from PIL import Image, ImageTk
 
 logger = logging.getLogger(__name__)
@@ -44,8 +45,7 @@ class ImageLoader:
             logger.error(f"Erro ao carregar imagem {image_path}: {str(e)}")
             return None, 0, 0
 
-    def resize_for_display(self, img: np.ndarray, max_width: int = 800, max_height: int = 600) -> Tuple[
-        np.ndarray, float]:
+    def resize_for_display(self, img: np.ndarray, max_width: int = 800, max_height: int = 600) -> Tuple[np.ndarray, float]:
         """
         Redimensiona uma imagem para exibição, respeitando proporções.
 
@@ -94,8 +94,9 @@ class ImageLoader:
 
         return self.current_img_tk
 
-    def redraw_with_zoom(self, img: np.ndarray, canvas, scale_factor: float, display_w: int, display_h: int,
-                         display_scale: float):
+    def redraw_with_zoom(
+        self, img: np.ndarray, canvas, scale_factor: float, display_w: int, display_h: int, display_scale: float
+    ):
         """
         Redesenha a imagem com o zoom atual.
 

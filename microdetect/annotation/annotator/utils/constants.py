@@ -12,10 +12,10 @@ HANDLE_NW = 1  # Noroeste
 HANDLE_NE = 2  # Nordeste
 HANDLE_SE = 3  # Sudeste
 HANDLE_SW = 4  # Sudoeste
-HANDLE_N = 5   # Norte
-HANDLE_E = 6   # Leste
-HANDLE_S = 7   # Sul
-HANDLE_W = 8   # Oeste
+HANDLE_N = 5  # Norte
+HANDLE_E = 6  # Leste
+HANDLE_S = 7  # Sul
+HANDLE_W = 8  # Oeste
 
 # Atalhos de teclado para anotação
 KEYBOARD_SHORTCUTS = {
@@ -34,5 +34,5 @@ KEYBOARD_SHORTCUTS = {
     "n": "Salvar e próxima imagem",
     "i": "Abrir diálogo de exportação/importação",
     "g": "Ativar/desativar sugestões automáticas",
-    "f": "Aplicar sugestões automáticas"
+    "f": "Aplicar sugestões automáticas",
 }

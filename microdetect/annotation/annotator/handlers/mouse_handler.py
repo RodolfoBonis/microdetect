@@ -148,8 +148,7 @@ class MouseHandler:
                 # Verificar se clicou em uma alça de redimensionamento
                 if selected_idx is not None:
                     resize_handle = self.box_manager.detect_resize_handle(
-                        canvas_x, canvas_y, selected_idx,
-                        self.display_scale, self.scale_factor
+                        canvas_x, canvas_y, selected_idx, self.display_scale, self.scale_factor
                     )
 
                     if resize_handle != HANDLE_NONE:
@@ -159,32 +158,28 @@ class MouseHandler:
                         self.box_manager.resize_handle = resize_handle
                         if selected_idx < self.box_manager.get_box_count():
                             self.box_manager.original_box_state = self.box_manager.get_box(selected_idx)
-                            self._call_callback('update_status', f"Redimensionando caixa {selected_idx + 1}")
+                            self._call_callback("update_status", f"Redimensionando caixa {selected_idx + 1}")
                         return
 
                 # Procurar se clicou em uma caixa para selecionar
-                box_idx = self.box_manager.find_box_at_position(
-                    canvas_x, canvas_y, self.display_scale, self.scale_factor
-                )
+                box_idx = self.box_manager.find_box_at_position(canvas_x, canvas_y, self.display_scale, self.scale_factor)
 
                 if box_idx is not None:
                     self.box_manager.select_box(box_idx)
                     self.start_x, self.start_y = canvas_x, canvas_y
                     self.box_manager.original_box_state = self.box_manager.get_box(box_idx)
-                    self._call_callback('update_status', f"Caixa {box_idx + 1} selecionada para edição")
+                    self._call_callback("update_status", f"Caixa {box_idx + 1} selecionada para edição")
                     self.visualizer.draw_bounding_boxes(
                         self.box_manager.get_all_boxes(),
                         highlight_idx=box_idx,
                         display_scale=self.display_scale,
-                        scale_factor=self.scale_factor
+                        scale_factor=self.scale_factor,
                     )
                 else:
                     # Se não selecionou nenhuma caixa, desselecionar
                     self.box_manager.select_box(None)
                     self.visualizer.draw_bounding_boxes(
-                        self.box_manager.get_all_boxes(),
-                        display_scale=self.display_scale,
-                        scale_factor=self.scale_factor
+                        self.box_manager.get_all_boxes(), display_scale=self.display_scale, scale_factor=self.scale_factor
                     )
                     # Importante: ainda salvar as coordenadas iniciais mesmo no modo de edição
                     self.start_x, self.start_y = canvas_x, canvas_y
@@ -192,7 +187,7 @@ class MouseHandler:
                 # Modo de desenho normal - salvar posição inicial
                 self.start_x, self.start_y = canvas_x, canvas_y
 
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro em on_mouse_down: {e}")
 
@@ -268,16 +263,15 @@ class MouseHandler:
                     self.box_manager.get_all_boxes(),
                     highlight_idx=box_idx,
                     display_scale=self.display_scale,
-                    scale_factor=self.scale_factor
+                    scale_factor=self.scale_factor,
                 )
             else:
                 # Desenhar retângulo temporário
                 self.current_rect_id = self.visualizer.draw_temporary_box(
-                    self.start_x, self.start_y, canvas_x, canvas_y,
-                    temp_id=self.current_rect_id
+                    self.start_x, self.start_y, canvas_x, canvas_y, temp_id=self.current_rect_id
                 )
 
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro em on_mouse_move: {e}")
 
@@ -347,22 +341,22 @@ class MouseHandler:
                     if self.box_manager.original_box_state:
                         current_box = self.box_manager.get_box(box_idx)
                         self._call_callback(
-                            'add_to_history',
+                            "add_to_history",
                             "resize",
-                            {"index": box_idx, "before": self.box_manager.original_box_state, "after": current_box}
+                            {"index": box_idx, "before": self.box_manager.original_box_state, "after": current_box},
                         )
-                    self._call_callback('update_status', f"Caixa {box_idx + 1} redimensionada")
+                    self._call_callback("update_status", f"Caixa {box_idx + 1} redimensionada")
                     self.box_manager.resize_handle = HANDLE_NONE
                 else:
                     # Foi movimento simples
                     if self.box_manager.original_box_state:
                         current_box = self.box_manager.get_box(box_idx)
                         self._call_callback(
-                            'add_to_history',
+                            "add_to_history",
                             "move",
-                            {"index": box_idx, "before": self.box_manager.original_box_state, "after": current_box}
+                            {"index": box_idx, "before": self.box_manager.original_box_state, "after": current_box},
                         )
-                    self._call_callback('update_status', f"Caixa {box_idx + 1} reposicionada")
+                    self._call_callback("update_status", f"Caixa {box_idx + 1} reposicionada")
 
                 # Reset estado para novas ações
                 self.box_manager.original_box_state = None
@@ -382,7 +376,7 @@ class MouseHandler:
                 y2 = max(0, min(y2, self.original_h))
 
                 # Obter índice da classe
-                current_class = self._call_callback('get_current_class')
+                current_class = self._call_callback("get_current_class")
                 if current_class:
                     class_id = current_class.split("-")[0]
 
@@ -390,13 +384,13 @@ class MouseHandler:
                     box_idx = self.box_manager.add_box(class_id, int(x1), int(y1), int(x2), int(y2))
 
                     # Adicionar ao histórico
-                    self._call_callback('add_to_history', "add", {"index": box_idx})
+                    self._call_callback("add_to_history", "add", {"index": box_idx})
 
                     # Atualizar status
-                    self._call_callback('update_status', f"Box adicionada: {current_class}")
+                    self._call_callback("update_status", f"Box adicionada: {current_class}")
 
                     # Auto-save se necessário
-                    self._call_callback('check_auto_save')
+                    self._call_callback("check_auto_save")
 
             # Limpar o retângulo temporário
             if self.current_rect_id:
@@ -408,14 +402,14 @@ class MouseHandler:
                 self.box_manager.get_all_boxes(),
                 highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                 display_scale=self.display_scale,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
             )
 
             # Redefinir os pontos iniciais para permitir novas boxes
             self.start_x = None
             self.start_y = None
 
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro em on_mouse_up: {e}")
 
@@ -443,17 +437,17 @@ class MouseHandler:
             # Aplicar zoom apenas se houve alteração
             if old_scale != self.scale_factor:
                 # Solicitar redimensionamento da imagem
-                self._call_callback('redraw_with_zoom', self.scale_factor)
+                self._call_callback("redraw_with_zoom", self.scale_factor)
 
                 # Redesenhar as caixas com o novo zoom
                 self.visualizer.draw_bounding_boxes(
                     self.box_manager.get_all_boxes(),
                     highlight_idx=self.box_manager.selected_idx if self.edit_mode else None,
                     display_scale=self.display_scale,
-                    scale_factor=self.scale_factor
+                    scale_factor=self.scale_factor,
                 )
 
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro ao aplicar zoom: {e}")
 
@@ -469,7 +463,7 @@ class MouseHandler:
 
         try:
             self.canvas.scan_mark(event.x, event.y)
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro ao iniciar pan: {e}")
 
@@ -485,7 +479,7 @@ class MouseHandler:
 
         try:
             self.canvas.scan_dragto(event.x, event.y, gain=1)
-            self._call_callback('reset_window_closed')
+            self._call_callback("reset_window_closed")
         except Exception as e:
             logger.error(f"Erro ao realizar pan: {e}")
 

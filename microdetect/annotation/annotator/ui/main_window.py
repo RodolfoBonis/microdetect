@@ -40,7 +40,7 @@ class MainWindow:
         self.button_manager = None
 
         # Limpar qualquer instância Tk anterior
-        if hasattr(tk, '_default_root') and tk._default_root is not None:
+        if hasattr(tk, "_default_root") and tk._default_root is not None:
             try:
                 tk._default_root.destroy()
                 logger.info("Janela Tk anterior destruída")
@@ -70,7 +70,7 @@ class MainWindow:
         self.root.title(f"Anotação: {os.path.basename(self.image_path)}")
 
         # Configurar protocolo de fechamento
-        self.root.protocol("WM_DELETE_WINDOW", lambda: self._call_callback('on_closing'))
+        self.root.protocol("WM_DELETE_WINDOW", lambda: self._call_callback("on_closing"))
 
         # Criar frame principal
         main_frame = tk.Frame(self.root)
@@ -91,7 +91,7 @@ class MainWindow:
         class_menu.pack(side=tk.LEFT, padx=5)
 
         # Vincular alteração de classe
-        self.class_var.trace("w", lambda *args: self._call_callback('set_current_class'))
+        self.class_var.trace("w", lambda *args: self._call_callback("set_current_class"))
 
         # Status label
         self.status_label = tk.Label(
@@ -151,9 +151,7 @@ class MainWindow:
             height: Altura da imagem
         """
         if self.info_label:
-            self.info_label.config(
-                text=f"Imagem: {os.path.basename(self.image_path)} | Dimensões: {width}x{height}"
-            )
+            self.info_label.config(text=f"Imagem: {os.path.basename(self.image_path)} | Dimensões: {width}x{height}")
 
     def update_status(self, msg=None, box_count=None):
         """

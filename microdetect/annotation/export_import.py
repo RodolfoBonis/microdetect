@@ -8,7 +8,7 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 import cv2
 
@@ -30,7 +30,7 @@ class AnnotationConverter:
             classes: Lista de classes para anotação
         """
         self.classes = classes or config.get("classes", ["0-levedura", "1-fungo", "2-micro-alga"])
-        self.class_map = {cls.split('-')[0]: cls for cls in self.classes}
+        self.class_map = {cls.split("-")[0]: cls for cls in self.classes}
 
     def export_to_coco(self, annotations_dir: str, images_dir: str, output_path: Optional[str] = None) -> str:
         """
@@ -57,29 +57,19 @@ class AnnotationConverter:
                 "version": "1.0",
                 "year": datetime.now().year,
                 "contributor": "MicroDetect",
-                "date_created": datetime.now().isoformat()
+                "date_created": datetime.now().isoformat(),
             },
-            "licenses": [
-                {
-                    "id": 1,
-                    "name": "Unknown",
-                    "url": ""
-                }
-            ],
+            "licenses": [{"id": 1, "name": "Unknown", "url": ""}],
             "images": [],
             "annotations": [],
-            "categories": []
+            "categories": [],
         }
 
         # Adicionar categorias
         for i, class_name in enumerate(self.classes):
-            class_id = class_name.split('-')[0]
-            name = class_name.split('-')[1] if '-' in class_name else class_name
-            coco_data["categories"].append({
-                "id": int(class_id),
-                "name": name,
-                "supercategory": "microorganism"
-            })
+            class_id = class_name.split("-")[0]
+            name = class_name.split("-")[1] if "-" in class_name else class_name
+            coco_data["categories"].append({"id": int(class_id), "name": name, "supercategory": "microorganism"})
 
         # Processar imagens e anotações
         annotation_files = glob.glob(os.path.join(annotations_dir, "*.txt"))
@@ -111,14 +101,16 @@ class AnnotationConverter:
 
                 # Adicionar entrada de imagem
                 image_id = len(coco_data["images"]) + 1
-                coco_data["images"].append({
-                    "id": image_id,
-                    "license": 1,
-                    "file_name": os.path.basename(img_path),
-                    "height": height,
-                    "width": width,
-                    "date_captured": datetime.fromtimestamp(os.path.getmtime(img_path)).isoformat()
-                })
+                coco_data["images"].append(
+                    {
+                        "id": image_id,
+                        "license": 1,
+                        "file_name": os.path.basename(img_path),
+                        "height": height,
+                        "width": width,
+                        "date_captured": datetime.fromtimestamp(os.path.getmtime(img_path)).isoformat(),
+                    }
+                )
 
                 # Ler anotações YOLO e converter para COCO
                 with open(ann_file, "r") as f:
@@ -140,15 +132,17 @@ class AnnotationConverter:
                         x = x_center - (box_w / 2)
                         y = y_center - (box_h / 2)
 
-                        coco_data["annotations"].append({
-                            "id": annotation_id,
-                            "image_id": image_id,
-                            "category_id": int(class_id),
-                            "bbox": [x, y, box_w, box_h],
-                            "area": box_w * box_h,
-                            "segmentation": [],
-                            "iscrowd": 0
-                        })
+                        coco_data["annotations"].append(
+                            {
+                                "id": annotation_id,
+                                "image_id": image_id,
+                                "category_id": int(class_id),
+                                "bbox": [x, y, box_w, box_h],
+                                "area": box_w * box_h,
+                                "segmentation": [],
+                                "iscrowd": 0,
+                            }
+                        )
 
                         annotation_id += 1
 
@@ -157,7 +151,7 @@ class AnnotationConverter:
                 continue
 
         # Salvar JSON
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(coco_data, f, indent=2)
 
         logger.info(f"Exportação COCO concluída: {output_path}")
@@ -261,8 +255,8 @@ class AnnotationConverter:
 
                         # Obter nome da classe
                         class_name = self.class_map.get(class_id, f"class_{class_id}")
-                        if '-' in class_name:
-                            class_name = class_name.split('-')[1]
+                        if "-" in class_name:
+                            class_name = class_name.split("-")[1]
 
                         # Adicionar objeto
                         obj = ET.SubElement(annotation, "object")
@@ -278,19 +272,20 @@ class AnnotationConverter:
                         ET.SubElement(bndbox, "ymax").text = str(ymax)
 
                 # Criar XML string formatado
-                xml_str = ET.tostring(annotation, encoding='utf-8')
+                xml_str = ET.tostring(annotation, encoding="utf-8")
 
                 # Formatar XML para melhor legibilidade
                 try:
                     import xml.dom.minidom
+
                     dom = xml.dom.minidom.parseString(xml_str)
                     xml_pretty_str = dom.toprettyxml(indent="  ")
                 except:
-                    xml_pretty_str = xml_str.decode('utf-8')
+                    xml_pretty_str = xml_str.decode("utf-8")
 
                 # Salvar arquivo XML
                 xml_path = os.path.join(output_dir, f"{base_name}.xml")
-                with open(xml_path, 'w') as f:
+                with open(xml_path, "w") as f:
                     f.write(xml_pretty_str)
 
                 exported_count += 1
@@ -320,7 +315,7 @@ class AnnotationConverter:
 
         try:
             # Carregar JSON
-            with open(coco_json_path, 'r') as f:
+            with open(coco_json_path, "r") as f:
                 coco_data = json.load(f)
 
             # Mapear imagens por ID
@@ -357,7 +352,7 @@ class AnnotationConverter:
                 # Criar arquivo de anotação YOLO
                 yolo_path = os.path.join(output_dir, f"{base_name}.txt")
 
-                with open(yolo_path, 'w') as f:
+                with open(yolo_path, "w") as f:
                     for ann in anns:
                         # Formato COCO: [x, y, width, height] onde (x, y) é o canto superior esquerdo
                         bbox = ann["bbox"]
@@ -401,7 +396,7 @@ class AnnotationConverter:
         # Criar mapeamento reverso de nomes de classes para IDs
         class_name_to_id = {}
         for cls in self.classes:
-            parts = cls.split('-')
+            parts = cls.split("-")
             if len(parts) == 2:
                 class_name_to_id[parts[1].lower()] = parts[0]
 
@@ -429,7 +424,7 @@ class AnnotationConverter:
                 yolo_path = os.path.join(output_dir, f"{base_name}.txt")
 
                 # Processar objetos
-                with open(yolo_path, 'w') as f:
+                with open(yolo_path, "w") as f:
                     for obj in root.findall("object"):
                         class_name = obj.find("name").text.lower()
 
@@ -488,7 +483,7 @@ def create_export_import_ui(parent: Any, image_dir: str, annotation_dir: str) ->
         Frame Tkinter contendo a interface
     """
     import tkinter as tk
-    from tkinter import messagebox, filedialog
+    from tkinter import filedialog, messagebox
 
     converter = AnnotationConverter()
 
@@ -539,20 +534,21 @@ def create_export_import_ui(parent: Any, image_dir: str, annotation_dir: str) ->
 
         try:
             if export_format == "coco":
-                output_path = converter.export_to_coco(annotation_dir, image_dir,
-                                                       os.path.join(output_dir, "annotations_coco.json"))
-                messagebox.showinfo("Exportação Concluída",
-                                    f"Anotações exportadas com sucesso para:\n{output_path}")
+                output_path = converter.export_to_coco(
+                    annotation_dir, image_dir, os.path.join(output_dir, "annotations_coco.json")
+                )
+                messagebox.showinfo("Exportação Concluída", f"Anotações exportadas com sucesso para:\n{output_path}")
             elif export_format == "voc":
-                output_path = converter.export_to_pascal_voc(annotation_dir, image_dir,
-                                                             os.path.join(output_dir, "voc_annotations"))
-                messagebox.showinfo("Exportação Concluída",
-                                    f"Anotações exportadas com sucesso para:\n{output_path}")
+                output_path = converter.export_to_pascal_voc(
+                    annotation_dir, image_dir, os.path.join(output_dir, "voc_annotations")
+                )
+                messagebox.showinfo("Exportação Concluída", f"Anotações exportadas com sucesso para:\n{output_path}")
         except Exception as e:
             messagebox.showerror("Erro na Exportação", f"Ocorreu um erro durante a exportação:\n{str(e)}")
 
-    export_button = tk.Button(export_frame, text="Exportar Anotações", command=export_annotations,
-                              bg="lightblue", padx=10, pady=5)
+    export_button = tk.Button(
+        export_frame, text="Exportar Anotações", command=export_annotations, bg="lightblue", padx=10, pady=5
+    )
     export_button.grid(row=2, column=0, columnspan=3, pady=10)
 
     # Frame para importação
@@ -582,8 +578,7 @@ def create_export_import_ui(parent: Any, image_dir: str, annotation_dir: str) ->
         if import_format == "coco":
             # Para COCO, escolher arquivo JSON
             file_path = filedialog.askopenfilename(
-                initialdir=annotation_dir,
-                filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
+                initialdir=annotation_dir, filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
             )
             if file_path:
                 import_path_var.set(file_path)
@@ -625,17 +620,20 @@ def create_export_import_ui(parent: Any, image_dir: str, annotation_dir: str) ->
         try:
             if import_format == "coco":
                 count = converter.import_from_coco(import_path, output_dir, image_dir)
-                messagebox.showinfo("Importação Concluída",
-                                    f"{count} arquivos de anotação importados com sucesso para:\n{output_dir}")
+                messagebox.showinfo(
+                    "Importação Concluída", f"{count} arquivos de anotação importados com sucesso para:\n{output_dir}"
+                )
             elif import_format == "voc":
                 count = converter.import_from_pascal_voc(import_path, output_dir)
-                messagebox.showinfo("Importação Concluída",
-                                    f"{count} arquivos de anotação importados com sucesso para:\n{output_dir}")
+                messagebox.showinfo(
+                    "Importação Concluída", f"{count} arquivos de anotação importados com sucesso para:\n{output_dir}"
+                )
         except Exception as e:
             messagebox.showerror("Erro na Importação", f"Ocorreu um erro durante a importação:\n{str(e)}")
 
-    import_button = tk.Button(import_frame, text="Importar Anotações", command=import_annotations,
-                              bg="lightgreen", padx=10, pady=5)
+    import_button = tk.Button(
+        import_frame, text="Importar Anotações", command=import_annotations, bg="lightgreen", padx=10, pady=5
+    )
     import_button.grid(row=3, column=0, columnspan=3, pady=10)
 
     # Botões de fechamento

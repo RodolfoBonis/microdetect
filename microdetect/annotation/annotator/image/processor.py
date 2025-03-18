@@ -2,10 +2,11 @@
 Módulo para processamento de imagens na ferramenta de anotação.
 """
 
+import logging
+from typing import Optional, Tuple
+
 import cv2
 import numpy as np
-import logging
-from typing import Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +113,7 @@ class ImageProcessor:
             return img.copy()
 
         # Kernel para sharpen
-        kernel = np.array([
-            [-1, -1, -1],
-            [-1, 9, -1],
-            [-1, -1, -1]
-        ])
+        kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
 
         # Ajustar intensidade
         if amount != 1.0:

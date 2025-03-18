@@ -2,10 +2,11 @@
 Funções base de UI para o módulo de anotação.
 """
 
-import tkinter as tk
 import logging
+import tkinter as tk
 
 logger = logging.getLogger(__name__)
+
 
 def create_secure_dialog() -> tk.Toplevel:
     """
@@ -19,7 +20,7 @@ def create_secure_dialog() -> tk.Toplevel:
         root = None
 
         # Verificar se tk._default_root existe antes de tentar acessá-lo
-        if hasattr(tk, '_default_root') and tk._default_root is not None:
+        if hasattr(tk, "_default_root") and tk._default_root is not None:
             # Usar a janela raiz existente
             for widget in tk._default_root.winfo_children():
                 if isinstance(widget, tk.Toplevel) and widget.winfo_exists():

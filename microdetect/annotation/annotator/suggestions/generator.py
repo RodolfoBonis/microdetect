@@ -2,10 +2,11 @@
 Geração de sugestões automáticas para anotações.
 """
 
-import cv2
-import random
 import logging
+import random
 from typing import List, Tuple
+
+import cv2
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ class SuggestionGenerator:
 
             for _ in range(num_suggestions):
                 # Escolher classe aleatoriamente
-                class_id = random.choice([c.split('-')[0] for c in self.classes])
+                class_id = random.choice([c.split("-")[0] for c in self.classes])
 
                 # Gerar coordenadas aleatórias
                 box_w = random.randint(w // 10, w // 3)
