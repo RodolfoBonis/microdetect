@@ -129,23 +129,33 @@ class ImageAnnotator:
             A janela de diálogo Toplevel
         """
         try:
-            # Verificar se já temos uma janela raiz
-            existing_root = None
-            for widget in tk._default_root.winfo_children():
-                if isinstance(widget, tk.Toplevel) and widget.winfo_exists():
-                    existing_root = widget
-                    break
+            # Verificar se já temos uma instância Tk ativa
+            root = None
 
-            if existing_root:
-                dialog = tk.Toplevel(existing_root)
-                dialog.transient(existing_root)
-            else:
+            # Verificar se tk._default_root existe antes de tentar acessá-lo
+            if hasattr(tk, '_default_root') and tk._default_root is not None:
+                # Usar a janela raiz existente
+                for widget in tk._default_root.winfo_children():
+                    if isinstance(widget, tk.Toplevel) and widget.winfo_exists():
+                        root = widget
+                        break
+
+                if root is None:
+                    # Se não encontrou um Toplevel, usar o _default_root diretamente
+                    root = tk._default_root
+
+            # Se não encontrou nenhuma janela, criar uma nova
+            if root is None:
                 # Criar uma nova janela raiz e escondê-la
                 temp_root = tk.Tk()
                 temp_root.withdraw()
                 dialog = tk.Toplevel(temp_root)
                 # Guardar referência para destruir depois
                 dialog._temp_root = temp_root
+            else:
+                # Usar a janela existente como pai
+                dialog = tk.Toplevel(root)
+                dialog.transient(root)
 
             return dialog
         except Exception as e:
@@ -234,118 +244,6 @@ class ImageAnnotator:
             self.image_references = new_refs
         except Exception as e:
             logger.error(f"Erro ao limpar referências de imagem: {e}")
-
-    def _show_option_dialog(self, title: str, message: str, options: List[str]) -> int:
-        """
-        Exibe um diálogo com opções que o usuário pode selecionar usando as teclas de seta.
-
-        Args:
-            title: Título da janela de diálogo
-            message: Mensagem a ser exibida
-            options: Lista de opções a serem mostradas
-
-        Returns:
-            Índice da opção selecionada (0 a len(options)-1)
-        """
-        # Criar uma janela de diálogo
-        dialog = tk.Toplevel()
-        dialog.title(title)
-        dialog.geometry("500x300")
-        dialog.resizable(False, False)
-
-        # Tornar a janela modal (bloqueia interação com outras janelas)
-        dialog.transient()
-        dialog.grab_set()
-
-        # Centralizar a janela na tela
-        dialog.update_idletasks()
-        width = dialog.winfo_width()
-        height = dialog.winfo_height()
-        x = (dialog.winfo_screenwidth() // 2) - (width // 2)
-        y = (dialog.winfo_screenheight() // 2) - (height // 2)
-        dialog.geometry(f"{width}x{height}+{x}+{y}")
-
-        # Adicionar a mensagem
-        tk.Label(dialog, text=message, pady=10, wraplength=450).pack()
-
-        # Criar frame para as opções
-        options_frame = tk.Frame(dialog)
-        options_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        # Variável para armazenar a seleção atual
-        selected_option = tk.IntVar(value=0)  # Padrão: primeira opção
-
-        # Adicionar radiobuttons para as opções
-        option_buttons = []
-        for i, option in enumerate(options):
-            radio = tk.Radiobutton(
-                options_frame,
-                text=option,
-                variable=selected_option,
-                value=i,
-                font=("Arial", 12),
-                anchor=tk.W,
-                padx=10,
-                pady=5,
-                indicatoron=0,  # Fazer o botão ocupar toda a largura
-                relief=tk.GROOVE,
-                selectcolor="lightblue",
-                width=40
-            )
-            radio.pack(fill=tk.X, pady=2)
-            option_buttons.append(radio)
-
-        # Selecionar primeiro botão visualmente
-        if option_buttons:
-            option_buttons[0].select()
-
-        # Variável para armazenar o resultado
-        result = [0]  # Usar lista para poder modificar dentro das funções internas
-
-        # Função para atualizar a seleção ao navegar com as teclas
-        def move_selection(delta):
-            new_index = (selected_option.get() + delta) % len(options)
-            selected_option.set(new_index)
-            if option_buttons and new_index < len(option_buttons):
-                option_buttons[new_index].focus_set()
-
-        # Função para confirmar a seleção
-        def confirm_selection():
-            result[0] = selected_option.get()
-            dialog.destroy()
-
-        # Adicionar botão de confirmação
-        confirm_button = tk.Button(
-            dialog,
-            text="Confirmar",
-            command=confirm_selection,
-            width=15,
-            bg="lightgreen"
-        )
-        confirm_button.pack(pady=10)
-
-        # Configurar eventos de teclado para toda a janela
-        dialog.bind("<Up>", lambda e: move_selection(-1))
-        dialog.bind("<Down>", lambda e: move_selection(1))
-        dialog.bind("<Return>", lambda e: confirm_selection())
-
-        # Também vincular eventos de teclado para números 1-9
-        for i in range(min(9, len(options))):
-            dialog.bind(f"{i+1}", lambda e, idx=i: (selected_option.set(idx), confirm_selection()))
-
-        # Focar no primeiro botão ao iniciar
-        if option_buttons:
-            option_buttons[0].focus_set()
-
-        # Evitar que a janela principal seja destruída enquanto o diálogo está aberto
-        # Isso é crítico para prevenir o erro de "image pyimage1 doesn't exist"
-        if hasattr(self, 'root') and self.root:
-            dialog.wm_transient(self.root)
-
-        # Aguardar até que o diálogo seja fechado de forma modal
-        dialog.wait_window()
-
-        return result[0]
 
     def suggest_annotations(self, image_path: str, confidence: float = 0.5) -> List[Tuple[str, int, int, int, int]]:
         """
@@ -706,10 +604,19 @@ class ImageAnnotator:
             # Redimensionar imagem
             img_resized = cv2.resize(img_display, (new_w, new_h))
 
-            # Criar nova instância de PhotoImage e armazenar no dicionário de referências
-            # para evitar coleta de lixo prematura
-            key = f"main_image_{id(img_resized)}"
-            self.image_references[key] = ImageTk.PhotoImage(Image.fromarray(img_resized))
+            # Converter para PIL Image
+            pil_img = Image.fromarray(img_resized)
+
+            # Criar nova instância de PhotoImage
+            # MODIFICAÇÃO CRÍTICA: Usar um nome de chave consistente e verificar duplicações
+            key = "zoomed_image"
+
+            # Remover a referência anterior se existir
+            if key in self.image_references:
+                del self.image_references[key]
+
+            # Criar nova referência
+            self.image_references[key] = ImageTk.PhotoImage(pil_img)
             self.current_img_tk = self.image_references[key]
 
             # Atualizar imagem no canvas
@@ -952,6 +859,12 @@ class ImageAnnotator:
         self.original_box_state = None
         self.pan_mode = False
 
+        # Limpar todas as referências de imagem anteriores para evitar problemas
+        if hasattr(self, 'image_references'):
+            self.image_references = {}
+        else:
+            self.image_references = {}
+
         # Rastreamento de timers ativos
         active_timer_ids = []
 
@@ -1017,13 +930,51 @@ class ImageAnnotator:
         # Modo de edição
         edit_mode = False
 
-        # Criar janela Tkinter
+        # MODIFICAÇÃO: Usar o mesmo nome para todas as instâncias Tk para evitar problemas com referências
+        if hasattr(tk, '_default_root') and tk._default_root is not None:
+            # Se já existe um root, destruí-lo para evitar conflitos
+            try:
+                tk._default_root.destroy()
+            except:
+                pass
+
+        # Criar um novo root limpo
         root = tk.Tk()
-        self.root = root  # Armazenar a referência ao root como atributo da classe
-        root.title(f"Anotação: {os.path.basename(image_path)}")
+        root.withdraw()  # Esconder a janela principal temporariamente
+
+        # Criar uma janela toplevel que será a interface principal
+        annotation_window = tk.Toplevel(root)
+        self.root = annotation_window  # Armazenar a referência como atributo da classe
+        annotation_window.title(f"Anotação: {os.path.basename(image_path)}")
+
+        # Configurar protocolo de fechamento para garantir limpeza adequada
+        def on_window_close():
+            try:
+                if len(self.bounding_boxes) > 0:
+                    if messagebox.askyesno("Sair", "Deseja salvar as anotações antes de sair?"):
+                        save()
+                # Limpar referências explicitamente
+                self.image_references.clear()
+                self.current_img_tk = None
+                # Cancelar timers
+                cleanup_timers()
+                # Definir flags
+                self.window_closed = True
+                self.user_cancelled = True
+            except:
+                pass
+            finally:
+                # Garantir que as janelas sejam destruídas
+                try:
+                    annotation_window.destroy()
+                    root.destroy()
+                except:
+                    pass
+
+        annotation_window.protocol("WM_DELETE_WINDOW", on_window_close)
 
         # Criar frame principal
-        main_frame = tk.Frame(root)
+        main_frame = tk.Frame(annotation_window)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Painel de controle
@@ -1034,7 +985,7 @@ class ImageAnnotator:
         class_label = tk.Label(control_frame, text="Selecionar classe:")
         class_label.pack(side=tk.LEFT, padx=5)
 
-        class_var = tk.StringVar(root)
+        class_var = tk.StringVar(annotation_window)
         class_var.set(current_class)
 
         class_menu = tk.OptionMenu(control_frame, class_var, *self.classes)
@@ -1077,20 +1028,25 @@ class ImageAnnotator:
         h_scrollbar.config(command=canvas.xview)
         v_scrollbar.config(command=canvas.yview)
 
-        # Converter para PhotoImage para o Tkinter
-        img_tk = ImageTk.PhotoImage(Image.fromarray(img_display))
+        # MODIFICAÇÃO CRÍTICA: Criar e armazenar a imagem usando Image.fromarray uma única vez
+        pil_image = Image.fromarray(img_display)
+        img_tk = ImageTk.PhotoImage(pil_image)
 
-        # Criar imagem no canvas
-        canvas.create_image(0, 0, anchor=tk.NW, image=img_tk, tags="background")
+        # Armazenar essa referência na classe e no dicionário para garantir que não seja coletada
+        self.current_img_tk = img_tk
+        self.image_references["main"] = img_tk
+
+        # Criar imagem no canvas usando apenas a referência armazenada
+        canvas.create_image(0, 0, anchor=tk.NW, image=self.current_img_tk, tags="background")
         canvas.config(scrollregion=canvas.bbox(tk.ALL))
 
-        # Armazenar referências
+        # Armazenar referência ao canvas
         self.canvas = canvas
-        self.current_img_tk = img_tk
-        self.image_references["main"] = img_tk  # Armazenar para evitar garbage collection
 
         # Resultado da anotação
         annotation_path = None
+
+        # O restante do método continua igual...
 
         def reset_window_closed():
             """Reseta o flag window_closed para False e verifica estado do canvas."""
@@ -1900,7 +1856,7 @@ class ImageAnnotator:
         search_button = tk.Button(
             button_frame2,
             text="Buscar Imagens (B)",
-            command=lambda: _show_search_dialog(os.path.dirname(image_path), output_dir)
+            command=lambda: _show_search_dialog(self, os.path.dirname(image_path), output_dir)
         )
         search_button.pack(side=tk.LEFT, padx=5)
 
@@ -2214,16 +2170,20 @@ class ImageAnnotator:
             logger.error(f"Erro ao exibir estatísticas: {e}")
             messagebox.showerror("Erro", f"Não foi possível exibir as estatísticas: {str(e)}")
 
-    def search_and_filter_images(self, image_dir: str, output_dir: str) -> List[str]:
+    def search_and_filter_images(self, image_dir: str, output_dir: str, last_annotated_path: Optional[str] = None) -> \
+    Tuple[List[str], int]:
         """
         Abre um diálogo para buscar e filtrar imagens para anotação.
+        Também permite escolher como continuar quando há progresso anterior.
 
         Args:
             image_dir: Diretório de imagens
             output_dir: Diretório de anotações
+            last_annotated_path: Caminho da última imagem anotada (opcional)
 
         Returns:
-            Lista de caminhos de imagem selecionados
+            Tuple[List[str], int]: Lista de caminhos de imagem selecionados e modo de continuação
+            Modos: 0 = Continuar de onde parou, 1 = Recomeçar do início, 2 = Revisar a última imagem
         """
         # Obter todas as imagens
         all_images = []
@@ -2235,13 +2195,17 @@ class ImageAnnotator:
 
         if not all_images:
             messagebox.showinfo("Informação", "Nenhuma imagem encontrada no diretório.")
-            return []
+            return [], 0
+
+        # Limpar todas as referências de imagem para evitar problemas de memória
+        if hasattr(self, 'image_references'):
+            self.image_references.clear()
 
         # Criar janela de busca de forma segura
         search_window = self._create_secure_dialog()
         search_window.title("Buscar e Filtrar Imagens")
-        search_window.geometry("800x600")
-        search_window.minsize(600, 400)
+        search_window.geometry("800x650")  # Aumentado para acomodar os botões extras
+        search_window.minsize(600, 450)
 
         # Criar um dicionário local para armazenar referências a imagens desta janela
         search_image_refs = {}
@@ -2249,10 +2213,119 @@ class ImageAnnotator:
         # Variáveis para armazenar resultados
         filtered_images = all_images.copy()
         result_images = []  # Para retornar
+        result_mode = 0  # Modo de continuação (padrão: continuar de onde parou)
 
         # Frame principal
         main_frame = tk.Frame(search_window)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Frame de informações de progresso (se houver progresso anterior)
+        if last_annotated_path:
+            progress_frame = tk.LabelFrame(main_frame, text="Progresso de Anotação")
+            progress_frame.pack(fill=tk.X, pady=10)
+
+            # Exibir informação sobre o último arquivo anotado
+            last_file_name = os.path.basename(last_annotated_path)
+            last_index = all_images.index(last_annotated_path) if last_annotated_path in all_images else -1
+
+            progress_info = tk.Frame(progress_frame)
+            progress_info.pack(fill=tk.X, padx=5, pady=5)
+
+            tk.Label(
+                progress_info,
+                text=f"Última imagem anotada: {last_file_name}",
+                font=("Arial", 10, "bold")
+            ).pack(side=tk.LEFT, padx=5)
+
+            # Exibir progresso total
+            if last_index >= 0:
+                progress_percent = (last_index + 1) / len(all_images) * 100
+                tk.Label(
+                    progress_info,
+                    text=f"Progresso: {last_index + 1}/{len(all_images)} ({progress_percent:.1f}%)"
+                ).pack(side=tk.LEFT, padx=20)
+
+            # Variável para armazenar a opção de continuação (mesmo que não use radio buttons)
+            continuation_mode = tk.IntVar(value=0)  # Padrão: continuar de onde parou
+
+            # Botões de acesso rápido para opções de navegação
+            quick_frame = tk.Frame(progress_frame)
+            quick_frame.pack(fill=tk.X, padx=5, pady=10)
+
+            tk.Label(
+                quick_frame,
+                text="Opções rápidas de navegação:",
+                font=("Arial", 10, "bold")
+            ).pack(anchor="w", padx=5, pady=5)
+
+            # Botões para cada opção de navegação
+            button_frame = tk.Frame(quick_frame)
+            button_frame.pack(fill=tk.X, padx=5, pady=5)
+
+            # Função para continuar com uma opção específica
+            def quick_continue(mode):
+                nonlocal result_images, result_mode
+                result_mode = mode
+
+                if mode == 0:  # Continuar de onde parou
+                    next_index = last_index + 1 if last_index < len(all_images) - 1 else 0
+                    result_images = [all_images[next_index]]
+                elif mode == 1:  # Recomeçar do início
+                    result_images = [all_images[0]]
+                else:  # Revisar a última imagem
+                    result_images = [last_annotated_path]
+
+                search_window.destroy()
+
+            # Continuar da próxima imagem
+            tk.Button(
+                button_frame,
+                text="Continuar da Próxima Imagem",
+                command=lambda: quick_continue(0),
+                bg="lightgreen",
+                padx=10,
+                pady=5,
+                width=25
+            ).pack(side=tk.LEFT, padx=5, pady=5)
+
+            # Recomeçar do início
+            tk.Button(
+                button_frame,
+                text="Recomeçar do Início",
+                command=lambda: quick_continue(1),
+                bg="#FFD580",  # Light orange
+                padx=10,
+                pady=5,
+                width=25
+            ).pack(side=tk.LEFT, padx=5, pady=5)
+
+            # Revisar última imagem
+            tk.Button(
+                button_frame,
+                text="Revisar Última Imagem",
+                command=lambda: quick_continue(2),
+                bg="#ADD8E6",  # Light blue
+                padx=10,
+                pady=5,
+                width=25
+            ).pack(side=tk.LEFT, padx=5, pady=5)
+
+            # Adicionar separador
+            tk.Frame(
+                progress_frame,
+                height=2,
+                bd=1,
+                relief=tk.SUNKEN
+            ).pack(fill=tk.X, padx=5, pady=10)
+
+            tk.Label(
+                progress_frame,
+                text="Ou selecione uma imagem específica abaixo:",
+                font=("Arial", 10)
+            ).pack(anchor="w", padx=5, pady=5)
+        else:
+            # Se não houver progresso anterior, definir o modo padrão
+            continuation_mode = tk.IntVar(value=0)
 
         # Frame de busca
         search_frame = tk.Frame(main_frame)
@@ -2264,17 +2337,25 @@ class ImageAnnotator:
         search_entry = tk.Entry(search_frame, textvariable=search_var, width=30)
         search_entry.pack(side=tk.LEFT, padx=5)
 
+        # Opções de filtro de busca
+        filter_frame = tk.Frame(main_frame)
+        filter_frame.pack(fill=tk.X, pady=5)
+
         # Opção para mostrar apenas imagens anotadas
         show_annotated_var = tk.BooleanVar(value=False)
-        show_annotated_check = tk.Checkbutton(search_frame, text="Mostrar apenas imagens anotadas",
+        show_annotated_check = tk.Checkbutton(filter_frame, text="Mostrar apenas imagens anotadas",
                                               variable=show_annotated_var)
-        show_annotated_check.pack(side=tk.LEFT, padx=20)
+        show_annotated_check.pack(side=tk.LEFT, padx=5)
 
         # Opção para mostrar apenas imagens não anotadas
         show_unannotated_var = tk.BooleanVar(value=False)
-        show_unannotated_check = tk.Checkbutton(search_frame, text="Mostrar apenas imagens não anotadas",
+        show_unannotated_check = tk.Checkbutton(filter_frame, text="Mostrar apenas imagens não anotadas",
                                                 variable=show_unannotated_var)
-        show_unannotated_check.pack(side=tk.LEFT, padx=5)
+        show_unannotated_check.pack(side=tk.LEFT, padx=20)
+
+        # Botão de busca
+        search_button = tk.Button(search_frame, text="Buscar", command=lambda: update_image_list())
+        search_button.pack(side=tk.LEFT, padx=5)
 
         # Função para atualizar a lista quando o usuário buscar
         def update_image_list():
@@ -2321,10 +2402,6 @@ class ImageAnnotator:
             # Atualizar contadores
             total_label.config(text=f"Total: {len(filtered_images)} / {len(all_images)} imagens")
 
-        # Botão de busca
-        search_button = tk.Button(search_frame, text="Buscar", command=update_image_list)
-        search_button.pack(side=tk.LEFT, padx=5)
-
         # Função auxiliar para impedir que os checkboxes sejam ambos selecionados
         def handle_annotated_check():
             if show_annotated_var.get() and show_unannotated_var.get():
@@ -2355,7 +2432,8 @@ class ImageAnnotator:
         scrollbar = tk.Scrollbar(list_subframe)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
-        image_listbox = tk.Listbox(list_subframe, selectmode=tk.EXTENDED, yscrollcommand=scrollbar.set)
+        image_listbox = tk.Listbox(list_subframe, selectmode=tk.SINGLE, yscrollcommand=scrollbar.set,
+                                   font=("Arial", 11))
         image_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         scrollbar.config(command=image_listbox.yview)
@@ -2382,7 +2460,7 @@ class ImageAnnotator:
         preview_image = tk.Label(preview_frame, text="Selecione uma imagem para visualizar")
         preview_image.pack(fill=tk.X, pady=5)
 
-        # Função para mostrar preview - MODIFICADA para resolver o problema de imagem
+        # Função para mostrar preview
         def show_preview(*args):
             # Limpar preview anterior
             preview_image.config(image='', text="Selecione uma imagem para visualizar")
@@ -2415,7 +2493,6 @@ class ImageAnnotator:
 
                 pil_img = pil_img.resize((new_width, new_height), Image.LANCZOS)
 
-                # MODIFICAÇÃO CRÍTICA: Usar o dicionário local de imagens
                 # Criar e armazenar a referência à imagem localmente
                 key = f"preview_{os.path.basename(img_path)}"
                 search_image_refs[key] = ImageTk.PhotoImage(pil_img)
@@ -2446,19 +2523,22 @@ class ImageAnnotator:
         button_frame = tk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=10)
 
-        # Função para confirmar a seleção
-        def confirm_selection():
-            nonlocal result_images
+        # Função para anotar imagem selecionada
+        def annotate_selected():
+            nonlocal result_images, result_mode
             selection = image_listbox.curselection()
 
             if not selection:
-                messagebox.showinfo("Informação", "Nenhuma imagem selecionada.")
+                messagebox.showinfo("Informação", "Selecione uma imagem para anotar.")
                 return
 
-            # Criar lista de imagens selecionadas
-            result_images = [filtered_images[i] for i in selection]
+            # Obter imagem selecionada
+            index = selection[0]
+            if index >= len(filtered_images):
+                return
 
-            # Fechar janela
+            result_images = [filtered_images[index]]
+            result_mode = 3  # Modo especial: imagem específica selecionada
             search_window.destroy()
 
         # Botão para selecionar todas
@@ -2470,17 +2550,53 @@ class ImageAnnotator:
             image_listbox.selection_clear(0, tk.END)
 
         # Adicionar botões
-        tk.Button(button_frame, text="Selecionar Todos", command=select_all).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Limpar Seleção", command=clear_selection).pack(side=tk.LEFT, padx=5)
-        tk.Button(button_frame, text="Cancelar", command=search_window.destroy).pack(side=tk.RIGHT, padx=5)
-        tk.Button(button_frame, text="Iniciar Anotação", command=confirm_selection,
-                  bg="lightgreen").pack(side=tk.RIGHT, padx=5)
+        tk.Button(
+            button_frame,
+            text="Cancelar",
+            command=search_window.destroy,
+            width=15
+        ).pack(side=tk.RIGHT, padx=5)
+
+        tk.Button(
+            button_frame,
+            text="Anotar Imagem Selecionada",
+            command=annotate_selected,
+            bg="lightgreen",
+            width=25
+        ).pack(side=tk.RIGHT, padx=5)
+
+        tk.Button(
+            button_frame,
+            text="Limpar Seleção",
+            command=clear_selection,
+            width=15
+        ).pack(side=tk.LEFT, padx=5)
 
         # Iniciar busca com os valores padrão
         update_image_list()
 
         # Configurar eventos de teclado para busca rápida
         search_entry.bind("<Return>", lambda e: update_image_list())
+
+        # Ativar duplo clique para anotar diretamente
+        image_listbox.bind("<Double-Button-1>", lambda e: annotate_selected())
+
+        # Destacar última imagem anotada ou próxima, se houver
+        if last_annotated_path and last_annotated_path in filtered_images:
+            last_index = filtered_images.index(last_annotated_path)
+
+            # Mostrar a próxima imagem por padrão
+            if last_index < len(filtered_images) - 1:
+                next_index = last_index + 1
+                image_listbox.selection_set(next_index)
+                image_listbox.see(next_index)
+            else:
+                # Se for a última imagem, selecionar a primeira
+                image_listbox.selection_set(0)
+                image_listbox.see(0)
+
+            # Mostrar preview
+            image_listbox.event_generate("<<ListboxSelect>>")
 
         # Centralizar janela
         search_window.update_idletasks()
@@ -2511,7 +2627,7 @@ class ImageAnnotator:
         search_window.protocol("WM_DELETE_WINDOW", on_closing)
         search_window.wait_window()
 
-        return result_images
+        return result_images, result_mode
 
     def batch_annotate(self, image_dir: str, output_dir: str) -> Tuple[int, int]:
         """
@@ -2538,22 +2654,9 @@ class ImageAnnotator:
         # Ordenar imagens para consistência
         image_files.sort()
 
-        filtered_images = self.search_and_filter_images(image_dir, output_dir)
-        if filtered_images:  # Se o usuário selecionou imagens específicas
-            # Usar apenas as imagens filtradas/selecionadas pelo usuário
-            image_files = filtered_images
-            logger.info(f"Usando {len(image_files)} imagens selecionadas para anotação")
-
-        # Criar backup antes de iniciar a anotação
-        self.backup_annotations(output_dir)
-
         # Verificar se há progresso salvo
         progress_path = os.path.join(output_dir, self.progress_file)
-        start_index = 0
-        total_annotated = 0
-        imagens_existentes = 0
         last_annotated_path = None
-        option_selected = 0  # Padrão: continuar de onde parou
 
         if os.path.exists(progress_path):
             try:
@@ -2562,46 +2665,42 @@ class ImageAnnotator:
 
                 last_annotated = progress_data.get("last_annotated", "")
                 if last_annotated in image_files:
-                    last_index = image_files.index(last_annotated)
                     last_annotated_path = last_annotated
-
-                    # Mostrar informações sobre o progresso
-                    logger.info(
-                        f"Anotação anterior encontrada. Última imagem anotada: {os.path.basename(last_annotated)}")
-
-                    if last_index < len(image_files) - 1:
-                        # Criar uma referência para o diálogo para garantir que não seja coletada pelo garbage collector
-                        import tkinter as tk
-                        root = tk.Tk()
-                        root.withdraw()  # Esconder a janela raiz
-
-                        # Oferecer opções de onde começar
-                        option_selected = self._show_option_dialog(
-                            "Opções de Anotação",
-                            "Selecione uma opção para continuar:",
-                            [
-                                "Continuar de onde parou (próxima imagem)",
-                                "Recomeçar do início",
-                                "Revisar a última imagem anotada"
-                            ]
-                        )
-
-                        # Destruir a janela raiz após obter a seleção
-                        try:
-                            root.destroy()
-                        except:
-                            pass
-
-                    # Configurar índice inicial com base na escolha do usuário
-                    if option_selected == 0:  # Continuar de onde parou
-                        start_index = last_index + 1
-                    elif option_selected == 1:  # Recomeçar do início
-                        start_index = 0
-                    else:  # Revisar a última imagem anotada
-                        start_index = last_index
+                    logger.info(f"Progresso encontrado. Última imagem anotada: {os.path.basename(last_annotated)}")
             except Exception as e:
                 logger.warning(f"Erro ao carregar progresso: {str(e)}")
                 logger.info("Iniciando anotação do início.")
+
+        # Criar backup antes de iniciar a anotação
+        self.backup_annotations(output_dir)
+
+        # Chamar o método de busca e filtro com o caminho da última imagem anotada
+        filtered_images, continuation_mode = self.search_and_filter_images(
+            image_dir, output_dir, last_annotated_path
+        )
+
+        if not filtered_images:
+            logger.info("Nenhuma imagem selecionada para anotação. Encerrando.")
+            return 0, 0
+
+        # Usar apenas as imagens filtradas/selecionadas pelo usuário
+        image_files = filtered_images
+        logger.info(f"Usando {len(image_files)} imagens selecionadas para anotação")
+
+        # Determinar o índice inicial com base no modo de continuação e última imagem anotada
+        start_index = 0
+        total_annotated = 0
+        imagens_existentes = 0
+
+        if last_annotated_path and last_annotated_path in image_files:
+            last_index = image_files.index(last_annotated_path)
+
+            if continuation_mode == 0:  # Continuar de onde parou
+                start_index = last_index + 1 if last_index < len(image_files) - 1 else 0
+            elif continuation_mode == 1:  # Recomeçar do início
+                start_index = 0
+            else:  # Revisar a última imagem anotada
+                start_index = last_index
 
         # Contar anotações já existentes antes do ponto de retomada
         for i in range(start_index):
@@ -2619,32 +2718,6 @@ class ImageAnnotator:
             existing_annotation = os.path.join(output_dir, f"{base_name}.txt")
 
             logger.info(f"Anotando: {os.path.basename(img_path)} ({i + 1}/{len(image_files)})")
-
-            # Verificar se já existe anotação e se NÃO estamos revisando a última imagem anotada
-            # (já que nesse caso o usuário explicitamente escolheu revisar)
-            if os.path.exists(existing_annotation) and i != start_index:
-                option_selected = self._show_option_dialog(
-                    f"Imagem Existente: {os.path.basename(img_path)}",
-                    "Esta imagem já possui anotação. O que deseja fazer?",
-                    [
-                        "Editar a anotação existente",
-                        "Sobrescrever (criar nova anotação)",
-                        "Pular esta imagem (manter anotação existente)"
-                    ]
-                )
-
-                if option_selected == 2:  # Pular esta imagem
-                    logger.info(f"Mantendo anotação existente para {base_name}")
-                    imagens_existentes += 1
-
-                    # Salvar progresso após cada imagem
-                    self._save_progress(progress_path, img_path)
-                    i += 1  # Avançar para próxima imagem
-                    continue
-                elif option_selected == 0:  # Editar anotação existente
-                    logger.info(f"Editando anotação existente para {base_name}")
-                else:  # Sobrescrever
-                    logger.info(f"Sobrescrevendo anotação existente para {base_name}")
 
             # Resetar flags antes de anotar cada imagem
             self.window_closed = False
