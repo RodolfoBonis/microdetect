@@ -5,7 +5,7 @@ Módulo para comparação de modelos de diferentes tamanhos.
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, re
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -32,7 +32,7 @@ class ModelComparator:
         self.evaluator = ModelEvaluator(self.output_dir)
 
     def compare_models(
-        self, model_paths: List[str], data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
+            self, model_paths: List[str], data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
     ) -> Dict[str, Any]:
         """
         Compara vários modelos usando o mesmo dataset e configurações.
@@ -53,48 +53,78 @@ class ModelComparator:
             model_name = os.path.basename(model_path)
             logger.info(f"Avaliando modelo: {model_name}")
 
-            # Avaliar o modelo
-            metrics = self.evaluator.evaluate_model(model_path, data_yaml, conf_threshold, iou_threshold)
+            try:
+                # Avaliar o modelo
+                metrics = self.evaluator.evaluate_model(model_path, data_yaml, conf_threshold, iou_threshold)
 
-            # Executar benchmark de velocidade
-            benchmark = SpeedBenchmark(model_path)
-            speed_results = benchmark.run(batch_sizes=[1, 4, 8], image_sizes=[640], iterations=10, warmup=2)
+                # Executar benchmark de velocidade
+                benchmark = SpeedBenchmark(model_path)
+                speed_results = benchmark.run(batch_sizes=[1, 4, 8], image_sizes=[640], iterations=10, warmup=2)
 
-            # Extrair tamanho do arquivo do modelo
-            model_size_mb = os.path.getsize(model_path) / (1024 * 1024)
+                # Extrair tamanho do arquivo do modelo
+                model_size_mb = os.path.getsize(model_path) / (1024 * 1024)
 
-            # Determinar categoria do modelo (n, s, m, l, x)
-            model_category = self._determine_model_category(model_path)
+                # Determinar categoria do modelo (n, s, m, l, x)
+                model_category = self._determine_model_category(model_path)
 
-            # Armazenar resultados
-            results[model_name] = {
-                "tamanho": model_category,
-                "tamanho_arquivo": round(model_size_mb, 2),  # MB
-                "metricas": {
-                    "mAP50": metrics["metricas_gerais"]["Precisão (mAP50)"],
-                    "mAP50-95": metrics["metricas_gerais"]["Precisão (mAP50-95)"],
-                    "recall": metrics["metricas_gerais"]["Recall"],
-                    "precision": metrics["metricas_gerais"]["Precisão"],
-                    "f1-score": metrics["metricas_gerais"]["F1-Score"],
-                },
-                "velocidade": {
-                    "fps": speed_results["results"][0]["fps"],
-                    "latencia_ms": speed_results["results"][0]["avg_latency_ms"],
-                },
-            }
+                # Obter valores de benchmark de forma segura
+                fps = 0
+                latencia_ms = 0
+                if "error" not in speed_results and "results" in speed_results and len(speed_results["results"]) > 0:
+                    benchmark_result = speed_results["results"][0]
+                    fps = benchmark_result.get("fps", 0)
+                    latencia_ms = benchmark_result.get("avg_latency_ms", 0)
 
-        # Gerar visualizações
-        self._generate_comparison_visualizations(results)
+                # Armazenar resultados
+                results[model_name] = {
+                    "tamanho": model_category,
+                    "tamanho_arquivo": round(model_size_mb, 2),  # MB
+                    "metricas": {
+                        "mAP50": metrics["metricas_gerais"]["Precisão (mAP50)"],
+                        "mAP50-95": metrics["metricas_gerais"]["Precisão (mAP50-95)"],
+                        "recall": metrics["metricas_gerais"]["Recall"],
+                        "precision": metrics["metricas_gerais"]["Precisão"],
+                        "f1-score": metrics["metricas_gerais"]["F1-Score"],
+                    },
+                    "velocidade": {
+                        "fps": fps,
+                        "latencia_ms": latencia_ms,
+                    },
+                }
+            except Exception as e:
+                logger.error(f"Erro ao avaliar modelo {model_name}: {str(e)}")
+                # Incluir resultados parciais mesmo com erro
+                results[model_name] = {
+                    "tamanho": self._determine_model_category(model_path),
+                    "tamanho_arquivo": round(os.path.getsize(model_path) / (1024 * 1024), 2),
+                    "metricas": {
+                        "mAP50": 0,
+                        "mAP50-95": 0,
+                        "recall": 0,
+                        "precision": 0,
+                        "f1-score": 0,
+                    },
+                    "velocidade": {
+                        "fps": 0,
+                        "latencia_ms": 0,
+                    },
+                    "error": str(e)
+                }
 
-        # Salvar resultados
-        self._save_comparison_results(results)
+        # Gerar visualizações - apenas se houver resultados válidos
+        if results:
+            self._generate_comparison_visualizations(results)
+
+            # Salvar resultados
+            self._save_comparison_results(results)
 
         logger.info(f"Comparação de modelos concluída, resultados em: {self.output_dir}")
         return results
 
     def _determine_model_category(self, model_path: str) -> str:
         """
-        Determina a categoria do modelo (n, s, m, l, x) pelo nome do arquivo.
+        Determina a categoria do modelo YOLOv8 a partir do nome do arquivo ou
+        extrai informações a partir do nome do arquivo para outros formatos.
 
         Args:
             model_path: Caminho para o arquivo do modelo
@@ -104,6 +134,7 @@ class ModelComparator:
         """
         model_name = os.path.basename(model_path).lower()
 
+        # Tentar detectar o tamanho do modelo YOLOv8 padrão
         if "yolov8n" in model_name:
             return "n"
         elif "yolov8s" in model_name:
@@ -114,8 +145,34 @@ class ModelComparator:
             return "l"
         elif "yolov8x" in model_name:
             return "x"
-        else:
-            return "unknown"
+
+        # Para os modelos com o formato b8_lr{taxa}.pt, extrair a taxa de aprendizado
+        # para usar como categoria
+        if "lr" in model_name:
+            try:
+                # Extrair a taxa de aprendizado do nome do modelo
+                # Exemplo: b8_lr0.01.pt -> lr=0.01
+                lr_match = re.search(r'lr([0-9.]+)', model_name)
+                if lr_match:
+                    lr_value = lr_match.group(1)
+                    return f"LR {lr_value}"
+            except:
+                pass
+
+        # Para qualquer outro tipo de modelo, tente extrair alguma informação útil
+        try:
+            # Se o modelo tem o formato batch{N}_outras_infos.pt
+            batch_match = re.search(r'b(atch)?[_-]?(\d+)', model_name)
+            if batch_match:
+                batch_value = batch_match.group(2)
+                return f"Batch {batch_value}"
+
+            # Se não conseguimos extrair informação específica,
+            # use os primeiros caracteres do nome (sem a extensão)
+            return model_name.split('.')[0][:10]
+        except:
+            # Como último recurso
+            return "custom"
 
     def _generate_comparison_visualizations(self, results: Dict[str, Dict]) -> Dict[str, str]:
         """

@@ -8,7 +8,7 @@ import logging
 import os
 import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from microdetect.annotation.annotator.annotation import AnnotationStorage, AnnotationVisualizer, BoundingBoxManager
@@ -38,6 +38,7 @@ class ImageAnnotator:
         classes: List[str] = None,
         auto_save: bool = DEFAULT_AUTO_SAVE,
         auto_save_interval: int = DEFAULT_AUTO_SAVE_INTERVAL,
+        yolo_model_path: Optional[str] = None,
     ):
         """
         Inicializa o anotador de imagens.
@@ -46,14 +47,16 @@ class ImageAnnotator:
             classes: Lista de classes para anotação
             auto_save: Se True, salva automaticamente as anotações
             auto_save_interval: Intervalo em segundos entre salvamentos automáticos
+            yolo_model_path: Caminho para o modelo YOLO (opcional)
         """
         self.current_image_path = None
-        self.current_output_dir = None  # Diretório de saída para as anotações
+        self.current_output_dir = None
         self.classes = classes or config.get("classes", ["0-levedura", "1-fungo", "2-micro-alga"])
         self.progress_file = ".annotation_progress.json"
         self.auto_save = auto_save
         self.auto_save_interval = auto_save_interval
         self.last_save_time = time.time()
+        self.yolo_model_path = yolo_model_path
 
         # Estado para controle de fluxo
         self.window_closed = False
@@ -110,7 +113,7 @@ class ImageAnnotator:
         self.image_loader = ImageLoader()
         self.image_processor = ImageProcessor()
         self.annotation_storage = AnnotationStorage(self.progress_file)
-        self.suggestion_generator = SuggestionGenerator(self.classes)
+        self.suggestion_generator = SuggestionGenerator(self.classes, self.yolo_model_path, True)
         self.annotation_backup = AnnotationBackup(self.progress_file)
         self.progress_manager = ProgressManager(self.progress_file)
 
@@ -120,6 +123,60 @@ class ImageAnnotator:
         self.next_image_requested = False
         self.edit_mode = False
         self.pan_mode = False
+
+    def select_yolo_model(self):
+        """Abre um diálogo para selecionar um modelo YOLO."""
+        if not hasattr(self, "suggestion_generator"):
+            return
+
+        model_path = filedialog.askopenfilename(
+            title="Selecionar Modelo YOLO",
+            filetypes=[
+                ("YOLO Models", "*.pt;*.pth"),
+                ("PyTorch Models", "*.pt"),
+                ("All Files", "*.*")
+            ]
+        )
+
+        if model_path:
+            success = self.suggestion_generator.set_model_path(model_path)
+            if success:
+                self.yolo_model_path = model_path
+                self.update_status(f"Modelo YOLO carregado: {os.path.basename(model_path)}")
+
+                # Atualizar estado do botão se existir
+                if hasattr(self, "main_window"):
+                    button_manager = self.main_window.get_button_manager()
+                    button_manager.update_button_state(
+                        "yolo_model",
+                        text=f"Modelo: {os.path.basename(model_path)[:10]}...",
+                        bg="lightgreen"
+                    )
+            else:
+                self.update_status("Falha ao carregar o modelo YOLO")
+
+    def toggle_cv_fallback(self, enabled=None):
+        """Ativa ou desativa o uso de visão computacional como fallback."""
+        if not hasattr(self, "suggestion_generator"):
+            return
+
+        # Se enabled não for especificado, inverte o estado atual
+        if enabled is None:
+            enabled = not getattr(self.suggestion_generator, "use_cv_fallback", True)
+
+        self.suggestion_generator.toggle_cv_fallback(enabled)
+
+        status = "ativado" if enabled else "desativado"
+        self.update_status(f"Fallback com visão computacional {status}")
+
+        # Atualizar estado do botão se existir
+        if hasattr(self, "main_window"):
+            button_manager = self.main_window.get_button_manager()
+            button_manager.update_button_state(
+                "cv_fallback",
+                text=f"VC Fallback: {'ON' if enabled else 'OFF'}",
+                bg="lightgreen" if enabled else "#f0f0f0"
+            )
 
     def _create_callbacks(self) -> Dict[str, Callable]:
         """
@@ -158,6 +215,9 @@ class ImageAnnotator:
             # Sugestões automáticas
             "toggle_suggestion_mode": self.toggle_suggestion_mode,
             "apply_suggestions": self.apply_suggested_annotations,
+            # Novas funcionalidades
+            "select_yolo_model": self.select_yolo_model,
+            "toggle_cv_fallback": self.toggle_cv_fallback,
             # Interface
             "update_status": self.update_status,
             "on_closing": self.on_closing,
@@ -800,20 +860,39 @@ class ImageAnnotator:
         if self.suggestion_mode:
             # Gerar sugestões para a imagem atual
             if hasattr(self, "current_image_path") and self.current_image_path:
-                self.suggested_boxes = self.suggestion_generator.generate_suggestions(self.current_image_path)
+                # Mostrar mensagem de espera durante o processamento
+                self.update_status("Gerando sugestões, aguarde...")
 
-                # Mostrar as sugestões na interface
-                if hasattr(self, "canvas"):
-                    visualizer = AnnotationVisualizer(self.canvas, self.classes)
-                    visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
+                # Exibir um indicador de progresso
+                cursor_backup = None
+                if hasattr(self, "root") and self.root:
+                    cursor_backup = self.root.config(cursor="watch")
+                    self.root.update()
 
-                self.update_status(f"Modo de sugestão ativado: {len(self.suggested_boxes)} sugestões disponíveis")
+                try:
+                    # Gerar sugestões usando o modelo ou visão computacional
+                    confidence = 0.3  # Valor inicial para confiança
+                    self.suggested_boxes = self.suggestion_generator.generate_suggestions(
+                        self.current_image_path, confidence
+                    )
 
-                # Habilitar botão de aplicar
-                if hasattr(self, "main_window"):
-                    button_manager = self.main_window.get_button_manager()
-                    button_manager.update_button_state("apply_suggestions", state=tk.NORMAL)
-                    button_manager.update_button_state("suggestion", bg="lightblue", text="Desativar Sugestões (G)")
+                    # Mostrar as sugestões na interface
+                    if hasattr(self, "canvas"):
+                        visualizer = AnnotationVisualizer(self.canvas, self.classes)
+                        visualizer.draw_suggestions(self.suggested_boxes, self.display_scale, self.scale_factor)
+
+                    source = "modelo YOLO" if self.suggestion_generator.model else "visão computacional"
+                    self.update_status(f"Modo de sugestão ativado: {len(self.suggested_boxes)} sugestões via {source}")
+
+                    # Habilitar botão de aplicar
+                    if hasattr(self, "main_window"):
+                        button_manager = self.main_window.get_button_manager()
+                        button_manager.update_button_state("apply_suggestions", state=tk.NORMAL)
+                        button_manager.update_button_state("suggestion", bg="lightblue", text="Desativar Sugestões (G)")
+                finally:
+                    # Restaurar cursor
+                    if hasattr(self, "root") and self.root and cursor_backup:
+                        self.root.config(cursor=cursor_backup)
             else:
                 self.update_status("Não foi possível gerar sugestões: imagem não encontrada")
                 self.suggestion_mode = False

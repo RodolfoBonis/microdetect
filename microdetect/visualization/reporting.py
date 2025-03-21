@@ -5,6 +5,7 @@ Módulo para geração de relatórios de análise e resultados.
 import csv
 import logging
 import os
+import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -30,15 +31,16 @@ class ReportGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_pdf_report(
-        self,
-        metrics: Dict[str, Any],
-        model_path: str,
-        output_file: Optional[str] = None,
-        include_images: List[str] = None,
-        template_path: Optional[str] = None,
+            self,
+            metrics: Dict[str, Any],
+            model_path: str,
+            output_file: Optional[str] = None,
+            include_images: List[str] = None,
+            template_path: Optional[str] = None,
     ) -> str:
         """
         Gera um relatório PDF detalhado com métricas de avaliação.
+        Se wkhtmltopdf não estiver disponível, gera um relatório HTML como fallback.
 
         Args:
             metrics: Dicionário com métricas de desempenho
@@ -48,14 +50,29 @@ class ReportGenerator:
             template_path: Caminho para o template HTML personalizado
 
         Returns:
-            Caminho para o arquivo PDF gerado
+            Caminho para o arquivo gerado (PDF ou HTML como fallback)
         """
+        # Verificar se wkhtmltopdf está instalado
+        wkhtmltopdf_present = False
         try:
             import pdfkit
+            # Verificar se o wkhtmltopdf está instalado no sistema
+            try:
+                config = pdfkit.configuration()
+                wkhtmltopdf_path = config.wkhtmltopdf
+                if wkhtmltopdf_path:
+                    import subprocess
+                    result = subprocess.run([wkhtmltopdf_path, '--version'],
+                                            stdout=subprocess.PIPE,
+                                            stderr=subprocess.PIPE)
+                    if result.returncode == 0:
+                        wkhtmltopdf_present = True
+                        logger.info(f"wkhtmltopdf encontrado: {result.stdout.decode().strip()}")
+            except Exception as e:
+                logger.debug(f"Erro ao verificar wkhtmltopdf: {str(e)}")
         except ImportError:
-            logger.error("pdfkit não encontrado. Instale com: pip install pdfkit")
-            logger.error("Nota: pdfkit requer wkhtmltopdf instalado no sistema")
-            return None
+            logger.warning("pdfkit não encontrado. Instalando com 'pip install pdfkit'")
+            logger.warning("Gerando relatório HTML como fallback")
 
         # Definir caminho de saída
         if output_file is None:
@@ -65,6 +82,25 @@ class ReportGenerator:
         # Garantir que o diretório de saída existe
         os.makedirs(os.path.dirname(os.path.abspath(output_file)), exist_ok=True)
 
+        # Preparar diretório de imagens temporárias para o relatório
+        temp_img_dir = os.path.join(os.path.dirname(os.path.abspath(output_file)), "temp_images")
+        os.makedirs(temp_img_dir, exist_ok=True)
+
+        # Copiar imagens para o diretório temporário
+        processed_images = []
+        if include_images:
+            for i, img_path in enumerate(include_images):
+                if os.path.exists(img_path):
+                    # Criar nome baseado no índice para evitar problemas com caracteres especiais
+                    base_name = f"image_{i + 1}{os.path.splitext(img_path)[1]}"
+                    dest_path = os.path.join(temp_img_dir, base_name)
+                    try:
+                        shutil.copy2(img_path, dest_path)
+                        # Usar caminho relativo para a imagem
+                        processed_images.append(os.path.join("temp_images", base_name))
+                    except Exception as e:
+                        logger.warning(f"Erro ao copiar imagem {img_path}: {str(e)}")
+
         # Preparar dados para o template
         report_data = {
             "model_name": os.path.basename(model_path),
@@ -72,7 +108,7 @@ class ReportGenerator:
             "date": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
             "general_metrics": metrics.get("metricas_gerais", {}),
             "class_metrics": metrics.get("metricas_por_classe", []),
-            "images": include_images or [],
+            "images": processed_images,  # Usar caminhos processados
         }
 
         # Carregar template
@@ -80,7 +116,7 @@ class ReportGenerator:
             with open(template_path, "r") as f:
                 template_str = f.read()
         else:
-            # Template HTML padrão
+            # Template HTML padrão (código existente)
             template_str = """
             <!DOCTYPE html>
             <html>
@@ -170,7 +206,7 @@ class ReportGenerator:
                         {% for metric, value in general_metrics.items() %}
                         <tr>
                             <td>{{ metric }}</td>
-                            <td>{{ "%.4f"|format(value) }}</td>
+                            <td>{{ "%.4f"|format(value) if value is number else value }}</td>
                         </tr>
                         {% endfor %}
                     </table>
@@ -182,18 +218,20 @@ class ReportGenerator:
                     <table>
                         <tr>
                             <th>Classe</th>
-                            <th>Precisão (AP50)</th>
-                            <th>Recall</th>
-                            <th>Precisão</th>
-                            <th>F1-Score</th>
+                            {% for key in class_metrics[0].keys() %}
+                                {% if key != 'Classe' %}
+                                <th>{{ key }}</th>
+                                {% endif %}
+                            {% endfor %}
                         </tr>
                         {% for metric in class_metrics %}
                         <tr>
                             <td>{{ metric.Classe }}</td>
-                            <td>{{ "%.4f"|format(metric["Precisão (AP50)"]) }}</td>
-                            <td>{{ "%.4f"|format(metric.Recall) }}</td>
-                            <td>{{ "%.4f"|format(metric.Precisão) }}</td>
-                            <td>{{ "%.4f"|format(metric["F1-Score"]) }}</td>
+                            {% for key, value in metric.items() %}
+                                {% if key != 'Classe' %}
+                                <td>{{ "%.4f"|format(value) if value is number else value }}</td>
+                                {% endif %}
+                            {% endfor %}
                         </tr>
                         {% endfor %}
                     </table>
@@ -225,19 +263,55 @@ class ReportGenerator:
         template = jinja2.Template(template_str)
         html_content = template.render(**report_data)
 
-        # Salvar versão HTML do relatório (para debug)
+        # Salvar versão HTML do relatório
         html_path = output_file.replace(".pdf", ".html")
         with open(html_path, "w") as f:
             f.write(html_content)
 
-        # Converter HTML para PDF
-        try:
-            pdfkit.from_string(html_content, output_file)
-            logger.info(f"Relatório PDF gerado: {output_file}")
-            return output_file
-        except Exception as e:
-            logger.error(f"Erro ao gerar PDF: {str(e)}")
-            return html_path  # Retorna o caminho HTML como fallback
+        logger.info(f"Relatório HTML gerado: {html_path}")
+
+        # Se wkhtmltopdf está instalado, tente converter para PDF
+        if wkhtmltopdf_present:
+            try:
+                import pdfkit
+
+                # Configurar opções do pdfkit
+                options = {
+                    'quiet': '',
+                    'enable-local-file-access': '',  # Importante para acessar arquivos locais
+                    'image-dpi': '300',
+                    'margin-top': '10mm',
+                    'margin-right': '10mm',
+                    'margin-bottom': '10mm',
+                    'margin-left': '10mm',
+                }
+
+                # Definir o diretório de trabalho para o diretório do HTML
+                # Isso ajuda com problemas de caminho relativo
+                current_dir = os.getcwd()
+                os.chdir(os.path.dirname(os.path.abspath(html_path)))
+
+                # Converter HTML para PDF
+                pdfkit.from_file(os.path.basename(html_path), output_file, options=options)
+
+                # Restaurar diretório original
+                os.chdir(current_dir)
+
+                logger.info(f"Relatório PDF gerado: {output_file}")
+                return output_file
+            except Exception as e:
+                logger.error(f"Erro ao gerar PDF: {str(e)}")
+                logger.info(f"Usando relatório HTML como fallback: {html_path}")
+                return html_path
+        else:
+            # Se wkhtmltopdf não está disponível, exibir instruções de instalação
+            logger.warning("wkhtmltopdf não encontrado. Para gerar PDFs:")
+            logger.warning("1. Instale wkhtmltopdf: https://wkhtmltopdf.org/downloads.html")
+            logger.warning("2. Para sistemas Linux/Ubuntu: sudo apt-get install wkhtmltopdf")
+            logger.warning("3. Para Windows: Baixe o instalador do site e adicione ao PATH")
+            logger.warning("4. Para macOS: brew install wkhtmltopdf")
+            logger.warning(f"Usando relatório HTML como alternativa: {html_path}")
+            return html_path
 
     def generate_csv_report(self, metrics: Dict[str, Any], output_file: Optional[str] = None) -> str:
         """
