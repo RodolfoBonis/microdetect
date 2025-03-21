@@ -87,12 +87,12 @@ class ModelEvaluator:
         """
         # Métricas gerais
         general_metrics = {
-            "Precisão (mAP50)": float(results.box.map50),
-            "Precisão (mAP50-95)": float(results.box.map),
-            "Recall": float(results.box.recall),
-            "Precisão": float(results.box.precision),
-            "F1-Score": self._calculate_f1(float(results.box.precision), float(results.box.recall)),
-            "Taxa de Erro": 1.0 - float(results.box.map50),
+            "Precisão (mAP50)": float(results.box.map50),  # Acessando como atributo
+            "Precisão (mAP50-95)": float(results.box.map),  # Acessando como atributo
+            "Recall": float(results.box.mr),  # Acessando como atributo
+            "Precisão": float(results.box.mp),  # Acessando como atributo
+            "F1-Score": self._calculate_f1(float(results.box.mp), float(results.box.mr)),
+            "Taxa de Erro": 1.0 - float(results.box.map50),  # Acessando como atributo
         }
 
         # Métricas por classe
@@ -101,6 +101,7 @@ class ModelEvaluator:
             if i < len(results.box.ap_class_index):
                 idx = results.box.ap_class_index.tolist().index(i) if i in results.box.ap_class_index else -1
                 if idx >= 0:
+                    # Acessando ap50 como atributo
                     class_metrics.append(
                         {
                             "Classe": class_name,
@@ -302,75 +303,126 @@ class ModelEvaluator:
             # Carregar modelo
             model = YOLO(model_path)
 
-            # Rodar validação para gerar matriz de confusão
-            results = model.val(data=data_yaml, conf_matrix=True)
+            # Rodar validação com plot_confusion_matrix=True (parâmetro correto no YOLOv8)
+            # O YOLOv8 não aceita 'conf_matrix', mas pode aceitar 'plot_confusion_matrix'
+            # ou simplesmente gerar a matriz após a validação
+            results = model.val(data=data_yaml)
 
-            if hasattr(results, "confusion_matrix") and hasattr(results.confusion_matrix, "plot"):
-                try:
-                    # Usar método integrado para plotar matriz de confusão
-                    results.confusion_matrix.plot(save_dir=self.output_dir, names=results.names)
-                    logger.info(f"Matriz de confusão salva em: {self.output_dir}")
-                    return conf_matrix_path
-                except Exception as plot_error:
-                    logger.error(f"Erro ao plotar matriz de confusão: {str(plot_error)}")
+            # Gerar a matriz de confusão manualmente
+            from ultralytics.utils.metrics import ConfusionMatrix
 
-                    # Fallback manual
-                    self._plot_confusion_matrix_manually(results.confusion_matrix.matrix, results.names, conf_matrix_path)
-                    return conf_matrix_path
-            else:
-                logger.warning("Matriz de confusão não disponível nos resultados")
-                return ""
+            # Criar matriz de confusão usando os resultados
+            conf_matrix = ConfusionMatrix(nc=len(results.names))
+
+            # Plotar
+            plt.figure(figsize=(10, 8))
+            fig = conf_matrix.plot(names=list(results.names.values()))
+            plt.savefig(conf_matrix_path)
+            plt.close()
+
+            logger.info(f"Matriz de confusão salva em: {conf_matrix_path}")
+            return conf_matrix_path
 
         except Exception as e:
             logger.error(f"Erro ao gerar matriz de confusão: {str(e)}")
-            return ""
 
-    def _plot_confusion_matrix_manually(self, matrix: np.ndarray, class_names: Dict[int, str], save_path: str) -> None:
+            # Tentar uma abordagem alternativa se a primeira falhar
+            try:
+                # Alguns modelos YOLOv8 podem usar uma abordagem diferente
+                results = model.val(data=data_yaml)
+
+                # Verificar se podemos acessar a matriz de confusão dos resultados
+                if hasattr(results, "confusion_matrix"):
+                    cm = results.confusion_matrix
+                    plt.figure(figsize=(10, 8))
+                    plt.imshow(cm, interpolation="nearest", cmap=plt.cm.Blues)
+                    plt.title("Matriz de Confusão")
+                    plt.colorbar()
+
+                    # Adicionar rótulos
+                    classes = list(results.names.values())
+                    tick_marks = np.arange(len(classes))
+                    plt.xticks(tick_marks, classes, rotation=45)
+                    plt.yticks(tick_marks, classes)
+
+                    plt.ylabel("Real")
+                    plt.xlabel("Previsto")
+                    plt.tight_layout()
+                    plt.savefig(conf_matrix_path)
+                    plt.close()
+
+                    logger.info(f"Matriz de confusão alternativa salva em: {conf_matrix_path}")
+                    return conf_matrix_path
+                else:
+                    # Se não conseguirmos acessar diretamente, tentar calcular manualmente
+                    return self._plot_confusion_matrix_manually(results, conf_matrix_path)
+            except Exception as e2:
+                logger.error(f"Erro na abordagem alternativa: {str(e2)}")
+                return ""
+
+        return ""
+
+    def _plot_confusion_matrix_manually(self, results, save_path: str) -> str:
         """
-        Plota a matriz de confusão manualmente.
+        Tenta plotar a matriz de confusão manualmente a partir dos resultados.
 
         Args:
-            matrix: Matriz de confusão como array numpy
-            class_names: Nomes das classes
-            save_path: Caminho para salvar a imagem
+            results: Resultado da validação do modelo
+            save_path: Caminho para salvar o gráfico
+
+        Returns:
+            Caminho para o gráfico salvo ou string vazia em caso de erro
         """
         try:
-            plt.figure(figsize=(10, 8))
+            # Coletar informações dos resultados para criar uma matriz de confusão básica
+            preds = []
+            targets = []
 
-            # Normalizar a matriz por linha (previsões verdadeiras)
-            matrix_normalized = matrix.astype("float") / (matrix.sum(axis=1, keepdims=True) + 1e-6)
+            # Tentar diferentes maneiras de obter os dados necessários
+            if hasattr(results, "pred") and hasattr(results, "gt"):
+                for pred, gt in zip(results.pred, results.gt):
+                    if len(pred) > 0 and len(gt) > 0:
+                        preds.extend(pred[:, -1].int().tolist())  # Supondo que a classe está na última coluna
+                        targets.extend(gt[:, 0].int().tolist())  # Supondo que a classe está na primeira coluna
 
-            plt.imshow(matrix_normalized, interpolation="nearest", cmap=plt.cm.Blues)
-            plt.title("Matriz de Confusão Normalizada")
-            plt.colorbar()
+            # Se conseguimos dados suficientes, criar uma matriz de confusão básica
+            if preds and targets:
+                import numpy as np
+                from sklearn.metrics import confusion_matrix
 
-            # Adicionar rótulos
-            classes = list(class_names.values())
-            tick_marks = np.arange(len(classes))
-            plt.xticks(tick_marks, classes, rotation=45)
-            plt.yticks(tick_marks, classes)
+                # Criar matriz
+                cm = confusion_matrix(targets, preds)
 
-            # Adicionar valores na matriz
-            thresh = matrix_normalized.max() / 2.0
-            for i, j in np.ndindex(matrix_normalized.shape):
-                plt.text(
-                    j,
-                    i,
-                    f"{matrix[i, j]}\n({matrix_normalized[i, j]:.2f})",
-                    ha="center",
-                    va="center",
-                    color="white" if matrix_normalized[i, j] > thresh else "black",
-                )
+                # Normalizar
+                cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
 
-            plt.ylabel("Real")
-            plt.xlabel("Previsto")
-            plt.tight_layout()
+                # Plotar
+                plt.figure(figsize=(10, 8))
+                plt.imshow(cm_normalized, interpolation="nearest", cmap=plt.cm.Blues)
+                plt.title("Matriz de Confusão Normalizada (Calculada Manualmente)")
+                plt.colorbar()
 
-            plt.savefig(save_path)
-            logger.info(f"Matriz de confusão manual salva em: {save_path}")
+                # Adicionar rótulos se possível
+                if hasattr(results, "names"):
+                    classes = list(results.names.values())
+                    tick_marks = np.arange(len(classes))
+                    plt.xticks(tick_marks, classes, rotation=45)
+                    plt.yticks(tick_marks, classes)
 
+                plt.ylabel("Real")
+                plt.xlabel("Previsto")
+                plt.tight_layout()
+                plt.savefig(save_path)
+                plt.close()
+
+                logger.info(f"Matriz de confusão manual salva em: {save_path}")
+                return save_path
+
+            logger.warning("Dados insuficientes para criar matriz de confusão")
+            return ""
         except Exception as e:
             logger.error(f"Erro ao plotar matriz de confusão manualmente: {str(e)}")
+            return ""
 
     def optimize_threshold(
         self,

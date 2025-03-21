@@ -24,7 +24,7 @@
 ## 🔑 Key Features
 
 - 📷 **Image Conversion** - Transform microscopy TIFF images to optimized formats
-- 🏷️ **Smart Annotation** - User-friendly interface with resumable sessions
+- 🏷️ **Smart Annotation** - User-friendly interface with resumable sessions and AI-assisted labeling
 - 📊 **Data Management** - Organize and prepare your datasets efficiently 
 - 🔄 **Data Augmentation** - Enhance datasets with advanced transformation techniques
 - 🧠 **Model Training** - Train custom YOLOv8 models with checkpoint management
@@ -101,6 +101,8 @@ microdetect batch_detect --model_path runs/train/yolov8_s_custom/weights/best.pt
 For detailed information, see our documentation:
 
 - [Installation Guide](docs/en/installation_guide.md) - Detailed installation instructions
+- [Annotation Guide](docs/en/annotation_guide.md) - Learn to annotate microscopy images effectively
+- [Training Guide](docs/en/training_guide.md) - Train custom models for your specific needs
 - [Troubleshooting](docs/en/troubleshooting.md) - Solutions to common problems
 - [Advanced Configuration](docs/en/advanced_configuration.md) - Customize MicroDetect for your needs
 - [Development Guide](docs/en/development_guide.md) - Contribute to MicroDetect
@@ -118,9 +120,9 @@ microdetect docs
 
 ```
 microdetect/
-├── annotation/        # Image annotation tools
+├── annotation/        # Image annotation tools with AI assistance
 ├── data/              # Data processing modules
-├── training/          # Model training and evaluation
+├── training/          # Model training and evaluation 
 ├── analysis/          # Analysis of results and detection errors
 ├── visualization/     # Visualization and reporting tools
 └── utils/             # Utility functions and configuration

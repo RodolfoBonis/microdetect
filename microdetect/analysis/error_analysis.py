@@ -57,6 +57,9 @@ class ErrorAnalyzer:
         Returns:
             Dicionário com contagens de erro e caminhos para resultados
         """
+        # Store the requested error type before any potential reassignment
+        requested_error_types = error_type
+
         # Criar diretórios para cada tipo de erro
         error_dirs = {
             "false_positives": os.path.join(self.output_dir, "false_positives"),
@@ -153,12 +156,12 @@ class ErrorAnalyzer:
             identified_errors = self._identify_errors(image_path, detections, ground_truth, iou_threshold)
 
             # Atualizar contagens
-            for error_type, errors in identified_errors.items():
-                error_counts[error_type] += len(errors)
+            for requested_error_types, errors in identified_errors.items():
+                error_counts[requested_error_types] += len(errors)
 
                 # Armazenar exemplos (até o limite)
-                if len(error_examples[error_type]) < max_samples and errors:
-                    error_examples[error_type].append({"image_path": image_path, "errors": errors})
+                if len(error_examples[requested_error_types]) < max_samples and errors:
+                    error_examples[requested_error_types].append({"image_path": image_path, "errors": errors})
 
         # Gerar visualizações para cada tipo de erro
         for error_category, examples in error_examples.items():

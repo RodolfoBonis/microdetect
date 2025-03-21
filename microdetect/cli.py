@@ -102,13 +102,47 @@ def setup_train_parser(subparsers):
         "--data_yaml",
         help="Caminho para arquivo data.yaml (se não especificado, será criado)",
     )
-    parser.add_argument("--model_size", choices=["n", "s", "m", "l", "x"], help="Tamanho do modelo YOLO")
+    parser.add_argument(
+        "--model_size",
+        type=str,
+        choices=["n", "s", "m", "l", "x"],
+        default="s",
+        help="Tamanho do modelo YOLOv8 (n, s, m, l, x)",
+    )
+    parser.add_argument(
+        "--model_sizes",
+        type=str,
+        nargs="+",
+        choices=["n", "s", "m", "l", "x"],
+        help="Lista de tamanhos de modelo para busca de hiperparâmetros (quando usado com --find-hyperparams)",
+    )
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        default=None,
+        help="Diretório para salvar/carregar checkpoints da busca de hiperparâmetros",
+    )
     parser.add_argument("--epochs", type=int, help="Número de épocas")
     parser.add_argument("--batch_size", type=int, help="Tamanho do batch")
+    parser.add_argument(
+        "--batch_sizes",
+        type=int,
+        nargs="+",
+        default=[8, 16, 32],
+        help="Lista de tamanhos de batch para testar (ex: --batch_sizes 8 16 32) (quando usado com --find-hyperparams)",
+    )
+    parser.add_argument(
+        "--learning_rates",
+        type=float,
+        nargs="+",
+        default=[0.001, 0.01, 0.1],
+        help="Lista de learning rates para testar (ex: --learning_rates 0.001 0.01 0.1) (quando usado com --find-hyperparams)",
+    )
     parser.add_argument("--image_size", type=int, help="Tamanho da imagem")
     parser.add_argument("--output_dir", help="Diretório para resultados")
     parser.add_argument("--no_pretrained", action="store_true", help="Não usar pesos pré-treinados")
     parser.add_argument("--resume", help="Continuar de um checkpoint")
+    parser.add_argument("--resume_hp", action="store_true", help="Retomar busca de hiperparâmetros")
     parser.add_argument(
         "--find_hyperparams",
         action="store_true",
@@ -665,9 +699,23 @@ def handle_train(args):
         logger.info(f"Retomando treinamento a partir de {args.resume}")
         results = trainer.resume_training(args.resume, data_yaml)
     elif args.find_hyperparams:
-        logger.info("Iniciando busca por hiperparâmetros")
-        best_config = trainer.find_best_hyperparameters(data_yaml)
-        logger.info(f"Melhores hiperparâmetros encontrados: {best_config}")
+        model_sizes = args.model_sizes if args.model_sizes else [args.model_size]
+        logging.info(f"Iniciando busca por hiperparâmetros para modelos: {', '.join(model_sizes)}")
+
+        search_space = {
+            "batch_sizes": args.batch_sizes,
+            "learning_rates": args.learning_rates,
+            "model_sizes": model_sizes,
+        }
+        best_hyperparams = trainer.find_best_hyperparameters(
+            data_yaml=data_yaml, checkpoint_dir=args.checkpoint_dir, resume=args.resume_hp, search_space=search_space
+        )
+
+        print(f"\nMelhores hiperparâmetros encontrados:")
+        print(f"  - Batch Size: {best_hyperparams.get('batch_size')}")
+        print(f"  - Learning Rate: {best_hyperparams.get('learning_rate')}")
+        print(f"  - Model Size: {best_hyperparams.get('model_size')}")
+        print(f"  - mAP50: {best_hyperparams.get('map'):.4f}")
     else:
         results = trainer.train(data_yaml)
 
@@ -696,9 +744,16 @@ def handle_evaluate(args):
 
     # Gerar matriz de confusão se solicitado
     if args.confusion_matrix:
-        conf_matrix_path = evaluator.confusion_matrix(args.model_path, data_yaml)
-        if conf_matrix_path:
-            report_paths["confusion_matrix"] = conf_matrix_path
+        try:
+            logger.info("Gerando matriz de confusão...")
+            conf_matrix_path = evaluator.confusion_matrix(args.model_path, data_yaml)
+            if conf_matrix_path:
+                report_paths["confusion_matrix"] = conf_matrix_path
+                logger.info(f"Matriz de confusão salva em: {conf_matrix_path}")
+            else:
+                logger.warning("Não foi possível gerar a matriz de confusão")
+        except Exception as e:
+            logger.error(f"Erro ao gerar matriz de confusão: {str(e)}")
 
     logger.info(f"Avaliação concluída. Precisão (mAP50): {metrics['metricas_gerais']['Precisão (mAP50)']:.4f}")
     logger.info(f"Relatórios salvos em: {args.output_dir or evaluator.output_dir}")
@@ -742,12 +797,35 @@ def handle_model_comparison(args):
 
         # Gerar dashboard interativo se solicitado
         if args.dashboard:
-            from microdetect.visualization.dashboards import DashboardGenerator
+            try:
+                # Importações necessárias
+                try:
+                    import dash
+                    import dash_bootstrap_components as dbc
+                except ImportError:
+                    logger.error("Dash não encontrado. Instale com: pip install dash dash-bootstrap-components")
+                    logger.info("Dashboard não será iniciado. Use 'pip install dash dash-bootstrap-components' para instalar.")
+                    return results
 
-            dashboard = DashboardGenerator(output_dir)
-            port = dashboard.create_model_comparison_dashboard(results)
+                # Iniciar dashboard
+                from microdetect.visualization.dashboards import DashboardGenerator
 
-            logger.info(f"Dashboard iniciado em: http://localhost:{port}")
+                dashboard = DashboardGenerator(output_dir)
+
+                try:
+                    # Tentar iniciar o dashboard
+                    port = dashboard.create_model_comparison_dashboard(results, port=8051, open_browser=True)
+                    if port > 0:
+                        logger.info(f"Dashboard iniciado em: http://localhost:{port}")
+                    else:
+                        logger.warning("Não foi possível iniciar o dashboard. Verifique os logs para detalhes.")
+                except Exception as dash_error:
+                    logger.error(f"Erro ao iniciar dashboard: {str(dash_error)}")
+                    # Instruções sobre como acessar os resultados
+                    logger.info(f"Dashboard não disponível, mas os resultados foram salvos em: {args.output_dir}")
+                    logger.info("Você pode visualizar os gráficos gerados nesse diretório diretamente.")
+            except Exception as e:
+                logger.error(f"Erro ao configurar dashboard: {str(e)}")
 
         logger.info(f"Comparação de modelos concluída. Resultados salvos em: {output_dir}")
 
@@ -873,115 +951,305 @@ def handle_analyze_errors(args):
 
 
 def handle_generate_report(args):
-    """Manipular comando de geração de relatórios."""
+    """
+    Manipula o comando generate_report para gerar relatórios a partir de resultados.
+    """
+    import glob
+    import json
+    import os
+
+    import pandas as pd
+
+    from microdetect.visualization.reporting import ReportGenerator
+
     logger.info(f"Iniciando geração de relatório para os resultados em: {args.results_dir}")
 
-    # Verificar diretório de resultados
+    # Verificar se o diretório existe
     if not os.path.exists(args.results_dir):
         logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
         return
 
-    # Definir arquivo de saída
-    if not args.output_file:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        extension = ".pdf" if args.format == "pdf" else f".{args.format}"
-        args.output_file = os.path.join("reports", f"report_{timestamp}{extension}")
+    # Localizar arquivo de métricas (json)
+    json_files = glob.glob(os.path.join(args.results_dir, "relatorio_metricas_*.json"))
+    csv_files = glob.glob(os.path.join(args.results_dir, "relatorio_metricas_*.csv"))
+    error_files = glob.glob(os.path.join(args.results_dir, "error_*.json"))
 
-    # Criar diretório de saída se necessário
-    os.makedirs(os.path.dirname(os.path.abspath(args.output_file)), exist_ok=True)
+    # Procurar por qualquer arquivo JSON que possa conter métricas
+    all_json_files = glob.glob(os.path.join(args.results_dir, "*.json"))
 
-    try:
-        # Instanciar gerador de relatórios
-        from microdetect.visualization.reporting import ReportGenerator
+    metrics_file = None
+    metrics_data = None
 
-        # Preparar lista de imagens para incluir no relatório
-        include_images = []
-        if args.include_images:
-            include_images = args.include_images.split(",")
-            # Verificar se as imagens existem
-            for img_path in include_images:
-                if not os.path.exists(img_path):
-                    logger.warning(f"Imagem não encontrada: {img_path}")
+    # Tentar carregar as métricas do arquivo JSON
+    if json_files:
+        metrics_file = json_files[0]  # Usar o primeiro arquivo encontrado
+        try:
+            with open(metrics_file, "r") as f:
+                metrics_data = json.load(f)
+            logger.info(f"Carregando métricas do arquivo: {metrics_file}")
+        except Exception as e:
+            logger.error(f"Erro ao ler arquivo de métricas JSON: {str(e)}")
+            metrics_file = None
+    # Se não encontrar arquivo específico de métricas, tentar qualquer JSON
+    elif all_json_files:
+        metrics_file = all_json_files[0]
+        try:
+            with open(metrics_file, "r") as f:
+                metrics_data = json.load(f)
+            logger.info(f"Carregando métricas de arquivo alternativo: {metrics_file}")
+        except Exception as e:
+            logger.error(f"Erro ao ler arquivo JSON alternativo: {str(e)}")
+            metrics_file = None
 
-        # Carregar métricas do arquivo JSON
-        metrics_file = None
-        for file in os.listdir(args.results_dir):
-            if file.endswith(".json") and ("metrics" in file or "report" in file):
-                metrics_file = os.path.join(args.results_dir, file)
-                break
+    # Se não conseguir carregar do JSON, tentar CSV
+    if metrics_data is None and csv_files:
+        metrics_file = csv_files[0]
+        try:
+            # Ler CSV e converter para formato de dicionário semelhante ao JSON
+            df = pd.read_csv(metrics_file)
 
-        if not metrics_file:
-            logger.error("Arquivo de métricas não encontrado no diretório de resultados")
-            return
+            # Converter para o formato esperado
+            if "Métrica" in df.columns and "Valor" in df.columns:
+                general_metrics = {}
+                class_metrics = []
 
-        with open(metrics_file, "r") as f:
-            metrics = json.load(f)
+                # Primeiro, processar métricas gerais
+                general_df = df[df["Tipo"] == "Geral"] if "Tipo" in df.columns else df
+                for _, row in general_df.iterrows():
+                    try:
+                        metric_name = row["Métrica"]
+                        metric_value = float(row["Valor"])
+                        general_metrics[metric_name] = metric_value
+                    except:
+                        pass
 
-        # Determinar caminho do modelo (pode estar no arquivo JSON)
-        model_path = metrics.get("modelo", {}).get("caminho", "unknown_model")
+                # Processar métricas por classe, se houver
+                if "Classe" in df.columns:
+                    class_df = df[~df["Métrica"].isna() & ~df["Classe"].isna()]
+                    for class_name in class_df["Classe"].unique():
+                        class_data = {"Classe": class_name}
+                        class_rows = class_df[class_df["Classe"] == class_name]
+                        for _, row in class_rows.iterrows():
+                            try:
+                                metric_name = row["Métrica"]
+                                metric_value = float(row["Valor"])
+                                class_data[metric_name] = metric_value
+                            except:
+                                pass
+                        if len(class_data) > 1:  # Se tiver algo além do nome da classe
+                            class_metrics.append(class_data)
 
-        # Gerar relatório no formato solicitado
-        generator = ReportGenerator(os.path.dirname(args.output_file))
+                metrics_data = {"metricas_gerais": general_metrics, "metricas_por_classe": class_metrics}
 
-        if args.format == "pdf":
-            report_path = generator.generate_pdf_report(
-                metrics=metrics, model_path=model_path, output_file=args.output_file, include_images=include_images
-            )
-        elif args.format == "csv":
-            report_path = generator.generate_csv_report(metrics=metrics, output_file=args.output_file)
-        else:  # json
-            # Copiar o arquivo JSON existente com eventuais modificações
-            with open(args.output_file, "w") as f:
-                json.dump(metrics, f, indent=4)
-            report_path = args.output_file
+                logger.info(f"Métricas carregadas do arquivo CSV: {metrics_file}")
+            else:
+                logger.warning(f"Formato de CSV não reconhecido: {metrics_file}")
+                metrics_file = None
+        except Exception as e:
+            logger.error(f"Erro ao processar arquivo CSV: {str(e)}")
+            metrics_file = None
 
-        logger.info(f"Relatório gerado com sucesso: {report_path}")
+    # Se ainda não tiver métricas, verificar se há arquivos de erro
+    if metrics_data is None and error_files:
+        metrics_file = error_files[0]
+        try:
+            with open(metrics_file, "r") as f:
+                error_data = json.load(f)
 
-    except Exception as e:
-        logger.error(f"Erro durante a geração do relatório: {str(e)}")
+            # Criar estrutura básica de métricas para incluir informações de erro
+            metrics_data = {"metricas_gerais": {"Erro": 1.0}, "metricas_por_classe": [], "erro": error_data}
+            logger.info(f"Usando informações de erro do arquivo: {metrics_file}")
+        except Exception as e:
+            logger.error(f"Erro ao ler arquivo de erro: {str(e)}")
+
+    # Se não conseguir encontrar nenhum arquivo de métricas
+    if metrics_data is None:
+        logger.error("Arquivo de métricas não encontrado no diretório de resultados")
+        # Criar estrutura mínima para evitar erros
+        metrics_data = {"metricas_gerais": {"Informação": 0.0}, "metricas_por_classe": [], "nota": "Dados não disponíveis"}
+
+    # Encontrar imagens para incluir no relatório
+    images = []
+    for ext in ["png", "jpg", "jpeg"]:
+        images.extend(glob.glob(os.path.join(args.results_dir, f"*.{ext}")))
+
+    # Se houver mais de 5 imagens, selecionar apenas as 5 primeiras para não sobrecarregar o relatório
+    if len(images) > 5:
+        images = images[:5]
+
+    # Encontrar caminhos para confusion_matrix se disponível
+    confusion_matrix_images = [img for img in images if "confusion_matrix" in img.lower()]
+    if confusion_matrix_images:
+        # Adicionar matriz de confusão como primeira imagem
+        images = [confusion_matrix_images[0]] + [img for img in images if img != confusion_matrix_images[0]]
+
+    logger.info(f"Encontradas {len(images)} imagens para incluir no relatório")
+
+    # Gerar relatório usando ReportGenerator
+    report_generator = ReportGenerator(os.path.dirname(args.output_file) if args.output_file else None)
+
+    # Identificar modelo usado, se disponível
+    model_path = "unknown_model.pt"
+    if metrics_data and isinstance(metrics_data, dict):
+        if "modelo" in metrics_data and "caminho" in metrics_data["modelo"]:
+            model_path = metrics_data["modelo"]["caminho"]
+        elif "model" in metrics_data:
+            model_path = metrics_data["model"]
+
+    # Gerar relatório no formato solicitado
+    if args.format.lower() == "pdf":
+        output_file = report_generator.generate_pdf_report(metrics_data, model_path, args.output_file, images)
+
+        # Verificar se o arquivo gerado é HTML em vez de PDF (fallback)
+        if output_file and output_file.endswith(".html"):
+            logger.info("Relatório HTML gerado como alternativa ao PDF.")
+            logger.info("Para gerar PDFs, instale wkhtmltopdf (https://wkhtmltopdf.org/downloads.html)")
+
+            # Sistemas comuns
+            if os.name == "posix":  # Linux/Mac
+                logger.info("Para Ubuntu/Debian: sudo apt-get install wkhtmltopdf")
+                logger.info("Para MacOS: brew install wkhtmltopdf")
+            elif os.name == "nt":  # Windows
+                logger.info("Para Windows: Baixe o instalador do site e adicione ao PATH")
+
+            logger.info(f"O relatório HTML foi salvo em: {output_file}")
+        else:
+            logger.info(f"Relatório PDF gerado com sucesso: {output_file}")
+
+    elif args.format.lower() == "csv":
+        output_file = report_generator.generate_csv_report(metrics_data, args.output_file)
+        if output_file:
+            logger.info(f"Relatório CSV gerado com sucesso: {output_file}")
+        else:
+            logger.error(f"Erro ao gerar relatório CSV")
+    else:
+        logger.error(f"Formato de relatório não suportado: {args.format}")
+        return
+
+    if not output_file:
+        logger.error(f"Erro ao gerar relatório no formato {args.format}")
+    else:
+        logger.info(f"Relatório finalizado com sucesso!")
+        # Abrir o relatório automaticamente, se for um ambiente com interface gráfica
+        try:
+            # Verificar se estamos em ambiente WSL
+            is_wsl = False
+            try:
+                with open("/proc/version", "r") as f:
+                    if "microsoft" in f.read().lower():
+                        is_wsl = True
+            except:
+                pass
+
+            if is_wsl:
+                # Em WSL, tentar usar o comando powershell.exe para abrir no Windows
+                import subprocess
+
+                try:
+                    windows_path = output_file.replace("/mnt/c/", "C:\\").replace("/", "\\")
+                    subprocess.run(["powershell.exe", "start", windows_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    logger.info("Relatório aberto no navegador do Windows (WSL)")
+                except Exception as e:
+                    logger.info(f"Não foi possível abrir automaticamente. Abra manualmente: {output_file}")
+            else:
+                # Ambiente não-WSL, usar navegador padrão
+                import webbrowser
+
+                if webbrowser.open(output_file):
+                    logger.info("Relatório aberto no navegador padrão")
+                else:
+                    logger.info(f"Não foi possível abrir automaticamente. Abra manualmente: {output_file}")
+        except Exception as e:
+            logger.info(f"Não foi possível abrir automaticamente. Abra manualmente: {output_file}")
 
 
 def handle_dashboard(args):
-    """Manipular comando de dashboard interativo."""
+    """
+    Manipula o comando dashboard para visualizar resultados interativamente.
+    """
+    import glob
+    import json
+    import os
+
+    from microdetect.visualization.dashboards import DashboardGenerator
+
     logger.info(f"Iniciando dashboard para os resultados em: {args.results_dir}")
 
-    # Verificar diretório de resultados
+    # Verificar se o diretório existe
     if not os.path.exists(args.results_dir):
         logger.error(f"Diretório de resultados não encontrado: {args.results_dir}")
         return
 
-    # Verificar se há arquivos JSON no diretório
-    json_files = [f for f in os.listdir(args.results_dir) if f.endswith(".json")]
-    if not json_files:
-        logger.error(f"Nenhum arquivo JSON encontrado em: {args.results_dir}")
-        return
+    # Procurar por diferentes tipos de arquivos de resultados
+    detection_files = glob.glob(os.path.join(args.results_dir, "*detection*.json"))
+    metrics_files = glob.glob(os.path.join(args.results_dir, "*metric*.json"))
+    any_json_files = glob.glob(os.path.join(args.results_dir, "*.json"))
 
-    try:
-        # Instanciar gerador de dashboard
-        from microdetect.visualization.dashboards import DashboardGenerator
+    # Determinar o tipo de dashboard com base nos dados disponíveis
+    dashboard_type = "unknown"
+    data_file = None
 
-        generator = DashboardGenerator(args.results_dir)
+    # Verificar primeiro por arquivos de detecção
+    if detection_files:
+        dashboard_type = "detection"
+        data_file = detection_files[0]
+    # Se não, verificar arquivos de métricas
+    elif metrics_files:
+        dashboard_type = "metrics"
+        data_file = metrics_files[0]
+    # Por último, verificar qualquer arquivo JSON
+    elif any_json_files:
+        # Tentar determinar o tipo pelo conteúdo
+        for json_file in any_json_files:
+            try:
+                with open(json_file, "r") as f:
+                    data = json.load(f)
 
-        # Iniciar o dashboard
-        port = generator.create_detection_dashboard(
-            results_dir=args.results_dir, port=args.port, open_browser=not args.no_browser
-        )
+                    # Se tem aspecto de arquivo de métricas
+                    if isinstance(data, dict) and ("metricas_gerais" in data or "metricas_por_classe" in data):
+                        dashboard_type = "metrics"
+                        data_file = json_file
+                        break
 
+                    # Se tem aspecto de arquivo de detecção
+                    elif isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
+                        dashboard_type = "detection"
+                        data_file = json_file
+                        break
+            except:
+                continue
+
+    # Iniciar dashboard
+    dashboard = DashboardGenerator(args.results_dir)
+
+    if dashboard_type == "detection":
+        logger.info(f"Iniciando dashboard de detecção com dados de: {data_file}")
+        port = dashboard.create_detection_dashboard(args.results_dir, port=args.port, open_browser=True)
+    elif dashboard_type == "metrics":
+        logger.info(f"Iniciando dashboard de avaliação com métricas de: {data_file}")
+        port = dashboard.create_metrics_dashboard(data_file, port=args.port, open_browser=True)
+    else:
+        logger.warning("Não foi possível determinar o tipo de dashboard. Usando visualização de métricas genérica.")
+        port = dashboard.create_metrics_dashboard(None, port=args.port, open_browser=True)
+
+    if port > 0:
         logger.info(f"Dashboard iniciado em: http://localhost:{port}")
-        logger.info("Pressione Ctrl+C para encerrar o dashboard")
 
-        # O dashboard já está rodando em um servidor, só precisamos manter o programa rodando
-        # até o usuário interromper com Ctrl+C
+        # Verificar se estamos em WSL e fornecer informações adicionais
+        is_wsl = False
         try:
-            # Aguardar indefinidamente (até Ctrl+C)
-            import signal
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
+                    is_wsl = True
+        except:
+            pass
 
-            signal.pause()
-        except (KeyboardInterrupt, SystemExit):
-            logger.info("Dashboard encerrado pelo usuário")
-
-    except Exception as e:
-        logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
+        if is_wsl:
+            logger.info("Detectado ambiente WSL. Se o navegador não abrir automaticamente:")
+            logger.info(f"1. Abra um navegador no Windows e acesse: http://localhost:{port}")
+            logger.info(f"2. Ou use: explorer.exe http://localhost:{port}")
+    else:
+        logger.error("Não foi possível iniciar o dashboard")
 
 
 def main(args: Optional[List[str]] = None):
