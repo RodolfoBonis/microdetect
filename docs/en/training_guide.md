@@ -1,267 +1,190 @@
 # Training Guide
 
-This guide explains how to train YOLOv8 models for microorganism detection using MicroDetect's training tools.
-
 ## Overview
 
-MicroDetect provides a comprehensive set of tools for training YOLOv8 models, optimized for microorganism detection in microscopy images. The `YOLOTrainer` class simplifies the process of training, resuming training from checkpoints, and finding optimal hyperparameters.
+MicroDetect provides a comprehensive workflow for training YOLOv8 models to detect microorganisms in microscopy images. This guide will walk you through the process of preparing your data, training models, and evaluating results.
 
-## Basic Training
+## Prerequisites
 
-### Command Line Interface
+- Annotated dataset prepared using the Microdetect annotation tool
+- Python environment with required dependencies installed
 
-The simplest way to train a model is through the command line:
+## Preparing Your Dataset
 
-```bash
-microdetect train --dataset_dir dataset --model_size s --epochs 100 --batch_size 16 --image_size 640
-```
-
-This command will:
-1. Load the dataset configuration from `dataset/data.yaml`
-2. Initialize a YOLOv8s model (small variant)
-3. Train for 100 epochs with the specified batch size and image size
-4. Save the results in the `runs/train` directory
-
-### Command Line Options
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `--dataset_dir` | Directory containing the dataset | `dataset` |
-| `--model_size` | YOLOv8 model size (n, s, m, l, x) | `s` |
-| `--epochs` | Number of training epochs | `100` |
-| `--batch_size` | Batch size for training | `16` |
-| `--image_size` | Input image size | `640` |
-| `--pretrained` | Use pretrained weights | `True` |
-| `--output_dir` | Directory for saving results | `runs/train` |
-
-## Model Size Selection
-
-YOLOv8 comes in various sizes, each with different complexity/performance tradeoffs:
-
-| Model Size | Description | Ideal Use Case |
-|------------|-------------|----------------|
-| `n` (nano) | Smallest model, fastest but less accurate | Resource-constrained environments, real-time applications |
-| `s` (small) | Good balance of speed and accuracy | General use, balanced performance |
-| `m` (medium) | Higher accuracy than small, still reasonably fast | Better detection when resources allow |
-| `l` (large) | High accuracy, slower than medium | Prioritizing accuracy over speed |
-| `x` (extra large) | Highest accuracy, slowest performance | Maximum accuracy requirements |
-
-Example for training a medium model:
+Before training, you need to organize your dataset in the YOLOv8 format:
 
 ```bash
-microdetect train --dataset_dir dataset --model_size m --epochs 150
+microdetect dataset --source_img_dir /path/to/images --source_label_dir /path/to/labels --val_split 0.2 --test_split 0.1
 ```
 
-## Advanced Training
+This command:
+1. Creates train/val/test splits from your data
+2. Organizes images and labels in the correct directories
+3. Generates a `data.yaml` configuration file for YOLOv8
 
-### Using the Python API
+### Options:
 
-For more control, you can use the `YOLOTrainer` class directly in Python:
+- `--val_split`: Proportion of data to use for validation (default: 0.2)
+- `--test_split`: Proportion of data to use for testing (default: 0.1)
+- `--classes`: Comma-separated list of class names (default: yeast,fungi,microalgae)
+- `--output_dir`: Output directory for dataset (default: "dataset")
 
-```python
-from microdetect.training.train import YOLOTrainer
-from microdetect.data.dataset import DatasetManager
+## Training a Model
 
-# Prepare dataset if needed
-dataset_manager = DatasetManager()
-data_yaml = dataset_manager.create_data_yaml()
-
-# Initialize trainer with custom parameters
-trainer = YOLOTrainer(
-    model_size="m",
-    epochs=150,
-    batch_size=8,
-    image_size=800,
-    pretrained=True,
-    output_dir="custom_runs/my_training"
-)
-
-# Start training
-results = trainer.train(data_yaml=data_yaml)
-
-# Print training summary
-print(f"Training complete. Best mAP: {results.best_map}")
-```
-
-### Hardware Selection
-
-MicroDetect automatically selects the best available hardware for training:
-
-1. NVIDIA GPU (CUDA) if available
-2. Apple Silicon GPU (MPS) if available
-3. CPU as fallback
-
-You can manually specify the device:
+Once your dataset is prepared, you can train a YOLOv8 model:
 
 ```bash
-microdetect train --dataset_dir dataset --model_size s --device cuda:0  # Specific CUDA device
-microdetect train --dataset_dir dataset --model_size s --device cpu     # Force CPU
-microdetect train --dataset_dir dataset --model_size s --device mps     # Force Apple MPS
+microdetect train --dataset_dir dataset --model_size m --epochs 100 --batch_size 16
 ```
 
-## Training Strategies
+### Options:
 
-### Transfer Learning
-
-By default, MicroDetect uses pre-trained weights trained on COCO dataset. You can start from scratch by disabling this:
-
-```bash
-microdetect train --dataset_dir dataset --model_size s --pretrained False
-```
-
-However, starting from pre-trained weights generally gives better results, even for specialized tasks like microorganism detection.
-
-### Learning Rate Schedules
-
-MicroDetect uses YOLOv8's built-in learning rate scheduler. You can customize it:
-
-```bash
-microdetect train --dataset_dir dataset --lr0 0.01 --lrf 0.01 --momentum 0.937 --weight_decay 0.0005
-```
-
-Where:
-- `lr0`: Initial learning rate
-- `lrf`: Final learning rate factor (final_lr = lr0 * lrf)
-- `momentum`: SGD momentum
-- `weight_decay`: Weight decay factor
-
-### Early Stopping
-
-MicroDetect implements early stopping to prevent overfitting:
-
-```bash
-microdetect train --dataset_dir dataset --patience 15
-```
-
-This stops training if no improvement is seen for 15 consecutive epochs.
-
-## Monitoring Training
-
-### Training Metrics
-
-During training, MicroDetect logs various metrics:
-
-- mAP50: Mean Average Precision at IoU threshold 0.5
-- mAP50-95: Mean Average Precision over multiple IoU thresholds
-- Precision, Recall, and F1-score
-- Loss components (box, class, dfl)
-
-You can visualize these metrics in real-time:
-
-```bash
-microdetect train --dataset_dir dataset --model_size s --plot True
-```
-
-### TensorBoard Integration
-
-For detailed training visualization, you can use TensorBoard:
-
-```bash
-# Start training with TensorBoard logging
-microdetect train --dataset_dir dataset --model_size s --use_tensorboard
-
-# Launch TensorBoard
-tensorboard --logdir runs/train
-```
+- `--dataset_dir`: Path to the dataset directory containing data.yaml
+- `--model_size`: YOLOv8 model size (n, s, m, l, x) (default: "m")
+- `--epochs`: Number of training epochs (default: 100)
+- `--batch_size`: Batch size for training (default: 16)
+- `--img_size`: Input image size (default: 640)
+- `--patience`: Early stopping patience (default: 20)
+- `--device`: Device to use (cpu, mps, 0, 1, etc.) (default: auto-detection)
+- `--resume`: Resume training from last checkpoint
+- `--pretrained`: Use pretrained weights
+- `--freeze`: Number of layers to freeze (default: 0)
 
 ## Hyperparameter Optimization
 
-MicroDetect provides tools for hyperparameter optimization:
+MicroDetect supports hyperparameter optimization to find the best model configuration:
 
 ```bash
-microdetect optimize_hyperparams --dataset_dir dataset --model_size s --trials 10
+microdetect optimize --dataset_dir dataset --iterations 20 --metric map
 ```
 
-This will perform multiple training runs with different hyperparameters to find the optimal configuration.
+### Options:
 
-### Using the Python API for Detailed Control
+- `--dataset_dir`: Path to the dataset directory containing data.yaml
+- `--iterations`: Number of hyperparameter combinations to try (default: 20)
+- `--metric`: Metric to optimize (map, precision, recall, F1) (default: "map")
+- `--params`: Comma-separated list of parameters to optimize (model_size,lr,batch_size,img_size)
 
-```python
-from microdetect.training.train import YOLOTrainer
+## Cross-Validation
 
-trainer = YOLOTrainer(model_size="s")
-best_params = trainer.find_best_hyperparameters("dataset/data.yaml")
-
-print(f"Best hyperparameters found: {best_params}")
-```
-
-This tries different combinations of batch sizes and learning rates to find the optimal configuration.
-
-## Model Export
-
-After training, MicroDetect automatically exports the model to ONNX format for deployment:
+To better evaluate model performance, particularly with small datasets, use cross-validation:
 
 ```bash
-# The model is already exported during training, but you can manually export it
-microdetect export --model_path runs/train/yolov8_s_custom/weights/best.pt --format onnx
+microdetect cross_validate --dataset_dir dataset --model_size m --folds 5
 ```
 
-Other supported export formats:
-- `torchscript`: For PyTorch deployment
-- `tflite`: For TensorFlow Lite (mobile)
-- `coreml`: For Apple Core ML (iOS/macOS)
+### Options:
 
-## Tips for Successful Training
+- `--dataset_dir`: Path to the dataset directory containing data.yaml
+- `--model_size`: YOLOv8 model size (n, s, m, l, x) (default: "m")
+- `--folds`: Number of cross-validation folds (default: 5)
+- `--epochs`: Number of training epochs per fold (default: 50)
 
-### Microorganism-Specific Recommendations
+## Evaluating Models
 
-#### For Yeast Detection
+After training, evaluate your model's performance:
+
 ```bash
-microdetect train --dataset_dir yeast_dataset --model_size s --image_size 800 --epochs 150
+microdetect evaluate --model_path runs/train/yolov8_m_custom/weights/best.pt --dataset_dir dataset
 ```
-Yeasts often require higher resolution due to their small size and round shape.
 
-#### For Fungi with Hyphae
+### Options:
+
+- `--model_path`: Path to the trained model
+- `--dataset_dir`: Path to the dataset directory containing data.yaml
+- `--conf`: Confidence threshold (default: 0.25)
+- `--iou`: IoU threshold (default: 0.5)
+- `--batch_size`: Batch size for evaluation (default: 16)
+- `--device`: Device to use (cpu, mps, 0, 1, etc.) (default: auto-detection)
+
+## Comparing Multiple Models
+
+Compare the performance of different models:
+
 ```bash
-microdetect train --dataset_dir fungi_dataset --model_size m --image_size 640 --epochs 200
+microdetect compare_models --model_paths model1.pt,model2.pt,model3.pt --data_yaml dataset/data.yaml
 ```
-Complex structures like hyphae benefit from more powerful models and longer training.
 
-#### For Micro-algae
+### Options:
+
+- `--model_paths`: Comma-separated list of model paths
+- `--data_yaml`: Path to data.yaml file
+- `--conf`: Confidence threshold (default: 0.25)
+- `--iou`: IoU threshold (default: 0.5)
+- `--output_dir`: Directory to save comparison results (default: "comparison_results")
+
+## Advanced Training Options
+
+### Checkpoint Management
+
+MicroDetect automatically saves checkpoints during training, which can be used to resume interrupted training sessions:
+
 ```bash
-microdetect train --dataset_dir algae_dataset --model_size s --image_size 640 --epochs 100 --batch_size 8
+microdetect train --dataset_dir dataset --resume
 ```
-Micro-algae often have distinctive shapes and may require less training time.
 
-### Common Challenges
+### Hardware Acceleration
 
-#### Small Objects
-For very small microorganisms:
+The training system automatically detects and uses available hardware acceleration:
+
+- CUDA for NVIDIA GPUs
+- MPS for Apple Silicon
+- CPU fallback if no GPU is available
+
+You can override this with the `--device` parameter.
+
+### Transfer Learning
+
+Use pretrained weights to speed up training and improve accuracy:
+
 ```bash
-microdetect train --dataset_dir dataset --model_size m --image_size 1280
+microdetect train --dataset_dir dataset --pretrained --freeze 10
 ```
-Higher resolution inputs help detect smaller objects.
 
-#### Class Imbalance
-If your dataset has imbalanced classes:
-```bash
-microdetect train --dataset_dir dataset --model_size s --class_weights 1.0,2.0,1.5
-```
-The weights correspond to each class, giving higher importance to underrepresented classes.
+This loads pretrained weights and freezes the first 10 layers of the model.
 
-#### Overfitting
-If you observe overfitting (good training metrics but poor validation):
+## Training Workflow Example
+
+Complete workflow from annotation to deployment:
+
 ```bash
-microdetect train --dataset_dir dataset --model_size s --augment strong --dropout 0.2
+# Prepare dataset
+microdetect dataset --source_img_dir data/images --source_label_dir data/labels
+
+# Train initial model
+microdetect train --dataset_dir dataset --model_size s --epochs 50 --pretrained
+
+# Optimize hyperparameters
+microdetect optimize --dataset_dir dataset --iterations 15
+
+# Train final model with optimized parameters
+microdetect train --dataset_dir dataset --model_size m --epochs 150 --batch_size 32 --img_size 800
+
+# Evaluate model
+microdetect evaluate --model_path runs/train/yolov8_m_custom/weights/best.pt --dataset_dir dataset
+
+# Export model
+microdetect export --model_path runs/train/yolov8_m_custom/weights/best.pt --format onnx
 ```
-Increase data augmentation and add dropout regularization.
+
+## Best Practices
+
+1. **Start Small**: Begin with a smaller model size (n or s) to ensure the training pipeline works
+2. **Use Pretrained Weights**: Always start with pretrained weights unless your domain is very different
+3. **Data Augmentation**: Use data augmentation to improve model robustness
+4. **Hyperparameter Tuning**: Find optimal hyperparameters for your specific dataset
+5. **Monitor Training**: Watch for signs of overfitting (validation performance worsens while training improves)
+6. **Multiple Models**: Train several model variants and compare their performance
+7. **Error Analysis**: Analyze false positives and false negatives to understand model limitations
 
 ## Troubleshooting
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Out of memory errors | Reduce batch size or image size |
-| Training loss not decreasing | Try a different learning rate (--lr0 0.001) |
-| Poor validation performance | Check data quality, increase augmentation |
-| Training too slow | Try a smaller model size or reduce image resolution |
-| NaN loss values | Reduce learning rate and check for extreme pixel values |
+1. **Out of Memory Errors**: Reduce batch size or model size
+2. **Slow Training**: Check hardware acceleration is working correctly
+3. **Poor Convergence**: Try different learning rates or optimizer settings
+4. **Overfitting**: Increase data augmentation or use early stopping
+5. **Underfitting**: Train for more epochs or use a larger model
 
-## Next Steps
-
-After training your model:
-
-- [Checkpoint Management Guide](checkpoint_management.md) - Learn how to manage and resume training from checkpoints
-- [Hyperparameter Optimization Guide](hyperparameter_optimization.md) - Fine-tune your model performance
-- [Model Evaluation Guide](model_evaluation_analysis.md) - Evaluate your trained model
+For more detailed troubleshooting, see the [Troubleshooting Guide](troubleshooting.md).

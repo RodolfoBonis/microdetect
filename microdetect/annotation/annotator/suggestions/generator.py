@@ -1059,7 +1059,7 @@ class SuggestionGenerator:
         """
         try:
             if roi.size == 0:
-                return random.choice([c.split("-")[0] for c in self.classes]), 0.3
+                return self.classes[0].split("-")[0] if self.classes else "0", 0.3
 
             # Converter para escala de cinza se for colorido
             if len(roi.shape) > 2:
@@ -1072,7 +1072,7 @@ class SuggestionGenerator:
             perimeter = cv2.arcLength(contour, True)
 
             if perimeter == 0:
-                return random.choice([c.split("-")[0] for c in self.classes]), 0.3
+                return self.classes[0].split("-")[0] if self.classes else "0", 0.3
 
             # Circularidade: 4π * área / perímetro²
             circularity = 4 * np.pi * area / (perimeter * perimeter)
@@ -1189,7 +1189,7 @@ class SuggestionGenerator:
 
         except Exception as e:
             logger.warning(f"Erro na classificação avançada: {str(e)}")
-            return random.choice([c.split("-")[0] for c in self.classes]), 0.3
+            return self.classes[0].split("-")[0] if self.classes else "0", 0.3
 
     def _emergency_detection(self, img_rgb: np.ndarray) -> List[Tuple[str, int, int, int, int]]:
         """
