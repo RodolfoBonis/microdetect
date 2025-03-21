@@ -3,7 +3,7 @@ Módulo para processamento de imagens na ferramenta de anotação.
 """
 
 import logging
-from typing import Optional, Tuple
+from typing import Tuple
 
 import cv2
 import numpy as np

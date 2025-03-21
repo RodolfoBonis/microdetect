@@ -1,7 +1,6 @@
 # tests/utils/test_config.py
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 import yaml
@@ -53,7 +52,7 @@ def test_config_default_values():
     assert "training" in config.config_data
 
     # Test specific default values
-    assert config.get("directories.dataset") == "dataset"
+    assert config.get("directories.dataset") == "./dataset"
     assert "0-levedura" in config.get("classes")
 
 
