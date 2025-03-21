@@ -964,7 +964,7 @@ class ImageAnnotator:
             output_dir: Diretório contendo as anotações (usa diretório da imagem atual se None)
         """
         # Se output_dir não for fornecido, usar diretório da imagem atual
-        if output_dir is None and hasattr(self, "current_image_path"):
+        if output_dir is None and hasattr(self, "current_image_path") and self.current_image_path is not None:
             output_dir = os.path.dirname(self.current_image_path)
 
         if not output_dir:
@@ -1112,7 +1112,8 @@ class ImageAnnotator:
         """
         Abre o diálogo de exportação/importação de anotações.
         """
-        if not hasattr(self, "current_image_path") or not hasattr(self, "root"):
+        if not hasattr(self, "current_image_path") or self.current_image_path is None:
+            self.update_status("Imagem não disponível.")
             return
 
         # Obter diretórios

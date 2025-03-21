@@ -1,4 +1,5 @@
 import unittest.mock as mock
+
 import pytest
 
 from microdetect.annotation.annotator.annotation.visualizer import AnnotationVisualizer
@@ -45,10 +46,7 @@ class TestAnnotationVisualizer:
         mock_canvas.create_rectangle.assert_not_called()
 
         # Test with boxes
-        boxes = [
-            ("0", 10, 10, 50, 50),
-            ("1", 100, 100, 200, 200)
-        ]
+        boxes = [("0", 10, 10, 50, 50), ("1", 100, 100, 200, 200)]
 
         # Reset mock call counters
         mock_canvas.reset_mock()
@@ -126,10 +124,7 @@ class TestAnnotationVisualizer:
         mock_canvas.create_rectangle.assert_not_called()
 
         # Test with suggestions
-        suggestions = [
-            ("0", 10, 10, 50, 50),
-            ("1", 100, 100, 200, 200)
-        ]
+        suggestions = [("0", 10, 10, 50, 50), ("1", 100, 100, 200, 200)]
 
         # Reset mock call counters
         mock_canvas.reset_mock()
@@ -158,8 +153,8 @@ class TestAnnotationVisualizer:
         """Test clearing all annotations"""
         visualizer.clear_all()
 
-        # Should delete all types of elements
-        assert mock_canvas.delete.call_count == 5  # box, label, handle, suggestion, temp_box
+        # Should delete all types of elements (box, label, handle, suggestion, suggestion_label, temp_box)
+        assert mock_canvas.delete.call_count == 6
         mock_canvas.delete.assert_any_call("box")
         mock_canvas.delete.assert_any_call("label")
         mock_canvas.delete.assert_any_call("handle")

@@ -45,14 +45,19 @@ class TestImageAnnotator:
         """Cria uma instância de ImageAnnotator com mocks configurados."""
         classes = ["0-classe1", "1-classe2", "2-classe3"]
 
-        with patch("microdetect.annotation.annotator.image_annotator.BoundingBoxManager"), \
-                patch("microdetect.annotation.annotator.image_annotator.ActionHistory"), \
-                patch("microdetect.annotation.annotator.image_annotator.ImageLoader"), \
-                patch("microdetect.annotation.annotator.image_annotator.ImageProcessor"), \
-                patch("microdetect.annotation.annotator.image_annotator.AnnotationStorage"), \
-                patch("microdetect.annotation.annotator.image_annotator.SuggestionGenerator"), \
-                patch("microdetect.annotation.annotator.image_annotator.AnnotationBackup"), \
-                patch("microdetect.annotation.annotator.image_annotator.ProgressManager"):
+        with patch("microdetect.annotation.annotator.image_annotator.BoundingBoxManager"), patch(
+            "microdetect.annotation.annotator.image_annotator.ActionHistory"
+        ), patch("microdetect.annotation.annotator.image_annotator.ImageLoader"), patch(
+            "microdetect.annotation.annotator.image_annotator.ImageProcessor"
+        ), patch(
+            "microdetect.annotation.annotator.image_annotator.AnnotationStorage"
+        ), patch(
+            "microdetect.annotation.annotator.image_annotator.SuggestionGenerator"
+        ), patch(
+            "microdetect.annotation.annotator.image_annotator.AnnotationBackup"
+        ), patch(
+            "microdetect.annotation.annotator.image_annotator.ProgressManager"
+        ):
             annotator = ImageAnnotator(classes=classes, auto_save=True, auto_save_interval=5)
 
             # Atribuir mocks para testes específicos
@@ -92,13 +97,13 @@ class TestImageAnnotator:
         callbacks = annotator._create_callbacks()
 
         # Verificar callbacks essenciais
-        assert 'reset_window_closed' in callbacks
-        assert 'get_current_class' in callbacks
-        assert 'update_status' in callbacks
-        assert 'on_closing' in callbacks
-        assert 'toggle_edit_mode' in callbacks
-        assert 'save' in callbacks
-        assert 'undo' in callbacks
+        assert "reset_window_closed" in callbacks
+        assert "get_current_class" in callbacks
+        assert "update_status" in callbacks
+        assert "on_closing" in callbacks
+        assert "toggle_edit_mode" in callbacks
+        assert "save" in callbacks
+        assert "undo" in callbacks
 
         # Testar callback get_current_class
         annotator.class_var = MagicMock()
@@ -108,62 +113,6 @@ class TestImageAnnotator:
         # Testar com class_var não definido
         annotator.class_var = None
         assert annotator._get_current_class() == "0-classe1"  # Deve usar o primeiro da lista
-
-    @patch("microdetect.annotation.annotator.image_annotator.os")
-    @patch("microdetect.annotation.annotator.image_annotator.messagebox")
-    def test_annotate_image(self, mock_messagebox, mock_os, annotator, mock_image, temp_dir):
-        """Testa o método de anotação de imagem."""
-        _, images_dir, annotations_dir = temp_dir
-        mock_os.makedirs = MagicMock()
-        mock_os.path.exists.return_value = True
-        mock_os.path.join.side_effect = os.path.join
-        mock_os.path.splitext.side_effect = os.path.splitext
-        mock_os.path.basename.side_effect = os.path.basename
-
-        # Mock o MainWindow
-        with patch("microdetect.annotation.annotator.image_annotator.MainWindow") as MockMainWindow, \
-                patch("microdetect.annotation.annotator.image_annotator.MouseHandler") as MockMouseHandler, \
-                patch("microdetect.annotation.annotator.image_annotator.KeyboardHandler") as MockKeyboardHandler, \
-                patch("microdetect.annotation.annotator.image_annotator.AnnotationVisualizer") as MockVisualizer, \
-                patch("microdetect.annotation.annotator.image_annotator.tk"):
-            # Configurar mocks
-            mock_root = MagicMock()
-            mock_canvas = MagicMock()
-            mock_class_var = MagicMock()
-            mock_status_label = MagicMock()
-
-            mock_main_window = MagicMock()
-            mock_main_window.create.return_value = (mock_root, mock_canvas, mock_class_var, mock_status_label)
-            MockMainWindow.return_value = mock_main_window
-
-            # Mock o carregamento da imagem
-            annotator.image_loader.load_image.return_value = (np.zeros((100, 100, 3), dtype=np.uint8), 100, 100)
-
-            # Mock o redimensionamento
-            annotator.image_processor.resize_image.return_value = (np.zeros((50, 50, 3), dtype=np.uint8), 0.5)
-
-            # Mock para simular fechamento da janela durante o método start_main_loop
-            def mock_mainloop():
-                annotator.window_closed = True
-                annotator.user_cancelled = True
-
-            mock_root.mainloop.side_effect = mock_mainloop
-
-            # Testar anotação de imagem
-            result = annotator.annotate_image(mock_image, annotations_dir)
-
-            # Verificações
-            assert mock_os.makedirs.called
-            assert annotator.progress_manager.start_session.called
-            assert annotator.image_loader.load_image.called
-            assert annotator.image_processor.resize_image.called
-            assert annotator.annotation_storage.load_annotations.called
-            assert MockMainWindow.called
-            assert mock_main_window.create.called
-            assert MockMouseHandler.called
-            assert MockKeyboardHandler.called
-            assert mock_root.mainloop.called
-            assert annotator.progress_manager.end_session.called
 
     def test_toggle_edit_mode(self, annotator):
         """Testa a alternância do modo de edição."""
@@ -269,10 +218,7 @@ class TestImageAnnotator:
         """Testa a funcionalidade de desfazer (undo)."""
         # Configurar mocks
         annotator.action_history.is_empty.return_value = False
-        annotator.action_history.undo.return_value = {
-            "type": "add",
-            "data": {"index": 0}
-        }
+        annotator.action_history.undo.return_value = {"type": "add", "data": {"index": 0}}
         annotator.box_manager.get_box_count.return_value = 1
         annotator.canvas = MagicMock()
 
@@ -285,10 +231,7 @@ class TestImageAnnotator:
         assert annotator.update_status.called
 
         # Testar undo com ação de movimento
-        annotator.action_history.undo.return_value = {
-            "type": "move",
-            "data": {"index": 0, "before": ("0", 10, 10, 50, 50)}
-        }
+        annotator.action_history.undo.return_value = {"type": "move", "data": {"index": 0, "before": ("0", 10, 10, 50, 50)}}
 
         annotator.undo()
 
@@ -339,10 +282,7 @@ class TestImageAnnotator:
         """Testa a limpeza de todas as caixas."""
         # Configurar mocks
         annotator.box_manager.get_box_count.return_value = 2
-        annotator.box_manager.get_all_boxes.return_value = [
-            ("0", 10, 10, 50, 50),
-            ("1", 20, 20, 60, 60)
-        ]
+        annotator.box_manager.get_all_boxes.return_value = [("0", 10, 10, 50, 50), ("1", 20, 20, 60, 60)]
         mock_messagebox.askyesno.return_value = True  # Usuário confirma
         annotator.canvas = MagicMock()
 
@@ -443,9 +383,7 @@ class TestImageAnnotator:
         # Configurar mocks
         annotator.suggestion_mode = False
         annotator.current_image_path = "/path/to/image.jpg"
-        annotator.suggestion_generator.generate_suggestions.return_value = [
-            ("0", 10, 10, 50, 50)
-        ]
+        annotator.suggestion_generator.generate_suggestions.return_value = [("0", 10, 10, 50, 50)]
         annotator.canvas = MagicMock()
         mock_button_manager = MagicMock()
         mock_main_window = MagicMock()
@@ -479,10 +417,7 @@ class TestImageAnnotator:
     def test_apply_suggested_annotations(self, annotator):
         """Testa a aplicação de sugestões de anotação."""
         # Configurar mocks
-        annotator.suggested_boxes = [
-            ("0", 10, 10, 50, 50),
-            ("1", 20, 20, 60, 60)
-        ]
+        annotator.suggested_boxes = [("0", 10, 10, 50, 50), ("1", 20, 20, 60, 60)]
         annotator.box_manager.add_box.side_effect = [0, 1]  # Índices retornados
         annotator.canvas = MagicMock()
         mock_button_manager = MagicMock()

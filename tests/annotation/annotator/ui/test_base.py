@@ -1,9 +1,13 @@
-import pytest
 import tkinter as tk
 import unittest.mock as mock
 
+import pytest
+
 from microdetect.annotation.annotator.ui.base import (
-    create_secure_dialog, is_window_valid, center_window, configure_window_close
+    center_window,
+    configure_window_close,
+    create_secure_dialog,
+    is_window_valid,
 )
 
 
@@ -12,25 +16,21 @@ class TestUIBase:
     @pytest.fixture
     def mock_tk(self):
         """Mock tkinter functionality for testing"""
-        with mock.patch('tkinter.Toplevel') as mock_toplevel, \
-                mock.patch('tkinter.Tk') as mock_tk, \
-                mock.patch('tkinter._default_root', None):
+        with mock.patch("tkinter.Toplevel") as mock_toplevel, mock.patch("tkinter.Tk") as mock_tk, mock.patch(
+            "tkinter._default_root", None
+        ):
             mock_instance = mock_toplevel.return_value
             mock_instance.winfo_exists.return_value = True
-            yield {
-                'toplevel': mock_toplevel,
-                'tk': mock_tk,
-                'instance': mock_instance
-            }
+            yield {"toplevel": mock_toplevel, "tk": mock_tk, "instance": mock_instance}
 
     def test_create_secure_dialog(self, mock_tk):
         """Test the creation of secure dialog windows"""
         dialog = create_secure_dialog()
         assert dialog is not None
-        mock_tk['toplevel'].assert_called_once()
+        mock_tk["toplevel"].assert_called_once()
 
         # Test with existing root
-        with mock.patch('tkinter._default_root', mock.MagicMock()):
+        with mock.patch("tkinter._default_root", mock.MagicMock()):
             dialog = create_secure_dialog()
             assert dialog is not None
 

@@ -1,6 +1,8 @@
 import unittest
-import numpy as np
+
 import cv2
+import numpy as np
+
 from microdetect.annotation.annotator.image.processor import ImageProcessor
 
 
@@ -187,5 +189,5 @@ class TestImageProcessor(unittest.TestCase):
         np.testing.assert_array_equal(not_denoised, noisy_img)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

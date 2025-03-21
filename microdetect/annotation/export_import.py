@@ -6,9 +6,9 @@ import glob
 import json
 import logging
 import os
-import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, List, Optional
+from xml.etree import ElementTree as safe_ET
 
 import cv2
 
@@ -206,25 +206,25 @@ class AnnotationConverter:
                 depth = 3  # Assumindo RGB
 
                 # Criar elemento raiz XML
-                annotation = ET.Element("annotation")
+                annotation = safe_ET.Element("annotation")
 
                 # Adicionar informações da imagem
-                ET.SubElement(annotation, "folder").text = os.path.basename(os.path.dirname(img_path))
-                ET.SubElement(annotation, "filename").text = os.path.basename(img_path)
-                ET.SubElement(annotation, "path").text = img_path
+                safe_ET.SubElement(annotation, "folder").text = os.path.basename(os.path.dirname(img_path))
+                safe_ET.SubElement(annotation, "filename").text = os.path.basename(img_path)
+                safe_ET.SubElement(annotation, "path").text = img_path
 
                 # Adicionar informações de origem
-                source = ET.SubElement(annotation, "source")
-                ET.SubElement(source, "database").text = "MicroDetect"
+                source = safe_ET.SubElement(annotation, "source")
+                safe_ET.SubElement(source, "database").text = "MicroDetect"
 
                 # Adicionar informações de tamanho
-                size = ET.SubElement(annotation, "size")
-                ET.SubElement(size, "width").text = str(width)
-                ET.SubElement(size, "height").text = str(height)
-                ET.SubElement(size, "depth").text = str(depth)
+                size = safe_ET.SubElement(annotation, "size")
+                safe_ET.SubElement(size, "width").text = str(width)
+                safe_ET.SubElement(size, "height").text = str(height)
+                safe_ET.SubElement(size, "depth").text = str(depth)
 
                 # Adicionar flag de segmentação
-                ET.SubElement(annotation, "segmented").text = "0"
+                safe_ET.SubElement(annotation, "segmented").text = "0"
 
                 # Ler anotações YOLO e converter para VOC
                 with open(ann_file, "r") as f:
@@ -259,20 +259,20 @@ class AnnotationConverter:
                             class_name = class_name.split("-")[1]
 
                         # Adicionar objeto
-                        obj = ET.SubElement(annotation, "object")
-                        ET.SubElement(obj, "name").text = class_name
-                        ET.SubElement(obj, "pose").text = "Unspecified"
-                        ET.SubElement(obj, "truncated").text = "0"
-                        ET.SubElement(obj, "difficult").text = "0"
+                        obj = safe_ET.SubElement(annotation, "object")
+                        safe_ET.SubElement(obj, "name").text = class_name
+                        safe_ET.SubElement(obj, "pose").text = "Unspecified"
+                        safe_ET.SubElement(obj, "truncated").text = "0"
+                        safe_ET.SubElement(obj, "difficult").text = "0"
 
-                        bndbox = ET.SubElement(obj, "bndbox")
-                        ET.SubElement(bndbox, "xmin").text = str(xmin)
-                        ET.SubElement(bndbox, "ymin").text = str(ymin)
-                        ET.SubElement(bndbox, "xmax").text = str(xmax)
-                        ET.SubElement(bndbox, "ymax").text = str(ymax)
+                        bndbox = safe_ET.SubElement(obj, "bndbox")
+                        safe_ET.SubElement(bndbox, "xmin").text = str(xmin)
+                        safe_ET.SubElement(bndbox, "ymin").text = str(ymin)
+                        safe_ET.SubElement(bndbox, "xmax").text = str(xmax)
+                        safe_ET.SubElement(bndbox, "ymax").text = str(ymax)
 
                 # Criar XML string formatado
-                xml_str = ET.tostring(annotation, encoding="utf-8")
+                xml_str = safe_ET.tostring(annotation, encoding="utf-8")
 
                 # Formatar XML para melhor legibilidade
                 try:
@@ -408,6 +408,7 @@ class AnnotationConverter:
             try:
                 # Analisar XML
                 from defusedxml import ElementTree as safe_ET
+
                 tree = safe_ET.parse(xml_file)
                 root = tree.getroot()
 

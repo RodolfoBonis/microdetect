@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
@@ -17,7 +17,7 @@ class TestImageLoader(unittest.TestCase):
         cv2.imwrite(self.test_img_path, self.test_img)
 
         # Create a mock for the PhotoImage class
-        self.pil_image_mock_patcher = patch('PIL.ImageTk.PhotoImage')
+        self.pil_image_mock_patcher = patch("PIL.ImageTk.PhotoImage")
         self.mock_photo_image = self.pil_image_mock_patcher.start()
         self.mock_photo_image.return_value = MagicMock()
 
@@ -78,9 +78,7 @@ class TestImageLoader(unittest.TestCase):
         # Ensure mocking is correct
         self.mock_photo_image.return_value = MagicMock()
 
-        result = self.loader.redraw_with_zoom(
-            self.test_img, canvas, 1.5, 100, 100, 1.0
-        )
+        result = self.loader.redraw_with_zoom(self.test_img, canvas, 1.5, 100, 100, 1.0)
 
         self.assertTrue(result)
         mock_resize.assert_called_once_with(self.test_img, (150, 150))
@@ -92,9 +90,7 @@ class TestImageLoader(unittest.TestCase):
         canvas = MagicMock()
         canvas.create_image.side_effect = Exception("Test exception")
 
-        result = self.loader.redraw_with_zoom(
-            self.test_img, canvas, 1.5, 100, 100, 1.0
-        )
+        result = self.loader.redraw_with_zoom(self.test_img, canvas, 1.5, 100, 100, 1.0)
 
         self.assertFalse(result)
 

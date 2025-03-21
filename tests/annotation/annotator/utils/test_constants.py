@@ -1,8 +1,16 @@
 from microdetect.annotation.annotator.utils.constants import (
-    DEFAULT_AUTO_SAVE, DEFAULT_AUTO_SAVE_INTERVAL, HANDLE_NONE,
-    HANDLE_NW, HANDLE_NE, HANDLE_SE, HANDLE_SW,
-    HANDLE_N, HANDLE_E, HANDLE_S, HANDLE_W,
-    KEYBOARD_SHORTCUTS
+    DEFAULT_AUTO_SAVE,
+    DEFAULT_AUTO_SAVE_INTERVAL,
+    HANDLE_E,
+    HANDLE_N,
+    HANDLE_NE,
+    HANDLE_NONE,
+    HANDLE_NW,
+    HANDLE_S,
+    HANDLE_SE,
+    HANDLE_SW,
+    HANDLE_W,
+    KEYBOARD_SHORTCUTS,
 )
 
 
@@ -28,9 +36,9 @@ class TestConstants:
     def test_keyboard_shortcuts(self):
         """Test keyboard shortcuts dictionary"""
         # Check essential shortcuts exist
-        assert 'a' in KEYBOARD_SHORTCUTS
-        assert 'z' in KEYBOARD_SHORTCUTS
-        assert 's' in KEYBOARD_SHORTCUTS
+        assert "a" in KEYBOARD_SHORTCUTS
+        assert "z" in KEYBOARD_SHORTCUTS
+        assert "s" in KEYBOARD_SHORTCUTS
 
         # Check descriptions are strings
         for key, desc in KEYBOARD_SHORTCUTS.items():

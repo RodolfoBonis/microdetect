@@ -1,4 +1,5 @@
 import unittest.mock as mock
+
 import pytest
 
 from microdetect.annotation.annotator.handlers.keyboard_handler import KeyboardHandler
@@ -15,19 +16,18 @@ class TestKeyboardHandler:
     def mock_callbacks(self):
         """Create mock callbacks"""
         return {
-            'reset_zoom': mock.MagicMock(),
-            'toggle_pan_mode': mock.MagicMock(),
-            'undo': mock.MagicMock(),
-            'delete_selected': mock.MagicMock(),
-            'save': mock.MagicMock(),
-            'on_closing': mock.MagicMock()
+            "reset_zoom": mock.MagicMock(),
+            "toggle_pan_mode": mock.MagicMock(),
+            "undo": mock.MagicMock(),
+            "delete_selected": mock.MagicMock(),
+            "save": mock.MagicMock(),
+            "on_closing": mock.MagicMock(),
         }
 
     @pytest.fixture
     def keyboard_handler(self, mock_root, mock_callbacks):
         """Create a KeyboardHandler with mocked dependencies"""
-        with mock.patch('microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid',
-                        return_value=True):
+        with mock.patch("microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid", return_value=True):
             return KeyboardHandler(mock_root, mock_callbacks)
 
     def test_initialization(self, keyboard_handler, mock_root, mock_callbacks):
@@ -38,18 +38,17 @@ class TestKeyboardHandler:
     def test_call_callback(self, keyboard_handler, mock_callbacks):
         """Test calling a callback by name"""
         # Call existing callback
-        keyboard_handler._call_callback('reset_zoom', 'arg1', kwarg1='value')
-        mock_callbacks['reset_zoom'].assert_called_once_with('arg1', kwarg1='value')
+        keyboard_handler._call_callback("reset_zoom", "arg1", kwarg1="value")
+        mock_callbacks["reset_zoom"].assert_called_once_with("arg1", kwarg1="value")
 
         # Call non-existent callback (should not raise error)
-        result = keyboard_handler._call_callback('non_existent')
+        result = keyboard_handler._call_callback("non_existent")
         assert result is None
 
     def test_setup_keyboard_shortcuts(self, mock_root, mock_callbacks):
         """Test setting up keyboard shortcuts"""
         # Test with valid window
-        with mock.patch('microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid',
-                        return_value=True):
+        with mock.patch("microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid", return_value=True):
             handler = KeyboardHandler(mock_root, mock_callbacks)
 
             # Check that bind was called for each shortcut
@@ -64,8 +63,7 @@ class TestKeyboardHandler:
 
         # Test with invalid window
         mock_root.reset_mock()
-        with mock.patch('microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid',
-                        return_value=False):
+        with mock.patch("microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid", return_value=False):
             handler = KeyboardHandler(mock_root, mock_callbacks)
 
             # Should not attempt to bind events
@@ -77,9 +75,8 @@ class TestKeyboardHandler:
         mock_root.bind.side_effect = Exception("Test error")
 
         # Should not raise error to caller
-        with mock.patch('microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid',
-                        return_value=True):
-            with mock.patch('microdetect.annotation.annotator.handlers.keyboard_handler.logger') as mock_logger:
+        with mock.patch("microdetect.annotation.annotator.handlers.keyboard_handler.is_window_valid", return_value=True):
+            with mock.patch("microdetect.annotation.annotator.handlers.keyboard_handler.logger") as mock_logger:
                 handler = KeyboardHandler(mock_root, mock_callbacks)
 
                 # Should log the error
@@ -108,24 +105,24 @@ class TestKeyboardHandler:
         # Test reset_zoom handler
         event = mock.MagicMock()
         keypress_handlers["<r>"](event)
-        mock_callbacks['reset_zoom'].assert_called_once()
+        mock_callbacks["reset_zoom"].assert_called_once()
 
         # Test toggle_pan_mode handler
         event = mock.MagicMock()
         keypress_handlers["<p>"](event)
-        mock_callbacks['toggle_pan_mode'].assert_called_once()
+        mock_callbacks["toggle_pan_mode"].assert_called_once()
 
         # Test undo handler
         event = mock.MagicMock()
         keypress_handlers["<z>"](event)
-        mock_callbacks['undo'].assert_called_once()
+        mock_callbacks["undo"].assert_called_once()
 
         # Test save handler
         event = mock.MagicMock()
         keypress_handlers["<s>"](event)
-        mock_callbacks['save'].assert_called_once()
+        mock_callbacks["save"].assert_called_once()
 
         # Test close handler
         event = mock.MagicMock()
         keypress_handlers["<q>"](event)
-        mock_callbacks['on_closing'].assert_called_once()
+        mock_callbacks["on_closing"].assert_called_once()

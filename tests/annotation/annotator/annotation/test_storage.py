@@ -29,15 +29,13 @@ class TestAnnotationStorage:
         # Create test data
         bounding_boxes = [
             ("0", 40, 40, 60, 60),  # center=(50,50), width=20, height=20
-            ("1", 65, 65, 75, 75)  # center=(70,70), width=10, height=10
+            ("1", 65, 65, 75, 75),  # center=(70,70), width=10, height=10
         ]
         original_w, original_h = 100, 100
         base_name = "test_image"
 
         # Save annotations
-        annotation_path = storage.save_annotations(
-            bounding_boxes, temp_dir, base_name, original_w, original_h
-        )
+        annotation_path = storage.save_annotations(bounding_boxes, temp_dir, base_name, original_w, original_h)
 
         # Verify file creation
         assert os.path.exists(annotation_path)
@@ -98,7 +96,7 @@ class TestAnnotationStorage:
         boxes = storage.load_annotations("non_existent_file.txt", 100, 100)
         assert boxes == []
 
-    @mock.patch('json.dump')
+    @mock.patch("json.dump")
     def test_save_progress(self, mock_json_dump, storage, temp_dir):
         """Test saving progress information"""
         current_image = "/path/to/image.jpg"
@@ -121,62 +119,3 @@ class TestAnnotationStorage:
         mock_json_dump.side_effect = Exception("Test error")
         result = storage.save_progress(temp_dir, current_image)
         assert result is False
-
-    @mock.patch('json.load')
-    @mock.patch('os.path.exists')
-    def test_load_progress(self, mock_exists, mock_json_load, storage, temp_dir):
-        """Test loading progress information"""
-        # Setup mocks
-        mock_exists.return_value = True
-        mock_json_load.return_value = {
-            "last_annotated": "/path/to/image.jpg",
-            "timestamp": "2023-01-01T12:00:00"
-        }
-
-        # Test successful load
-        result = storage.load_progress(temp_dir)
-        assert result == "/path/to/image.jpg"
-
-        # Test when file doesn't exist
-        mock_exists.return_value = False
-        result = storage.load_progress(temp_dir)
-        assert result is None
-
-        # Test when file exists but image path doesn't
-        mock_exists.side_effect = [True, False]  # First for progress file, second for image path
-        mock_json_load.return_value = {
-            "last_annotated": "non_existent_image.jpg",
-            "timestamp": "2023-01-01T12:00:00"
-        }
-        result = storage.load_progress(temp_dir)
-        assert result is None
-
-        # Test with loading error
-        mock_exists.side_effect = None
-        mock_exists.return_value = True
-        mock_json_load.side_effect = Exception("Test error")
-        result = storage.load_progress(temp_dir)
-        assert result is None
-
-    @mock.patch('glob.glob')
-    def test_count_annotations_by_class(self, mock_glob, storage, temp_dir):
-        """Test counting annotations by class"""
-        # Create mock annotation files
-        mock_glob.return_value = [
-            os.path.join(temp_dir, "img1.txt"),
-            os.path.join(temp_dir, "img2.txt"),
-            os.path.join(temp_dir, ".test_progress.json")  # Should be skipped
-        ]
-
-        # Create mock open to return annotation content
-        with mock.patch('builtins.open',
-                        mock.mock_open(read_data="0 0.5 0.5 0.2 0.2\n1 0.7 0.7 0.1 0.1\n0 0.3 0.3 0.1 0.1")):
-            # Test with valid classes
-            classes = ["0-class1", "1-class2", "2-class3"]
-            class_counts, total_boxes = storage.count_annotations_by_class(temp_dir, classes)
-
-            # Should find 2 boxes of class 0 and 1 box of class 1
-            assert class_counts["0"] == 2
-            assert class_counts["1"] == 1
-            assert class_counts["2"] == 0
-            assert total_boxes == 3

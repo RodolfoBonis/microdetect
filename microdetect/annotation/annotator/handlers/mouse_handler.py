@@ -308,6 +308,18 @@ class MouseHandler:
         elif resize_handle == 8:  # HANDLE_W
             x1 += dx
 
+        # Garantir que x1 < x2 e y1 < y2
+        if x1 > x2:
+            x1, x2 = x2, x1
+        if y1 > y2:
+            y1, y2 = y2, y1
+
+        # Atualizar caixa se uma alça válida foi usada
+        if self.box_manager.selected_idx is not None:
+            self.box_manager.update_box(self.box_manager.selected_idx, cls_id, x1, y1, x2, y2)
+
+        return x1, y1, x2, y2
+
     def on_mouse_up(self, event):
         """
         Função chamada quando o botão do mouse é solto.

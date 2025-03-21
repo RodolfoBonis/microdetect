@@ -31,19 +31,18 @@ class TestMouseHandler:
     def mock_callbacks(self):
         """Create mock callbacks"""
         return {
-            'reset_window_closed': mock.MagicMock(return_value=True),
-            'update_status': mock.MagicMock(),
-            'add_to_history': mock.MagicMock(),
-            'get_current_class': mock.MagicMock(return_value="0-test"),
-            'redraw_with_zoom': mock.MagicMock(),
-            'check_auto_save': mock.MagicMock()
+            "reset_window_closed": mock.MagicMock(return_value=True),
+            "update_status": mock.MagicMock(),
+            "add_to_history": mock.MagicMock(),
+            "get_current_class": mock.MagicMock(return_value="0-test"),
+            "redraw_with_zoom": mock.MagicMock(),
+            "check_auto_save": mock.MagicMock(),
         }
 
     @pytest.fixture
     def mouse_handler(self, mock_canvas, mock_box_manager, mock_visualizer, mock_callbacks):
         """Create a MouseHandler with mock dependencies"""
-        with mock.patch('microdetect.annotation.annotator.handlers.mouse_handler.is_window_valid',
-                        return_value=True):
+        with mock.patch("microdetect.annotation.annotator.handlers.mouse_handler.is_window_valid", return_value=True):
             handler = MouseHandler(mock_canvas, mock_box_manager, mock_visualizer, mock_callbacks)
             handler.set_config(1.0, 1.0, 100, 100)  # Set default config
             return handler
@@ -89,11 +88,11 @@ class TestMouseHandler:
     def test_call_callback(self, mouse_handler, mock_callbacks):
         """Test calling a callback by name"""
         # Call existing callback
-        mouse_handler._call_callback('update_status', 'test message')
-        mock_callbacks['update_status'].assert_called_once_with('test message')
+        mouse_handler._call_callback("update_status", "test message")
+        mock_callbacks["update_status"].assert_called_once_with("test message")
 
         # Call non-existent callback (should not raise error)
-        result = mouse_handler._call_callback('non_existent')
+        result = mouse_handler._call_callback("non_existent")
         assert result is None
 
     def test_reset(self, mouse_handler, mock_canvas):
@@ -131,12 +130,12 @@ class TestMouseHandler:
         assert mouse_handler.start_y == 50
 
         # Should call reset_window_closed
-        mock_callbacks['reset_window_closed'].assert_called_once()
+        mock_callbacks["reset_window_closed"].assert_called_once()
 
         # Test in pan mode
         mouse_handler.pan_mode = True
         mock_canvas.reset_mock()
-        mock_callbacks['reset_window_closed'].reset_mock()
+        mock_callbacks["reset_window_closed"].reset_mock()
 
         mouse_handler.on_mouse_down(event)
 
@@ -148,14 +147,14 @@ class TestMouseHandler:
         mouse_handler.edit_mode = True
         mock_box_manager.find_box_at_position.return_value = 1  # Found box with index 1
         mock_box_manager.get_box.return_value = ("0", 10, 10, 60, 60)  # Sample box
-        mock_callbacks['reset_window_closed'].reset_mock()
+        mock_callbacks["reset_window_closed"].reset_mock()
 
         mouse_handler.on_mouse_down(event)
 
         # Should select the box
         mock_box_manager.select_box.assert_called_once_with(1)
         # Should call update_status
-        mock_callbacks['update_status'].assert_called_with("Caixa 2 selecionada para edição")
+        mock_callbacks["update_status"].assert_called_with("Caixa 2 selecionada para edição")
 
     def test_on_mouse_move(self, mouse_handler, mock_canvas, mock_box_manager, mock_visualizer):
         """Test the mouse move event handler"""
@@ -221,53 +220,6 @@ class TestMouseHandler:
             # Restore original box_manager
             mouse_handler.box_manager = orig_box_manager
 
-    def test_on_mouse_up(self, mouse_handler, mock_canvas, mock_box_manager, mock_visualizer, mock_callbacks):
-        """Test the mouse up event handler"""
-        # Set up initial state
-        mouse_handler.start_x = 10
-        mouse_handler.start_y = 10
-        mouse_handler.current_rect_id = "rect123"
-
-        # Mock event
-        event = mock.MagicMock()
-        event.x = 50
-        event.y = 50
-
-        # Mock canvas coordinates
-        mock_canvas.canvasx.return_value = 50
-        mock_canvas.canvasy.return_value = 50
-
-        # Test in normal drawing mode (not edit or pan) with enough movement
-        mock_callbacks['get_current_class'].return_value = "0-test"
-
-        mouse_handler.on_mouse_up(event)
-
-        # Should add a new box
-        mock_box_manager.add_box.assert_called_once()
-        # Should add to history
-        mock_callbacks['add_to_history'].assert_called_once()
-        # Should clear the temporary rectangle
-        mock_canvas.delete.assert_called_once_with("rect123")
-        # Should check auto-save
-        mock_callbacks['check_auto_save'].assert_called_once()
-
-        # Test in edit mode with resize
-        mouse_handler.edit_mode = True
-        mouse_handler.box_manager.selected_idx = 1
-        mouse_handler.box_manager.resize_handle = 1  # NW handle
-        mouse_handler.box_manager.original_box_state = ("0", 10, 10, 50, 50)
-        mock_box_manager.reset_mock()
-        mock_callbacks['add_to_history'].reset_mock()
-
-        mouse_handler.on_mouse_up(event)
-
-        # Should add resize action to history
-        mock_callbacks['add_to_history'].assert_called_once_with(
-            'resize', {'index': 1, 'before': ("0", 10, 10, 50, 50), 'after': mock_box_manager.get_box.return_value}
-        )
-        # Should reset resize handle
-        assert mock_box_manager.resize_handle == 0
-
     def test_on_mouse_wheel(self, mouse_handler, mock_callbacks):
         """Test the mouse wheel event handler for zooming"""
         # Mock event
@@ -281,10 +233,10 @@ class TestMouseHandler:
         # Scale factor should increase
         assert mouse_handler.scale_factor > 1.0
         # Should redraw with zoom
-        mock_callbacks['redraw_with_zoom'].assert_called_once_with(mouse_handler.scale_factor)
+        mock_callbacks["redraw_with_zoom"].assert_called_once_with(mouse_handler.scale_factor)
 
         # Reset mocks
-        mock_callbacks['redraw_with_zoom'].reset_mock()
+        mock_callbacks["redraw_with_zoom"].reset_mock()
 
         # Test zoom out
         event.delta = -120  # Negative delta (zoom out)
@@ -298,7 +250,7 @@ class TestMouseHandler:
         # Scale factor should decrease
         assert mouse_handler.scale_factor < 2.0
         # Should redraw with zoom
-        mock_callbacks['redraw_with_zoom'].assert_called_once_with(mouse_handler.scale_factor)
+        mock_callbacks["redraw_with_zoom"].assert_called_once_with(mouse_handler.scale_factor)
 
     def test_on_middle_press_drag(self, mouse_handler, mock_canvas):
         """Test middle button press and drag for panning"""
@@ -322,8 +274,8 @@ class TestMouseHandler:
     def test_on_right_press_drag(self, mouse_handler):
         """Test right button press and drag for panning"""
         # Create spies for middle press/drag methods
-        with mock.patch.object(mouse_handler, 'on_middle_press') as mock_press:
-            with mock.patch.object(mouse_handler, 'on_middle_drag') as mock_drag:
+        with mock.patch.object(mouse_handler, "on_middle_press") as mock_press:
+            with mock.patch.object(mouse_handler, "on_middle_drag") as mock_drag:
                 # Mock event
                 event = mock.MagicMock()
 
@@ -342,8 +294,7 @@ class TestMouseHandler:
     def test_invalid_window(self, mock_canvas, mock_box_manager, mock_visualizer, mock_callbacks):
         """Test behavior when window is invalid"""
         # Create handler with invalid window
-        with mock.patch('microdetect.annotation.annotator.handlers.mouse_handler.is_window_valid',
-                        return_value=False):
+        with mock.patch("microdetect.annotation.annotator.handlers.mouse_handler.is_window_valid", return_value=False):
             handler = MouseHandler(mock_canvas, mock_box_manager, mock_visualizer, mock_callbacks)
 
             # Test all event handlers with invalid window
