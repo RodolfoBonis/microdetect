@@ -276,9 +276,9 @@ class AnnotationConverter:
 
                 # Formatar XML para melhor legibilidade
                 try:
-                    import xml.dom.minidom
+                    from defusedxml.minidom import parseString as safe_parseString
 
-                    dom = xml.dom.minidom.parseString(xml_str)
+                    dom = safe_parseString(xml_str)
                     xml_pretty_str = dom.toprettyxml(indent="  ")
                 except:
                     xml_pretty_str = xml_str.decode("utf-8")
@@ -407,7 +407,8 @@ class AnnotationConverter:
         for xml_file in xml_files:
             try:
                 # Analisar XML
-                tree = ET.parse(xml_file)
+                from defusedxml import ElementTree as safe_ET
+                tree = safe_ET.parse(xml_file)
                 root = tree.getroot()
 
                 # Obter dimensões da imagem

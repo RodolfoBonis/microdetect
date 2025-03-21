@@ -35,11 +35,11 @@ class SpeedBenchmark:
         self.results = []
 
     def run(
-            self,
-            batch_sizes: List[int] = [1, 2, 4, 8, 16],
-            image_sizes: List[int] = [640, 960, 1280],
-            iterations: int = 50,
-            warmup: int = 10,
+        self,
+        batch_sizes: List[int] = [1, 2, 4, 8, 16],
+        image_sizes: List[int] = [640, 960, 1280],
+        iterations: int = 50,
+        warmup: int = 10,
     ) -> Dict[str, Any]:
         """
         Executa benchmark de velocidade para diferentes tamanhos de batch e imagem.
@@ -80,11 +80,7 @@ class SpeedBenchmark:
 
                         # Criamos um dicionário para armazenar os resultados do benchmark
                         # para este tamanho de batch específico
-                        benchmark_results = {
-                            "batch_size": batch_size,
-                            "image_size": img_size,
-                            "latencies": []
-                        }
+                        benchmark_results = {"batch_size": batch_size, "image_size": img_size, "latencies": []}
 
                         # Warmup - usando a mesma imagem repetidamente
                         for _ in range(warmup):
@@ -124,7 +120,7 @@ class SpeedBenchmark:
                         if batch_size > 1:
                             # Fórmula empírica para estimar ganhos de eficiência de batch
                             # Supõe que há ganhos sublineares à medida que o tamanho do batch aumenta
-                            batch_efficiency_factor = batch_size ** 0.8
+                            batch_efficiency_factor = batch_size**0.8
 
                         # Estimar FPS para este tamanho de batch
                         # Esta é uma estimativa razoável e conservadora
@@ -143,7 +139,7 @@ class SpeedBenchmark:
                                 "p95_latency_ms": p95_latency,
                                 "fps": estimated_fps,
                                 "samples_per_second": samples_per_second,
-                                "note": f"FPS estimado para batch_size={batch_size}"
+                                "note": f"FPS estimado para batch_size={batch_size}",
                             }
                         )
 
@@ -173,8 +169,7 @@ class SpeedBenchmark:
                     logger.warning("Nenhum benchmark bem-sucedido. Tentando método alternativo com imagem padrão.")
                     self._run_simple_benchmark()
 
-            return {"model": os.path.basename(self.model_path), "device": self.device or "auto",
-                    "results": self.results}
+            return {"model": os.path.basename(self.model_path), "device": self.device or "auto", "results": self.results}
 
         except Exception as e:
             logger.error(f"Erro durante benchmark: {str(e)}")
@@ -219,7 +214,7 @@ class SpeedBenchmark:
                     "avg_latency_ms": avg_latency,
                     "fps": fps,
                     "samples_per_second": fps,
-                    "note": "Método alternativo de benchmark usado"
+                    "note": "Método alternativo de benchmark usado",
                 }
             )
 
@@ -236,7 +231,7 @@ class SpeedBenchmark:
                     "fps": 10,  # Valor padrão conservador
                     "samples_per_second": 10,
                     "note": "Valores estimados (benchmark falhou)",
-                    "error": str(e)
+                    "error": str(e),
                 }
             )
 

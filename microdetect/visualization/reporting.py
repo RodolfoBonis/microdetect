@@ -31,12 +31,12 @@ class ReportGenerator:
         os.makedirs(self.output_dir, exist_ok=True)
 
     def generate_pdf_report(
-            self,
-            metrics: Dict[str, Any],
-            model_path: str,
-            output_file: Optional[str] = None,
-            include_images: List[str] = None,
-            template_path: Optional[str] = None,
+        self,
+        metrics: Dict[str, Any],
+        model_path: str,
+        output_file: Optional[str] = None,
+        include_images: List[str] = None,
+        template_path: Optional[str] = None,
     ) -> str:
         """
         Gera um relatório PDF detalhado com métricas de avaliação.
@@ -56,15 +56,15 @@ class ReportGenerator:
         wkhtmltopdf_present = False
         try:
             import pdfkit
+
             # Verificar se o wkhtmltopdf está instalado no sistema
             try:
                 config = pdfkit.configuration()
                 wkhtmltopdf_path = config.wkhtmltopdf
                 if wkhtmltopdf_path:
                     import subprocess
-                    result = subprocess.run([wkhtmltopdf_path, '--version'],
-                                            stdout=subprocess.PIPE,
-                                            stderr=subprocess.PIPE)
+
+                    result = subprocess.run([wkhtmltopdf_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     if result.returncode == 0:
                         wkhtmltopdf_present = True
                         logger.info(f"wkhtmltopdf encontrado: {result.stdout.decode().strip()}")
@@ -277,13 +277,13 @@ class ReportGenerator:
 
                 # Configurar opções do pdfkit
                 options = {
-                    'quiet': '',
-                    'enable-local-file-access': '',  # Importante para acessar arquivos locais
-                    'image-dpi': '300',
-                    'margin-top': '10mm',
-                    'margin-right': '10mm',
-                    'margin-bottom': '10mm',
-                    'margin-left': '10mm',
+                    "quiet": "",
+                    "enable-local-file-access": "",  # Importante para acessar arquivos locais
+                    "image-dpi": "300",
+                    "margin-top": "10mm",
+                    "margin-right": "10mm",
+                    "margin-bottom": "10mm",
+                    "margin-left": "10mm",
                 }
 
                 # Definir o diretório de trabalho para o diretório do HTML

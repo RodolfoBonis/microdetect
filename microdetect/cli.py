@@ -102,15 +102,25 @@ def setup_train_parser(subparsers):
         "--data_yaml",
         help="Caminho para arquivo data.yaml (se não especificado, será criado)",
     )
-    parser.add_argument("--model_size", type=str, choices=["n", "s", "m", "l", "x"],
-                             default="s", help="Tamanho do modelo YOLOv8 (n, s, m, l, x)")
-    parser.add_argument("--model_sizes", type=str, nargs="+", choices=["n", "s", "m", "l", "x"],
-                              help="Lista de tamanhos de modelo para busca de hiperparâmetros (quando usado com --find-hyperparams)")
+    parser.add_argument(
+        "--model_size",
+        type=str,
+        choices=["n", "s", "m", "l", "x"],
+        default="s",
+        help="Tamanho do modelo YOLOv8 (n, s, m, l, x)",
+    )
+    parser.add_argument(
+        "--model_sizes",
+        type=str,
+        nargs="+",
+        choices=["n", "s", "m", "l", "x"],
+        help="Lista de tamanhos de modelo para busca de hiperparâmetros (quando usado com --find-hyperparams)",
+    )
     parser.add_argument(
         "--checkpoint_dir",
         type=str,
         default=None,
-        help="Diretório para salvar/carregar checkpoints da busca de hiperparâmetros"
+        help="Diretório para salvar/carregar checkpoints da busca de hiperparâmetros",
     )
     parser.add_argument("--epochs", type=int, help="Número de épocas")
     parser.add_argument("--batch_size", type=int, help="Tamanho do batch")
@@ -119,20 +129,20 @@ def setup_train_parser(subparsers):
         type=int,
         nargs="+",
         default=[8, 16, 32],
-        help="Lista de tamanhos de batch para testar (ex: --batch_sizes 8 16 32) (quando usado com --find-hyperparams)"
+        help="Lista de tamanhos de batch para testar (ex: --batch_sizes 8 16 32) (quando usado com --find-hyperparams)",
     )
     parser.add_argument(
         "--learning_rates",
         type=float,
         nargs="+",
         default=[0.001, 0.01, 0.1],
-        help="Lista de learning rates para testar (ex: --learning_rates 0.001 0.01 0.1) (quando usado com --find-hyperparams)"
+        help="Lista de learning rates para testar (ex: --learning_rates 0.001 0.01 0.1) (quando usado com --find-hyperparams)",
     )
     parser.add_argument("--image_size", type=int, help="Tamanho da imagem")
     parser.add_argument("--output_dir", help="Diretório para resultados")
     parser.add_argument("--no_pretrained", action="store_true", help="Não usar pesos pré-treinados")
     parser.add_argument("--resume", help="Continuar de um checkpoint")
-    parser.add_argument("--resume_hp" , action="store_true", help="Retomar busca de hiperparâmetros")
+    parser.add_argument("--resume_hp", action="store_true", help="Retomar busca de hiperparâmetros")
     parser.add_argument(
         "--find_hyperparams",
         action="store_true",
@@ -698,10 +708,7 @@ def handle_train(args):
             "model_sizes": model_sizes,
         }
         best_hyperparams = trainer.find_best_hyperparameters(
-            data_yaml=data_yaml,
-            checkpoint_dir=args.checkpoint_dir,
-            resume=args.resume_hp,
-            search_space=search_space
+            data_yaml=data_yaml, checkpoint_dir=args.checkpoint_dir, resume=args.resume_hp, search_space=search_space
         )
 
         print(f"\nMelhores hiperparâmetros encontrados:")
@@ -797,12 +804,12 @@ def handle_model_comparison(args):
                     import dash_bootstrap_components as dbc
                 except ImportError:
                     logger.error("Dash não encontrado. Instale com: pip install dash dash-bootstrap-components")
-                    logger.info(
-                        "Dashboard não será iniciado. Use 'pip install dash dash-bootstrap-components' para instalar.")
+                    logger.info("Dashboard não será iniciado. Use 'pip install dash dash-bootstrap-components' para instalar.")
                     return results
 
                 # Iniciar dashboard
                 from microdetect.visualization.dashboards import DashboardGenerator
+
                 dashboard = DashboardGenerator(output_dir)
 
                 try:
@@ -947,11 +954,13 @@ def handle_generate_report(args):
     """
     Manipula o comando generate_report para gerar relatórios a partir de resultados.
     """
-    from microdetect.visualization.reporting import ReportGenerator
-    import os
-    import json
     import glob
+    import json
+    import os
+
     import pandas as pd
+
+    from microdetect.visualization.reporting import ReportGenerator
 
     logger.info(f"Iniciando geração de relatório para os resultados em: {args.results_dir}")
 
@@ -975,7 +984,7 @@ def handle_generate_report(args):
     if json_files:
         metrics_file = json_files[0]  # Usar o primeiro arquivo encontrado
         try:
-            with open(metrics_file, 'r') as f:
+            with open(metrics_file, "r") as f:
                 metrics_data = json.load(f)
             logger.info(f"Carregando métricas do arquivo: {metrics_file}")
         except Exception as e:
@@ -985,7 +994,7 @@ def handle_generate_report(args):
     elif all_json_files:
         metrics_file = all_json_files[0]
         try:
-            with open(metrics_file, 'r') as f:
+            with open(metrics_file, "r") as f:
                 metrics_data = json.load(f)
             logger.info(f"Carregando métricas de arquivo alternativo: {metrics_file}")
         except Exception as e:
@@ -1000,40 +1009,37 @@ def handle_generate_report(args):
             df = pd.read_csv(metrics_file)
 
             # Converter para o formato esperado
-            if 'Métrica' in df.columns and 'Valor' in df.columns:
+            if "Métrica" in df.columns and "Valor" in df.columns:
                 general_metrics = {}
                 class_metrics = []
 
                 # Primeiro, processar métricas gerais
-                general_df = df[df['Tipo'] == 'Geral'] if 'Tipo' in df.columns else df
+                general_df = df[df["Tipo"] == "Geral"] if "Tipo" in df.columns else df
                 for _, row in general_df.iterrows():
                     try:
-                        metric_name = row['Métrica']
-                        metric_value = float(row['Valor'])
+                        metric_name = row["Métrica"]
+                        metric_value = float(row["Valor"])
                         general_metrics[metric_name] = metric_value
                     except:
                         pass
 
                 # Processar métricas por classe, se houver
-                if 'Classe' in df.columns:
-                    class_df = df[~df['Métrica'].isna() & ~df['Classe'].isna()]
-                    for class_name in class_df['Classe'].unique():
-                        class_data = {'Classe': class_name}
-                        class_rows = class_df[class_df['Classe'] == class_name]
+                if "Classe" in df.columns:
+                    class_df = df[~df["Métrica"].isna() & ~df["Classe"].isna()]
+                    for class_name in class_df["Classe"].unique():
+                        class_data = {"Classe": class_name}
+                        class_rows = class_df[class_df["Classe"] == class_name]
                         for _, row in class_rows.iterrows():
                             try:
-                                metric_name = row['Métrica']
-                                metric_value = float(row['Valor'])
+                                metric_name = row["Métrica"]
+                                metric_value = float(row["Valor"])
                                 class_data[metric_name] = metric_value
                             except:
                                 pass
                         if len(class_data) > 1:  # Se tiver algo além do nome da classe
                             class_metrics.append(class_data)
 
-                metrics_data = {
-                    'metricas_gerais': general_metrics,
-                    'metricas_por_classe': class_metrics
-                }
+                metrics_data = {"metricas_gerais": general_metrics, "metricas_por_classe": class_metrics}
 
                 logger.info(f"Métricas carregadas do arquivo CSV: {metrics_file}")
             else:
@@ -1047,15 +1053,11 @@ def handle_generate_report(args):
     if metrics_data is None and error_files:
         metrics_file = error_files[0]
         try:
-            with open(metrics_file, 'r') as f:
+            with open(metrics_file, "r") as f:
                 error_data = json.load(f)
 
             # Criar estrutura básica de métricas para incluir informações de erro
-            metrics_data = {
-                'metricas_gerais': {'Erro': 1.0},
-                'metricas_por_classe': [],
-                'erro': error_data
-            }
+            metrics_data = {"metricas_gerais": {"Erro": 1.0}, "metricas_por_classe": [], "erro": error_data}
             logger.info(f"Usando informações de erro do arquivo: {metrics_file}")
         except Exception as e:
             logger.error(f"Erro ao ler arquivo de erro: {str(e)}")
@@ -1064,15 +1066,11 @@ def handle_generate_report(args):
     if metrics_data is None:
         logger.error("Arquivo de métricas não encontrado no diretório de resultados")
         # Criar estrutura mínima para evitar erros
-        metrics_data = {
-            'metricas_gerais': {'Informação': 0.0},
-            'metricas_por_classe': [],
-            'nota': 'Dados não disponíveis'
-        }
+        metrics_data = {"metricas_gerais": {"Informação": 0.0}, "metricas_por_classe": [], "nota": "Dados não disponíveis"}
 
     # Encontrar imagens para incluir no relatório
     images = []
-    for ext in ['png', 'jpg', 'jpeg']:
+    for ext in ["png", "jpg", "jpeg"]:
         images.extend(glob.glob(os.path.join(args.results_dir, f"*.{ext}")))
 
     # Se houver mais de 5 imagens, selecionar apenas as 5 primeiras para não sobrecarregar o relatório
@@ -1080,7 +1078,7 @@ def handle_generate_report(args):
         images = images[:5]
 
     # Encontrar caminhos para confusion_matrix se disponível
-    confusion_matrix_images = [img for img in images if 'confusion_matrix' in img.lower()]
+    confusion_matrix_images = [img for img in images if "confusion_matrix" in img.lower()]
     if confusion_matrix_images:
         # Adicionar matriz de confusão como primeira imagem
         images = [confusion_matrix_images[0]] + [img for img in images if img != confusion_matrix_images[0]]
@@ -1093,37 +1091,33 @@ def handle_generate_report(args):
     # Identificar modelo usado, se disponível
     model_path = "unknown_model.pt"
     if metrics_data and isinstance(metrics_data, dict):
-        if 'modelo' in metrics_data and 'caminho' in metrics_data['modelo']:
-            model_path = metrics_data['modelo']['caminho']
-        elif 'model' in metrics_data:
-            model_path = metrics_data['model']
+        if "modelo" in metrics_data and "caminho" in metrics_data["modelo"]:
+            model_path = metrics_data["modelo"]["caminho"]
+        elif "model" in metrics_data:
+            model_path = metrics_data["model"]
 
     # Gerar relatório no formato solicitado
-    if args.format.lower() == 'pdf':
-        output_file = report_generator.generate_pdf_report(
-            metrics_data, model_path, args.output_file, images
-        )
+    if args.format.lower() == "pdf":
+        output_file = report_generator.generate_pdf_report(metrics_data, model_path, args.output_file, images)
 
         # Verificar se o arquivo gerado é HTML em vez de PDF (fallback)
-        if output_file and output_file.endswith('.html'):
+        if output_file and output_file.endswith(".html"):
             logger.info("Relatório HTML gerado como alternativa ao PDF.")
             logger.info("Para gerar PDFs, instale wkhtmltopdf (https://wkhtmltopdf.org/downloads.html)")
 
             # Sistemas comuns
-            if os.name == 'posix':  # Linux/Mac
+            if os.name == "posix":  # Linux/Mac
                 logger.info("Para Ubuntu/Debian: sudo apt-get install wkhtmltopdf")
                 logger.info("Para MacOS: brew install wkhtmltopdf")
-            elif os.name == 'nt':  # Windows
+            elif os.name == "nt":  # Windows
                 logger.info("Para Windows: Baixe o instalador do site e adicione ao PATH")
 
             logger.info(f"O relatório HTML foi salvo em: {output_file}")
         else:
             logger.info(f"Relatório PDF gerado com sucesso: {output_file}")
 
-    elif args.format.lower() == 'csv':
-        output_file = report_generator.generate_csv_report(
-            metrics_data, args.output_file
-        )
+    elif args.format.lower() == "csv":
+        output_file = report_generator.generate_csv_report(metrics_data, args.output_file)
         if output_file:
             logger.info(f"Relatório CSV gerado com sucesso: {output_file}")
         else:
@@ -1141,8 +1135,8 @@ def handle_generate_report(args):
             # Verificar se estamos em ambiente WSL
             is_wsl = False
             try:
-                with open('/proc/version', 'r') as f:
-                    if 'microsoft' in f.read().lower():
+                with open("/proc/version", "r") as f:
+                    if "microsoft" in f.read().lower():
                         is_wsl = True
             except:
                 pass
@@ -1150,16 +1144,17 @@ def handle_generate_report(args):
             if is_wsl:
                 # Em WSL, tentar usar o comando powershell.exe para abrir no Windows
                 import subprocess
+
                 try:
-                    windows_path = output_file.replace('/mnt/c/', 'C:\\').replace('/', '\\')
-                    subprocess.run(['powershell.exe', 'start', windows_path],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    windows_path = output_file.replace("/mnt/c/", "C:\\").replace("/", "\\")
+                    subprocess.run(["powershell.exe", "start", windows_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     logger.info("Relatório aberto no navegador do Windows (WSL)")
                 except Exception as e:
                     logger.info(f"Não foi possível abrir automaticamente. Abra manualmente: {output_file}")
             else:
                 # Ambiente não-WSL, usar navegador padrão
                 import webbrowser
+
                 if webbrowser.open(output_file):
                     logger.info("Relatório aberto no navegador padrão")
                 else:
@@ -1172,9 +1167,10 @@ def handle_dashboard(args):
     """
     Manipula o comando dashboard para visualizar resultados interativamente.
     """
-    import os
     import glob
     import json
+    import os
+
     from microdetect.visualization.dashboards import DashboardGenerator
 
     logger.info(f"Iniciando dashboard para os resultados em: {args.results_dir}")
@@ -1206,7 +1202,7 @@ def handle_dashboard(args):
         # Tentar determinar o tipo pelo conteúdo
         for json_file in any_json_files:
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file, "r") as f:
                     data = json.load(f)
 
                     # Se tem aspecto de arquivo de métricas
@@ -1242,8 +1238,8 @@ def handle_dashboard(args):
         # Verificar se estamos em WSL e fornecer informações adicionais
         is_wsl = False
         try:
-            with open('/proc/version', 'r') as f:
-                if 'microsoft' in f.read().lower():
+            with open("/proc/version", "r") as f:
+                if "microsoft" in f.read().lower():
                     is_wsl = True
         except:
             pass

@@ -107,30 +107,37 @@ class DashboardGenerator:
         if not rows:
             logger.warning("Não há detecções para mostrar no dashboard")
             # Criar pelo menos uma linha para o dashboard funcionar
-            rows.append({
-                "image": images[0] if images else "exemplo.jpg",
-                "class": 0,
-                "class_name": "Sem detecções",
-                "confidence": 0,
-                "x1": 0, "y1": 0, "x2": 0, "y2": 0,
-                "width": 0, "height": 0, "area": 0
-            })
+            rows.append(
+                {
+                    "image": images[0] if images else "exemplo.jpg",
+                    "class": 0,
+                    "class_name": "Sem detecções",
+                    "confidence": 0,
+                    "x1": 0,
+                    "y1": 0,
+                    "x2": 0,
+                    "y2": 0,
+                    "width": 0,
+                    "height": 0,
+                    "area": 0,
+                }
+            )
 
         # Criar DataFrame
         import pandas as pd
+
         df = pd.DataFrame(rows)
 
         # Limpar o DataFrame, tratando valores ausentes
         for col in df.columns:
             if pd.api.types.is_numeric_dtype(df[col]):
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
         # Obter classes únicas
         classes = sorted(df["class_name"].unique())
 
         # Criar aplicação Dash
-        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY],
-                        title="MicroDetect - Dashboard de Detecções")
+        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], title="MicroDetect - Dashboard de Detecções")
 
         # Layout do dashboard
         app.layout = dbc.Container(
@@ -214,8 +221,7 @@ class DashboardGenerator:
                                 dbc.Tabs(
                                     [
                                         dbc.Tab([dcc.Graph(id="detections-by-class")], label="Detecções por Classe"),
-                                        dbc.Tab([dcc.Graph(id="confidence-histogram")],
-                                                label="Histograma de Confiança"),
+                                        dbc.Tab([dcc.Graph(id="confidence-histogram")], label="Histograma de Confiança"),
                                         dbc.Tab([dcc.Graph(id="size-scatter")], label="Tamanho x Confiança"),
                                     ]
                                 ),
@@ -268,21 +274,21 @@ class DashboardGenerator:
                 fig1 = go.Figure()
                 fig1.update_layout(
                     title="Número de Detecções por Classe",
-                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}]
+                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}],
                 )
 
                 # Gráfico vazio para histograma de confiança
                 fig2 = go.Figure()
                 fig2.update_layout(
                     title="Distribuição de Confiança por Classe",
-                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}]
+                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}],
                 )
 
                 # Gráfico vazio para scatter plot
                 fig3 = go.Figure()
                 fig3.update_layout(
                     title="Relação entre Tamanho e Confiança",
-                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}]
+                    annotations=[{"text": empty_msg, "showarrow": False, "font": {"size": 16}}],
                 )
 
                 # Estatísticas vazias
@@ -294,10 +300,7 @@ class DashboardGenerator:
                 )
 
                 # Detalhes da imagem vazios
-                image_details = [
-                    html.H4(f"Detecções em: {selected_image}"),
-                    html.P("Nenhuma detecção com os filtros atuais")
-                ]
+                image_details = [html.H4(f"Detecções em: {selected_image}"), html.P("Nenhuma detecção com os filtros atuais")]
 
                 return fig1, fig2, fig3, stats, image_details
 
@@ -314,8 +317,7 @@ class DashboardGenerator:
             except Exception as e:
                 fig1 = go.Figure()
                 fig1.update_layout(
-                    title="Erro ao gerar gráfico de detecções por classe",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar gráfico de detecções por classe", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Gráfico 2: Histograma de Confiança
@@ -331,8 +333,7 @@ class DashboardGenerator:
             except Exception as e:
                 fig2 = go.Figure()
                 fig2.update_layout(
-                    title="Erro ao gerar histograma de confiança",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar histograma de confiança", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Gráfico 3: Scatter Plot de Tamanho vs Confiança
@@ -354,8 +355,7 @@ class DashboardGenerator:
             except Exception as e:
                 fig3 = go.Figure()
                 fig3.update_layout(
-                    title="Erro ao gerar gráfico de tamanho vs confiança",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar gráfico de tamanho vs confiança", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Estatísticas filtradas
@@ -375,7 +375,7 @@ class DashboardGenerator:
                 stats = dbc.Card(
                     [
                         dbc.CardHeader("Estatísticas Filtradas"),
-                        dbc.CardBody([html.H4(f"Erro ao calcular estatísticas: {str(e)}")])
+                        dbc.CardBody([html.H4(f"Erro ao calcular estatísticas: {str(e)}")]),
                     ]
                 )
 
@@ -402,13 +402,10 @@ class DashboardGenerator:
                 image_details = [
                     html.H4(f"Detecções em: {selected_image}"),
                     html.P(f"Total: {len(image_dets)} detecções"),
-                    table
+                    table,
                 ]
             except Exception as e:
-                image_details = [
-                    html.H4(f"Detecções em: {selected_image}"),
-                    html.P(f"Erro ao processar detecções: {str(e)}")
-                ]
+                image_details = [html.H4(f"Detecções em: {selected_image}"), html.P(f"Erro ao processar detecções: {str(e)}")]
 
             return fig1, fig2, fig3, stats, image_details
 
@@ -419,8 +416,8 @@ class DashboardGenerator:
                     # Verificar se estamos em ambiente WSL
                     is_wsl = False
                     try:
-                        with open('/proc/version', 'r') as f:
-                            if 'microsoft' in f.read().lower():
+                        with open("/proc/version", "r") as f:
+                            if "microsoft" in f.read().lower():
                                 is_wsl = True
                     except:
                         pass
@@ -428,11 +425,16 @@ class DashboardGenerator:
                     if is_wsl:
                         # Em WSL, tentar abrir no Windows
                         import subprocess
-                        subprocess.run(['powershell.exe', 'start', f'http://localhost:{port}'],
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                        subprocess.run(
+                            ["powershell.exe", "start", f"http://localhost:{port}"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
                     else:
                         # Em outros ambientes, usar webbrowser
                         import webbrowser
+
                         webbrowser.open_new_tab(f"http://localhost:{port}")
                 except Exception as e:
                     logger.warning(f"Não foi possível abrir o navegador automaticamente: {str(e)}")
@@ -442,17 +444,18 @@ class DashboardGenerator:
         try:
             threading.Timer(1, open_browser_tab).start()
             # Verificamos qual método existe na versão atual do Dash
-            if hasattr(app, 'run') and callable(app.run):
+            if hasattr(app, "run") and callable(app.run):
                 # Nova API do Dash
-                app.run(debug=False, port=port, host="0.0.0.0")
+                app.run(debug=False, port=port, host="127.0.0.1")
             else:
                 # API legada do Dash
-                app.run_server(debug=False, port=port, host="0.0.0.0")
+                app.run_server(debug=False, port=port, host="127.0.0.1")
             return port
         except Exception as e:
             logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
             logger.info(
-                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components")
+                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components"
+            )
             return 0
 
     def _load_detection_data(self, results_dir: str) -> Dict:
@@ -465,23 +468,22 @@ class DashboardGenerator:
         Returns:
             Dicionário com dados de detecção
         """
-        import os
         import glob
         import json
+        import os
 
         # Procurar por arquivos JSON que possam conter resultados de detecção
         json_files = glob.glob(os.path.join(results_dir, "*.json"))
 
         # Primeiro, verificar arquivos que tenham nomes que sugerem resultados de detecção
-        detection_files = [f for f in json_files if
-                           any(term in f.lower() for term in ['detect', 'result', 'detection'])]
+        detection_files = [f for f in json_files if any(term in f.lower() for term in ["detect", "result", "detection"])]
         if not detection_files:
             detection_files = json_files  # Se não encontrar nomes específicos, usar todos os JSONs
 
         # Tentar carregar cada arquivo JSON e verificar se tem o formato esperado
         for json_file in detection_files:
             try:
-                with open(json_file, 'r') as f:
+                with open(json_file, "r") as f:
                     data = json.load(f)
 
                     # Verificar se é um dicionário (formato esperado para detecções)
@@ -499,19 +501,10 @@ class DashboardGenerator:
         # Se não encontrou resultados, criar dados mínimos para evitar erros
         logger.warning("Não foi possível encontrar resultados de detecção. Criando dados de exemplo.")
         # Criar alguns dados mínimos de exemplo para o dashboard funcionar
-        return {
-            "exemplo.jpg": [
-                {
-                    "bbox": [100, 100, 200, 200],
-                    "class": 0,
-                    "class_name": "exemplo",
-                    "confidence": 0.9
-                }
-            ]
-        }
+        return {"exemplo.jpg": [{"bbox": [100, 100, 200, 200], "class": 0, "class_name": "exemplo", "confidence": 0.9}]}
 
     def create_model_comparison_dashboard(
-            self, comparison_results: Dict[str, Dict], port: int = 8051, open_browser: bool = True
+        self, comparison_results: Dict[str, Dict], port: int = 8051, open_browser: bool = True
     ) -> int:
         """
         Cria um dashboard interativo para comparar diferentes modelos.
@@ -525,12 +518,13 @@ class DashboardGenerator:
             Porta onde o dashboard está sendo executado
         """
         try:
+            import re
+
             import dash
             import dash_bootstrap_components as dbc
+            import pandas as pd
             from dash import dcc, html
             from dash.dependencies import Input, Output
-            import pandas as pd
-            import re
         except ImportError:
             logger.error("Dash não encontrado. Instale com: pip install dash dash-bootstrap-components")
             return 0
@@ -557,7 +551,7 @@ class DashboardGenerator:
                 # Extrair informações da taxa de aprendizado do nome do modelo
                 lr_value = "unknown"
                 try:
-                    lr_match = re.search(r'lr([0-9.]+)', model_name.lower())
+                    lr_match = re.search(r"lr([0-9.]+)", model_name.lower())
                     if lr_match:
                         lr_value = lr_match.group(1)
                 except:
@@ -605,7 +599,7 @@ class DashboardGenerator:
         numeric_columns = ["size_mb", "mAP50", "mAP50-95", "recall", "precision", "f1-score", "fps", "latencia_ms"]
         for col in numeric_columns:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
         # Criar aplicação Dash
         app = dash.Dash(__name__, external_stylesheets=[dbc.themes.FLATLY], title="MicroDetect - Comparação de Modelos")
@@ -638,8 +632,7 @@ class DashboardGenerator:
                                                     [
                                                         dbc.ListGroupItem(
                                                             f"{row['model']} (Categoria: {row['category']})",
-                                                            color=["primary", "success", "info", "warning", "danger"][
-                                                                i % 5],
+                                                            color=["primary", "success", "info", "warning", "danger"][i % 5],
                                                         )
                                                         for i, (_, row) in enumerate(df.iterrows())
                                                     ]
@@ -706,8 +699,7 @@ class DashboardGenerator:
                     ]
                 ),
                 dbc.Row(
-                    [dbc.Col([html.H3("Tabela Comparativa", className="mb-3"), html.Div(id="comparison-table")],
-                             width=12)]
+                    [dbc.Col([html.H3("Tabela Comparativa", className="mb-3"), html.Div(id="comparison-table")], width=12)]
                 ),
             ],
             fluid=True,
@@ -725,9 +717,9 @@ class DashboardGenerator:
             [Input("metric-dropdown", "value"), Input("chart-type", "value")],
         )
         def update_graphs(selected_metric, chart_type):
+            import numpy as np
             import plotly.express as px
             import plotly.graph_objects as go
-            import numpy as np
 
             # Garantir que temos dados para trabalhar
             if df.empty or selected_metric not in df.columns:
@@ -735,11 +727,9 @@ class DashboardGenerator:
                 fig1 = go.Figure()
                 fig1.update_layout(
                     title="Sem dados disponíveis para visualização",
-                    annotations=[{
-                        "text": "Dados insuficientes ou métrica não disponível",
-                        "showarrow": False,
-                        "font": {"size": 16}
-                    }]
+                    annotations=[
+                        {"text": "Dados insuficientes ou métrica não disponível", "showarrow": False, "font": {"size": 16}}
+                    ],
                 )
 
                 fig2 = go.Figure()
@@ -750,10 +740,7 @@ class DashboardGenerator:
 
                 # Mostrar estatísticas de fallback
                 stats = dbc.Card(
-                    [
-                        dbc.CardHeader("Estatísticas Comparativas"),
-                        dbc.CardBody([html.H4("Dados insuficientes para análise")])
-                    ]
+                    [dbc.CardHeader("Estatísticas Comparativas"), dbc.CardBody([html.H4("Dados insuficientes para análise")])]
                 )
 
                 # Mostrar tabela vazia
@@ -763,17 +750,17 @@ class DashboardGenerator:
 
             # Garantir que todos os valores são válidos antes de plotar
             plot_df = df.copy()
-            for col in [selected_metric, 'fps', 'size_mb']:
+            for col in [selected_metric, "fps", "size_mb"]:
                 if col in plot_df.columns:
-                    plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce').fillna(0)
+                    plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce").fillna(0)
 
             # Garantir que temos categorias para trabalhar
-            if 'category' not in plot_df.columns or plot_df['category'].isna().all():
-                plot_df['category'] = 'default'
+            if "category" not in plot_df.columns or plot_df["category"].isna().all():
+                plot_df["category"] = "default"
 
             # Garantir que temos o modelo para trabalhar
-            if 'model' not in plot_df.columns or plot_df['model'].isna().all():
-                plot_df['model'] = [f"Modelo {i + 1}" for i in range(len(plot_df))]
+            if "model" not in plot_df.columns or plot_df["model"].isna().all():
+                plot_df["model"] = [f"Modelo {i + 1}" for i in range(len(plot_df))]
 
             # ===== GRÁFICO 1: Comparação por métrica =====
             try:
@@ -789,13 +776,7 @@ class DashboardGenerator:
                     # Adicionar valores numéricos nas barras
                     for i, row in enumerate(plot_df.itertuples()):
                         value = getattr(row, selected_metric, 0)
-                        fig1.add_annotation(
-                            x=row.model,
-                            y=value,
-                            text=f"{value:.4f}",
-                            showarrow=False,
-                            yshift=10
-                        )
+                        fig1.add_annotation(x=row.model, y=value, text=f"{value:.4f}", showarrow=False, yshift=10)
                 elif chart_type == "line":
                     fig1 = px.line(
                         plot_df,
@@ -815,10 +796,7 @@ class DashboardGenerator:
                             category_df = plot_df[plot_df["category"] == category]
                             fig1.add_trace(
                                 go.Scatterpolar(
-                                    r=category_df[selected_metric],
-                                    theta=category_df["model"],
-                                    fill="toself",
-                                    name=category
+                                    r=category_df[selected_metric], theta=category_df["model"], fill="toself", name=category
                                 )
                             )
 
@@ -837,14 +815,13 @@ class DashboardGenerator:
                         # Se não temos dados suficientes para um gráfico radar
                         fig1.update_layout(
                             title=f"Comparação de {selected_metric} (Dados insuficientes para radar)",
-                            annotations=[{"text": "Precisa de pelo menos 2 modelos", "showarrow": False}]
+                            annotations=[{"text": "Precisa de pelo menos 2 modelos", "showarrow": False}],
                         )
             except Exception as e:
                 # Fallback em caso de erro
                 fig1 = go.Figure()
                 fig1.update_layout(
-                    title=f"Erro ao gerar gráfico para {selected_metric}",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title=f"Erro ao gerar gráfico para {selected_metric}", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # ===== GRÁFICO 2: Precisão vs. Velocidade =====
@@ -870,20 +847,19 @@ class DashboardGenerator:
                         fig2 = go.Figure()
                         fig2.update_layout(
                             title="Trade-off: Precisão vs. Velocidade (Dados indisponíveis)",
-                            annotations=[{"text": "Sem valores válidos para mostrar", "showarrow": False}]
+                            annotations=[{"text": "Sem valores válidos para mostrar", "showarrow": False}],
                         )
                 else:
                     fig2 = go.Figure()
                     fig2.update_layout(
                         title="Dados insuficientes para gráfico de trade-off",
-                        annotations=[{"text": "Precisa de valores de mAP50 e FPS", "showarrow": False}]
+                        annotations=[{"text": "Precisa de valores de mAP50 e FPS", "showarrow": False}],
                     )
             except Exception as e:
                 # Fallback em caso de erro
                 fig2 = go.Figure()
                 fig2.update_layout(
-                    title="Erro ao gerar gráfico de trade-off",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar gráfico de trade-off", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # ===== GRÁFICO 3: Tamanho do Modelo =====
@@ -900,24 +876,19 @@ class DashboardGenerator:
                     # Adicionar valores nas barras
                     for i, row in enumerate(plot_df.itertuples()):
                         fig3.add_annotation(
-                            x=row.model,
-                            y=row.size_mb,
-                            text=f"{row.size_mb:.1f} MB",
-                            showarrow=False,
-                            yshift=10
+                            x=row.model, y=row.size_mb, text=f"{row.size_mb:.1f} MB", showarrow=False, yshift=10
                         )
                 else:
                     fig3 = go.Figure()
                     fig3.update_layout(
                         title="Dados de tamanho indisponíveis",
-                        annotations=[{"text": "Sem informações de tamanho disponíveis", "showarrow": False}]
+                        annotations=[{"text": "Sem informações de tamanho disponíveis", "showarrow": False}],
                     )
             except Exception as e:
                 # Fallback em caso de erro
                 fig3 = go.Figure()
                 fig3.update_layout(
-                    title="Erro ao gerar gráfico de tamanho",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar gráfico de tamanho", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # ===== ESTATÍSTICAS =====
@@ -928,17 +899,17 @@ class DashboardGenerator:
                 if selected_metric in plot_df.columns and not plot_df[selected_metric].isna().all():
                     max_idx = plot_df[selected_metric].idxmax()
                     if not pd.isna(max_idx):
-                        best_model = plot_df.loc[max_idx, 'model']
+                        best_model = plot_df.loc[max_idx, "model"]
                         best_value = plot_df.loc[max_idx, selected_metric]
 
                 # Encontrar modelo mais rápido
                 fastest_model = "N/A"
                 fastest_fps = 0
-                if 'fps' in plot_df.columns and not plot_df['fps'].isna().all():
-                    max_idx = plot_df['fps'].idxmax()
+                if "fps" in plot_df.columns and not plot_df["fps"].isna().all():
+                    max_idx = plot_df["fps"].idxmax()
                     if not pd.isna(max_idx):
-                        fastest_model = plot_df.loc[max_idx, 'model']
-                        fastest_fps = plot_df.loc[max_idx, 'fps']
+                        fastest_model = plot_df.loc[max_idx, "model"]
+                        fastest_fps = plot_df.loc[max_idx, "fps"]
 
                 # Criar estatísticas
                 stats = dbc.Card(
@@ -947,11 +918,13 @@ class DashboardGenerator:
                         dbc.CardBody(
                             [
                                 html.H4(f"Melhor modelo para {selected_metric}: {best_model}"),
-                                html.H4(f"Valor: {best_value:.4f}" if isinstance(best_value, (
-                                int, float)) else f"Valor: {best_value}"),
-                                html.H4(f"Modelo mais rápido: {fastest_model}"),
                                 html.H4(
-                                    f"FPS: {fastest_fps:.1f}" if isinstance(fastest_fps, (int, float)) else "FPS: N/A"),
+                                    f"Valor: {best_value:.4f}"
+                                    if isinstance(best_value, (int, float))
+                                    else f"Valor: {best_value}"
+                                ),
+                                html.H4(f"Modelo mais rápido: {fastest_model}"),
+                                html.H4(f"FPS: {fastest_fps:.1f}" if isinstance(fastest_fps, (int, float)) else "FPS: N/A"),
                             ]
                         ),
                     ]
@@ -961,7 +934,7 @@ class DashboardGenerator:
                 stats = dbc.Card(
                     [
                         dbc.CardHeader("Estatísticas Comparativas"),
-                        dbc.CardBody([html.H4(f"Erro ao calcular estatísticas: {str(e)}")])
+                        dbc.CardBody([html.H4(f"Erro ao calcular estatísticas: {str(e)}")]),
                     ]
                 )
 
@@ -989,12 +962,7 @@ class DashboardGenerator:
                             table_df[col] = table_df[col].round(4)
 
                     table = dbc.Table.from_dataframe(
-                        table_df,
-                        striped=True,
-                        bordered=True,
-                        hover=True,
-                        responsive=True,
-                        className="mt-3"
+                        table_df, striped=True, bordered=True, hover=True, responsive=True, className="mt-3"
                     )
                 else:
                     table = html.Div("Não há dados para exibir na tabela")
@@ -1017,17 +985,18 @@ class DashboardGenerator:
         try:
             threading.Timer(1, open_browser_tab).start()
             # Verificamos qual método existe na versão atual do Dash
-            if hasattr(app, 'run') and callable(app.run):
+            if hasattr(app, "run") and callable(app.run):
                 # Nova API do Dash
-                app.run(debug=False, port=port, host="0.0.0.0")
+                app.run(debug=False, port=port, host="127.0.0.1")
             else:
                 # API legada do Dash
-                app.run_server(debug=False, port=port, host="0.0.0.0")
+                app.run_server(debug=False, port=port, host="127.0.0.1")
             return port
         except Exception as e:
             logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
             logger.info(
-                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components")
+                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components"
+            )
             return 0
 
     def create_metrics_dashboard(self, metrics_file: str = None, port: int = 8051, open_browser: bool = True) -> int:
@@ -1082,14 +1051,13 @@ class DashboardGenerator:
                                             [
                                                 html.H4("Métricas de Avaliação de Modelo"),
                                                 html.P(
-                                                    "Este dashboard apresenta uma visualização das métricas de avaliação do modelo."),
+                                                    "Este dashboard apresenta uma visualização das métricas de avaliação do modelo."
+                                                ),
                                                 html.Hr(),
                                                 html.H5("Modelo:"),
-                                                html.P(
-                                                    metrics_data.get("model_info", {}).get("name", "Não especificado")),
+                                                html.P(metrics_data.get("model_info", {}).get("name", "Não especificado")),
                                                 html.H5("Data da Avaliação:"),
-                                                html.P(
-                                                    metrics_data.get("model_info", {}).get("date", "Não especificada")),
+                                                html.P(metrics_data.get("model_info", {}).get("date", "Não especificada")),
                                             ]
                                         ),
                                     ],
@@ -1103,8 +1071,9 @@ class DashboardGenerator:
                                                 html.Div(
                                                     [
                                                         html.H5(f"{metric}:"),
-                                                        html.P(f"{value:.4f}" if isinstance(value, (
-                                                        int, float)) else f"{value}")
+                                                        html.P(
+                                                            f"{value:.4f}" if isinstance(value, (int, float)) else f"{value}"
+                                                        ),
                                                     ]
                                                 )
                                                 for metric, value in metrics_data.get("general_metrics", {}).items()
@@ -1153,22 +1122,24 @@ class DashboardGenerator:
                 Output("metrics-comparison", "figure"),
                 Output("class-metrics-table", "children"),
             ],
-            [Input("metrics-overview", "figure")]  # Gatilho de inicialização
+            [Input("metrics-overview", "figure")],  # Gatilho de inicialização
         )
         def update_metrics_figures(trigger):
+            import numpy as np
+            import pandas as pd
             import plotly.express as px
             import plotly.graph_objects as go
-            import pandas as pd
-            import numpy as np
 
             # Gráfico 1: Visão geral das métricas
             try:
                 # Converter métricas gerais para DataFrame
-                general_df = pd.DataFrame([
-                    {"Métrica": metric, "Valor": value}
-                    for metric, value in metrics_data.get("general_metrics", {}).items()
-                    if isinstance(value, (int, float))  # Filtrar apenas valores numéricos
-                ])
+                general_df = pd.DataFrame(
+                    [
+                        {"Métrica": metric, "Valor": value}
+                        for metric, value in metrics_data.get("general_metrics", {}).items()
+                        if isinstance(value, (int, float))  # Filtrar apenas valores numéricos
+                    ]
+                )
 
                 if not general_df.empty:
                     fig1 = px.bar(
@@ -1185,24 +1156,17 @@ class DashboardGenerator:
 
                     # Adicionar valores nas barras
                     for i, row in enumerate(general_df.itertuples()):
-                        fig1.add_annotation(
-                            x=row.Métrica,
-                            y=row.Valor,
-                            text=f"{row.Valor:.4f}",
-                            showarrow=False,
-                            yshift=10
-                        )
+                        fig1.add_annotation(x=row.Métrica, y=row.Valor, text=f"{row.Valor:.4f}", showarrow=False, yshift=10)
                 else:
                     fig1 = go.Figure()
                     fig1.update_layout(
                         title="Métricas Gerais",
-                        annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}]
+                        annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}],
                     )
             except Exception as e:
                 fig1 = go.Figure()
                 fig1.update_layout(
-                    title="Erro ao gerar visão geral das métricas",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar visão geral das métricas", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Gráfico 2: Métricas por classe
@@ -1227,11 +1191,7 @@ class DashboardGenerator:
                         for metric in metric_cols:
                             value = class_data.get(metric)
                             if isinstance(value, (int, float)):
-                                rows.append({
-                                    "Classe": class_name,
-                                    "Métrica": metric,
-                                    "Valor": value
-                                })
+                                rows.append({"Classe": class_name, "Métrica": metric, "Valor": value})
 
                     class_df = pd.DataFrame(rows)
 
@@ -1252,19 +1212,18 @@ class DashboardGenerator:
                         fig2 = go.Figure()
                         fig2.update_layout(
                             title="Métricas por Classe",
-                            annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}]
+                            annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}],
                         )
                 else:
                     fig2 = go.Figure()
                     fig2.update_layout(
                         title="Métricas por Classe",
-                        annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}]
+                        annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}],
                     )
             except Exception as e:
                 fig2 = go.Figure()
                 fig2.update_layout(
-                    title="Erro ao gerar métricas por classe",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar métricas por classe", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Gráfico 3: Comparação do modelo com referências (opcional)
@@ -1274,12 +1233,14 @@ class DashboardGenerator:
 
                 if comparison_data:
                     # Converter para DataFrame
-                    comparison_df = pd.DataFrame([
-                        {"Modelo": modelo, "Métrica": metrica, "Valor": valor}
-                        for modelo, metricas in comparison_data.items()
-                        for metrica, valor in metricas.items()
-                        if isinstance(valor, (int, float))
-                    ])
+                    comparison_df = pd.DataFrame(
+                        [
+                            {"Modelo": modelo, "Métrica": metrica, "Valor": valor}
+                            for modelo, metricas in comparison_data.items()
+                            for metrica, valor in metricas.items()
+                            if isinstance(valor, (int, float))
+                        ]
+                    )
 
                     if not comparison_df.empty:
                         fig3 = px.line(
@@ -1294,8 +1255,9 @@ class DashboardGenerator:
                         fig3 = go.Figure()
                         fig3.update_layout(
                             title="Comparação com Outros Modelos",
-                            annotations=[{"text": "Dados de comparação não disponíveis", "showarrow": False,
-                                          "font": {"size": 16}}]
+                            annotations=[
+                                {"text": "Dados de comparação não disponíveis", "showarrow": False, "font": {"size": 16}}
+                            ],
                         )
                 else:
                     # Tentar criar um gráfico de radar com as métricas gerais
@@ -1309,39 +1271,35 @@ class DashboardGenerator:
                             # Criar gráfico de radar
                             fig3 = go.Figure()
 
-                            fig3.add_trace(go.Scatterpolar(
-                                r=list(metrics_values.values()),
-                                theta=list(metrics_values.keys()),
-                                fill='toself',
-                                name='Métricas'
-                            ))
+                            fig3.add_trace(
+                                go.Scatterpolar(
+                                    r=list(metrics_values.values()),
+                                    theta=list(metrics_values.keys()),
+                                    fill="toself",
+                                    name="Métricas",
+                                )
+                            )
 
                             fig3.update_layout(
-                                polar=dict(
-                                    radialaxis=dict(
-                                        visible=True,
-                                        range=[0, max(metrics_values.values()) * 1.1]
-                                    )),
-                                title="Representação de Métricas em Radar"
+                                polar=dict(radialaxis=dict(visible=True, range=[0, max(metrics_values.values()) * 1.1])),
+                                title="Representação de Métricas em Radar",
                             )
                         else:
                             fig3 = go.Figure()
                             fig3.update_layout(
                                 title="Comparação de Métricas",
-                                annotations=[
-                                    {"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}]
+                                annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}],
                             )
                     else:
                         fig3 = go.Figure()
                         fig3.update_layout(
                             title="Comparação de Métricas",
-                            annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}]
+                            annotations=[{"text": "Dados não disponíveis", "showarrow": False, "font": {"size": 16}}],
                         )
             except Exception as e:
                 fig3 = go.Figure()
                 fig3.update_layout(
-                    title="Erro ao gerar comparação de métricas",
-                    annotations=[{"text": str(e), "showarrow": False}]
+                    title="Erro ao gerar comparação de métricas", annotations=[{"text": str(e), "showarrow": False}]
                 )
 
             # Tabela de métricas por classe
@@ -1378,8 +1336,8 @@ class DashboardGenerator:
                     # Verificar se estamos em ambiente WSL
                     is_wsl = False
                     try:
-                        with open('/proc/version', 'r') as f:
-                            if 'microsoft' in f.read().lower():
+                        with open("/proc/version", "r") as f:
+                            if "microsoft" in f.read().lower():
                                 is_wsl = True
                     except:
                         pass
@@ -1387,11 +1345,16 @@ class DashboardGenerator:
                     if is_wsl:
                         # Em WSL, tentar abrir no Windows
                         import subprocess
-                        subprocess.run(['powershell.exe', 'start', f'http://localhost:{port}'],
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                        subprocess.run(
+                            ["powershell.exe", "start", f"http://localhost:{port}"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                        )
                     else:
                         # Em outros ambientes, usar webbrowser
                         import webbrowser
+
                         webbrowser.open_new_tab(f"http://localhost:{port}")
                 except Exception as e:
                     logger.warning(f"Não foi possível abrir o navegador automaticamente: {str(e)}")
@@ -1401,17 +1364,18 @@ class DashboardGenerator:
         try:
             threading.Timer(1, open_browser_tab).start()
             # Verificamos qual método existe na versão atual do Dash
-            if hasattr(app, 'run') and callable(app.run):
+            if hasattr(app, "run") and callable(app.run):
                 # Nova API do Dash
-                app.run(debug=False, port=port, host="0.0.0.0")
+                app.run(debug=False, port=port, host="127.0.0.1")
             else:
                 # API legada do Dash
-                app.run_server(debug=False, port=port, host="0.0.0.0")
+                app.run_server(debug=False, port=port, host="127.0.0.1")
             return port
         except Exception as e:
             logger.error(f"Erro ao iniciar o dashboard: {str(e)}")
             logger.info(
-                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components")
+                "Para visualizar dashboards, instale dash e dash-bootstrap-components: pip install dash dash-bootstrap-components"
+            )
             return 0
 
     def _load_metrics_data(self, metrics_file: str = None) -> Dict:
@@ -1424,14 +1388,14 @@ class DashboardGenerator:
         Returns:
             Dicionário com dados de métricas formatados para o dashboard
         """
-        import os
         import glob
         import json
+        import os
 
         # Se um arquivo específico foi fornecido, tentar carregá-lo
         if metrics_file and os.path.exists(metrics_file):
             try:
-                with open(metrics_file, 'r') as f:
+                with open(metrics_file, "r") as f:
                     data = json.load(f)
 
                     # Verificar se é um arquivo de métricas
@@ -1446,8 +1410,7 @@ class DashboardGenerator:
             json_files = glob.glob(os.path.join(self.output_dir, "*.json"))
 
             # Filtrar por nomes sugestivos
-            metrics_files = [f for f in json_files if
-                             any(term in f.lower() for term in ['metric', 'avaliacao', 'relatorio'])]
+            metrics_files = [f for f in json_files if any(term in f.lower() for term in ["metric", "avaliacao", "relatorio"])]
 
             # Se não encontrou nomes específicos, usar todos os JSONs
             if not metrics_files:
@@ -1456,7 +1419,7 @@ class DashboardGenerator:
             # Tentar carregar cada arquivo
             for json_file in metrics_files:
                 try:
-                    with open(json_file, 'r') as f:
+                    with open(json_file, "r") as f:
                         data = json.load(f)
 
                         # Verificar se parece um arquivo de métricas
@@ -1469,29 +1432,12 @@ class DashboardGenerator:
         # Se não encontrou nada, criar dados de exemplo
         logger.warning("Criando dados de métricas de exemplo")
         return {
-            "model_info": {
-                "name": "Exemplo",
-                "date": "2025-03-18"
-            },
-            "general_metrics": {
-                "Precisão (mAP50)": 0.75,
-                "Recall": 0.80,
-                "F1-Score": 0.77
-            },
+            "model_info": {"name": "Exemplo", "date": "2025-03-18"},
+            "general_metrics": {"Precisão (mAP50)": 0.75, "Recall": 0.80, "F1-Score": 0.77},
             "class_metrics": [
-                {
-                    "Classe": "Classe 0",
-                    "Precisão": 0.82,
-                    "Recall": 0.78,
-                    "F1-Score": 0.80
-                },
-                {
-                    "Classe": "Classe 1",
-                    "Precisão": 0.76,
-                    "Recall": 0.81,
-                    "F1-Score": 0.78
-                }
-            ]
+                {"Classe": "Classe 0", "Precisão": 0.82, "Recall": 0.78, "F1-Score": 0.80},
+                {"Classe": "Classe 1", "Precisão": 0.76, "Recall": 0.81, "F1-Score": 0.78},
+            ],
         }
 
     def _format_metrics_data(self, data: Dict) -> Dict:
@@ -1505,18 +1451,14 @@ class DashboardGenerator:
             Dados formatados para o dashboard
         """
         # Estrutura para armazenar dados formatados
-        formatted_data = {
-            "model_info": {},
-            "general_metrics": {},
-            "class_metrics": []
-        }
+        formatted_data = {"model_info": {}, "general_metrics": {}, "class_metrics": []}
 
         # Extrair informações do modelo
         if "modelo" in data:
             modelo_info = data["modelo"]
             formatted_data["model_info"] = {
                 "name": modelo_info.get("nome", modelo_info.get("path", "Não especificado")),
-                "date": modelo_info.get("data_avaliacao", "Não especificada")
+                "date": modelo_info.get("data_avaliacao", "Não especificada"),
             }
 
         # Métricas gerais

@@ -332,11 +332,11 @@ class ModelEvaluator:
                 results = model.val(data=data_yaml)
 
                 # Verificar se podemos acessar a matriz de confusão dos resultados
-                if hasattr(results, 'confusion_matrix'):
+                if hasattr(results, "confusion_matrix"):
                     cm = results.confusion_matrix
                     plt.figure(figsize=(10, 8))
-                    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
-                    plt.title('Matriz de Confusão')
+                    plt.imshow(cm, interpolation="nearest", cmap=plt.cm.Blues)
+                    plt.title("Matriz de Confusão")
                     plt.colorbar()
 
                     # Adicionar rótulos
@@ -345,8 +345,8 @@ class ModelEvaluator:
                     plt.xticks(tick_marks, classes, rotation=45)
                     plt.yticks(tick_marks, classes)
 
-                    plt.ylabel('Real')
-                    plt.xlabel('Previsto')
+                    plt.ylabel("Real")
+                    plt.xlabel("Previsto")
                     plt.tight_layout()
                     plt.savefig(conf_matrix_path)
                     plt.close()
@@ -379,7 +379,7 @@ class ModelEvaluator:
             targets = []
 
             # Tentar diferentes maneiras de obter os dados necessários
-            if hasattr(results, 'pred') and hasattr(results, 'gt'):
+            if hasattr(results, "pred") and hasattr(results, "gt"):
                 for pred, gt in zip(results.pred, results.gt):
                     if len(pred) > 0 and len(gt) > 0:
                         preds.extend(pred[:, -1].int().tolist())  # Supondo que a classe está na última coluna
@@ -387,30 +387,30 @@ class ModelEvaluator:
 
             # Se conseguimos dados suficientes, criar uma matriz de confusão básica
             if preds and targets:
-                from sklearn.metrics import confusion_matrix
                 import numpy as np
+                from sklearn.metrics import confusion_matrix
 
                 # Criar matriz
                 cm = confusion_matrix(targets, preds)
 
                 # Normalizar
-                cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+                cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
 
                 # Plotar
                 plt.figure(figsize=(10, 8))
-                plt.imshow(cm_normalized, interpolation='nearest', cmap=plt.cm.Blues)
-                plt.title('Matriz de Confusão Normalizada (Calculada Manualmente)')
+                plt.imshow(cm_normalized, interpolation="nearest", cmap=plt.cm.Blues)
+                plt.title("Matriz de Confusão Normalizada (Calculada Manualmente)")
                 plt.colorbar()
 
                 # Adicionar rótulos se possível
-                if hasattr(results, 'names'):
+                if hasattr(results, "names"):
                     classes = list(results.names.values())
                     tick_marks = np.arange(len(classes))
                     plt.xticks(tick_marks, classes, rotation=45)
                     plt.yticks(tick_marks, classes)
 
-                plt.ylabel('Real')
-                plt.xlabel('Previsto')
+                plt.ylabel("Real")
+                plt.xlabel("Previsto")
                 plt.tight_layout()
                 plt.savefig(save_path)
                 plt.close()

@@ -8,7 +8,7 @@ import logging
 import os
 import time
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import filedialog, messagebox
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from microdetect.annotation.annotator.annotation import AnnotationStorage, AnnotationVisualizer, BoundingBoxManager
@@ -131,11 +131,7 @@ class ImageAnnotator:
 
         model_path = filedialog.askopenfilename(
             title="Selecionar Modelo YOLO",
-            filetypes=[
-                ("YOLO Models", "*.pt;*.pth"),
-                ("PyTorch Models", "*.pt"),
-                ("All Files", "*.*")
-            ]
+            filetypes=[("YOLO Models", "*.pt;*.pth"), ("PyTorch Models", "*.pt"), ("All Files", "*.*")],
         )
 
         if model_path:
@@ -148,9 +144,7 @@ class ImageAnnotator:
                 if hasattr(self, "main_window"):
                     button_manager = self.main_window.get_button_manager()
                     button_manager.update_button_state(
-                        "yolo_model",
-                        text=f"Modelo: {os.path.basename(model_path)[:10]}...",
-                        bg="lightgreen"
+                        "yolo_model", text=f"Modelo: {os.path.basename(model_path)[:10]}...", bg="lightgreen"
                     )
             else:
                 self.update_status("Falha ao carregar o modelo YOLO")
@@ -173,9 +167,7 @@ class ImageAnnotator:
         if hasattr(self, "main_window"):
             button_manager = self.main_window.get_button_manager()
             button_manager.update_button_state(
-                "cv_fallback",
-                text=f"VC Fallback: {'ON' if enabled else 'OFF'}",
-                bg="lightgreen" if enabled else "#f0f0f0"
+                "cv_fallback", text=f"VC Fallback: {'ON' if enabled else 'OFF'}", bg="lightgreen" if enabled else "#f0f0f0"
             )
 
     def _create_callbacks(self) -> Dict[str, Callable]:
@@ -872,9 +864,7 @@ class ImageAnnotator:
                 try:
                     # Gerar sugestões usando o modelo ou visão computacional
                     confidence = 0.3  # Valor inicial para confiança
-                    self.suggested_boxes = self.suggestion_generator.generate_suggestions(
-                        self.current_image_path, confidence
-                    )
+                    self.suggested_boxes = self.suggestion_generator.generate_suggestions(self.current_image_path, confidence)
 
                     # Mostrar as sugestões na interface
                     if hasattr(self, "canvas"):

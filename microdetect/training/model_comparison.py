@@ -32,7 +32,7 @@ class ModelComparator:
         self.evaluator = ModelEvaluator(self.output_dir)
 
     def compare_models(
-            self, model_paths: List[str], data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
+        self, model_paths: List[str], data_yaml: str, conf_threshold: float = 0.25, iou_threshold: float = 0.7
     ) -> Dict[str, Any]:
         """
         Compara vários modelos usando o mesmo dataset e configurações.
@@ -108,7 +108,7 @@ class ModelComparator:
                         "fps": 0,
                         "latencia_ms": 0,
                     },
-                    "error": str(e)
+                    "error": str(e),
                 }
 
         # Gerar visualizações - apenas se houver resultados válidos
@@ -152,7 +152,7 @@ class ModelComparator:
             try:
                 # Extrair a taxa de aprendizado do nome do modelo
                 # Exemplo: b8_lr0.01.pt -> lr=0.01
-                lr_match = re.search(r'lr([0-9.]+)', model_name)
+                lr_match = re.search(r"lr([0-9.]+)", model_name)
                 if lr_match:
                     lr_value = lr_match.group(1)
                     return f"LR {lr_value}"
@@ -162,14 +162,14 @@ class ModelComparator:
         # Para qualquer outro tipo de modelo, tente extrair alguma informação útil
         try:
             # Se o modelo tem o formato batch{N}_outras_infos.pt
-            batch_match = re.search(r'b(atch)?[_-]?(\d+)', model_name)
+            batch_match = re.search(r"b(atch)?[_-]?(\d+)", model_name)
             if batch_match:
                 batch_value = batch_match.group(2)
                 return f"Batch {batch_value}"
 
             # Se não conseguimos extrair informação específica,
             # use os primeiros caracteres do nome (sem a extensão)
-            return model_name.split('.')[0][:10]
+            return model_name.split(".")[0][:10]
         except:
             # Como último recurso
             return "custom"

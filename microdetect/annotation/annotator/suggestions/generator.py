@@ -6,7 +6,7 @@ e métodos de visão computacional.
 import logging
 import os
 import random
-from typing import List, Optional, Tuple, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -131,7 +131,7 @@ class SuggestionGenerator:
         for keyword, class_id in [
             (("levedura", "yeast"), "0"),
             (("fungo", "fungus", "fungi"), "1"),
-            (("alga", "microalga"), "2")
+            (("alga", "microalga"), "2"),
         ]:
             if any(k in yolo_class_lower for k in keyword):
                 return class_id
@@ -159,8 +159,10 @@ class SuggestionGenerator:
             is_dark_image = img_mean < 100
             is_low_contrast = img_std < 30
 
-            logger.info(f"Características da imagem: média={img_mean:.1f}, std={img_std:.1f}, " +
-                       f"dimensões={w}x{h}, {'baixo contraste' if is_low_contrast else 'contraste normal'}")
+            logger.info(
+                f"Características da imagem: média={img_mean:.1f}, std={img_std:.1f}, "
+                + f"dimensões={w}x{h}, {'baixo contraste' if is_low_contrast else 'contraste normal'}"
+            )
 
             # Converter para escala de cinza
             img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
@@ -182,34 +184,31 @@ class SuggestionGenerator:
                     # Filtrar contornos com critérios mais sofisticados
                     valid_contours = self._filter_contours(contours, img_rgb)
 
-                    segmentation_results.append({
-                        'method': f"{prep_name}_{seg_name}",
-                        'contours': valid_contours
-                    })
+                    segmentation_results.append({"method": f"{prep_name}_{seg_name}", "contours": valid_contours})
 
                     logger.debug(f"Método {prep_name}_{seg_name}: {len(valid_contours)} contornos válidos")
 
             # 2. Detecção específica para diferentes tipos de microorganismos
 
             # 2.1 Detecção de leveduras (formas circulares/ovais)
-            yeast_candidates = self._detect_yeasts(img_gray, preprocessed_imgs['enhanced'])
+            yeast_candidates = self._detect_yeasts(img_gray, preprocessed_imgs["enhanced"])
 
             # 2.2 Detecção de fungos (estruturas filamentosas)
-            fungi_candidates = self._detect_fungi(img_gray, preprocessed_imgs['enhanced'])
+            fungi_candidates = self._detect_fungi(img_gray, preprocessed_imgs["enhanced"])
 
             # 2.3 Detecção de microalgas
-            algae_candidates = self._detect_algae(img_rgb, preprocessed_imgs['enhanced'])
+            algae_candidates = self._detect_algae(img_rgb, preprocessed_imgs["enhanced"])
 
             # 3. Combinar e filtrar resultados para reduzir duplicatas
             all_boxes = []
 
             # Adicionar caixas de segmentação geral
             for result in segmentation_results:
-                for contour in result['contours']:
+                for contour in result["contours"]:
                     x, y, box_w, box_h = cv2.boundingRect(contour)
 
                     # Extrair região de interesse para classificação
-                    roi = img_rgb[y:y+box_h, x:x+box_w]
+                    roi = img_rgb[y : y + box_h, x : x + box_w]
 
                     # Ignorar ROIs muito pequenas para análise
                     if roi.size <= 0 or box_w < 5 or box_h < 5:
@@ -220,48 +219,56 @@ class SuggestionGenerator:
 
                     # Adicionar apenas se a confiança for razoável
                     if confidence > 0.4:
-                        all_boxes.append({
-                            'coords': (int(x), int(y), int(x + box_w), int(y + box_h)),
-                            'class_id': class_id,
-                            'confidence': confidence,
-                            'size': box_w * box_h
-                        })
+                        all_boxes.append(
+                            {
+                                "coords": (int(x), int(y), int(x + box_w), int(y + box_h)),
+                                "class_id": class_id,
+                                "confidence": confidence,
+                                "size": box_w * box_h,
+                            }
+                        )
 
             # Adicionar detecções específicas de cada tipo
             for coords, conf in yeast_candidates:
                 x1, y1, x2, y2 = coords
-                all_boxes.append({
-                    'coords': (int(x1), int(y1), int(x2), int(y2)),
-                    'class_id': "0",  # Levedura
-                    'confidence': conf,
-                    'size': (x2 - x1) * (y2 - y1)
-                })
+                all_boxes.append(
+                    {
+                        "coords": (int(x1), int(y1), int(x2), int(y2)),
+                        "class_id": "0",  # Levedura
+                        "confidence": conf,
+                        "size": (x2 - x1) * (y2 - y1),
+                    }
+                )
 
             for coords, conf in fungi_candidates:
                 x1, y1, x2, y2 = coords
-                all_boxes.append({
-                    'coords': (int(x1), int(y1), int(x2), int(y2)),
-                    'class_id': "1",  # Fungo
-                    'confidence': conf,
-                    'size': (x2 - x1) * (y2 - y1)
-                })
+                all_boxes.append(
+                    {
+                        "coords": (int(x1), int(y1), int(x2), int(y2)),
+                        "class_id": "1",  # Fungo
+                        "confidence": conf,
+                        "size": (x2 - x1) * (y2 - y1),
+                    }
+                )
 
             for coords, conf in algae_candidates:
                 x1, y1, x2, y2 = coords
-                all_boxes.append({
-                    'coords': (int(x1), int(y1), int(x2), int(y2)),
-                    'class_id': "2",  # Microalga
-                    'confidence': conf,
-                    'size': (x2 - x1) * (y2 - y1)
-                })
+                all_boxes.append(
+                    {
+                        "coords": (int(x1), int(y1), int(x2), int(y2)),
+                        "class_id": "2",  # Microalga
+                        "confidence": conf,
+                        "size": (x2 - x1) * (y2 - y1),
+                    }
+                )
 
             # Remover duplicatas usando Non-Maximum Suppression (NMS)
             final_boxes = self._apply_nms(all_boxes)
 
             # Converter para o formato final
             for box in final_boxes:
-                x1, y1, x2, y2 = box['coords']
-                class_id = box['class_id']
+                x1, y1, x2, y2 = box["coords"]
+                class_id = box["class_id"]
                 suggested_boxes.append((class_id, x1, y1, x2, y2))
 
             logger.info(f"Detectados {len(suggested_boxes)} objetos após processamento e filtragem")
@@ -294,18 +301,18 @@ class SuggestionGenerator:
 
         # Versão normalizada - útil para imagens com problemas de iluminação
         normalized = cv2.normalize(img_gray, None, 0, 255, cv2.NORM_MINMAX)
-        results['normalized'] = normalized
+        results["normalized"] = normalized
 
         # Aplicar desfoque para redução de ruído
         # Use bilateral filter para preservar bordas
         blur = cv2.bilateralFilter(img_gray, 9, 75, 75)
-        results['blur'] = blur
+        results["blur"] = blur
 
         # Aplicar CLAHE com parâmetros adaptados
         clip_limit = 3.0 if is_low_contrast else 2.0
         clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(8, 8))
         clahe_result = clahe.apply(blur)
-        results['clahe'] = clahe_result
+        results["clahe"] = clahe_result
 
         # Versão aprimorada combinando as técnicas
         enhanced = clahe_result.copy()
@@ -332,7 +339,7 @@ class SuggestionGenerator:
             edge_enhanced = cv2.addWeighted(enhanced, 0.7, magnitude, 0.3, 0)
             enhanced = edge_enhanced
 
-        results['enhanced'] = enhanced
+        results["enhanced"] = enhanced
 
         return results
 
@@ -349,15 +356,12 @@ class SuggestionGenerator:
         results = {}
 
         # 1. Limiarização adaptativa - boa para detecção de objetos locais
-        adaptive_thresh = cv2.adaptiveThreshold(
-            img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 11, 2
-        )
-        results['adaptive'] = adaptive_thresh
+        adaptive_thresh = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+        results["adaptive"] = adaptive_thresh
 
         # 2. Limiarização de Otsu - bom para separação bimodal (fundo vs objetos)
         _, otsu_thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        results['otsu'] = otsu_thresh
+        results["otsu"] = otsu_thresh
 
         # 3. Limiarização multi-level (K-Means) - útil para diferentes intensidades
         try:
@@ -378,7 +382,7 @@ class SuggestionGenerator:
             darkest_cluster = np.argmin(centers)
             kmeans_mask = (segmented == darkest_cluster).astype(np.uint8) * 255
 
-            results['kmeans'] = kmeans_mask
+            results["kmeans"] = kmeans_mask
         except Exception as e:
             logger.debug(f"K-means falhou: {e}")
 
@@ -412,7 +416,7 @@ class SuggestionGenerator:
             # Extrair objetos do watershed (valores > 1)
             watershed_mask = (markers > 1).astype(np.uint8) * 255
 
-            results['watershed'] = watershed_mask
+            results["watershed"] = watershed_mask
         except Exception as e:
             logger.debug(f"Watershed falhou: {e}")
 
@@ -449,7 +453,7 @@ class SuggestionGenerator:
 
             # Ignorar contornos muito pequenos ou muito grandes
             min_area = img_area * 0.0003  # 0.03% da imagem
-            max_area = img_area * 0.15    # 15% da imagem
+            max_area = img_area * 0.15  # 15% da imagem
 
             if area < min_area or area > max_area:
                 continue
@@ -508,7 +512,7 @@ class SuggestionGenerator:
             # Se o padded retângulo é válido
             if padded_w > 0 and padded_h > 0:
                 surrounding_mask = np.zeros((img_h, img_w), dtype=np.uint8)
-                surrounding_mask[padded_y:padded_y+padded_h, padded_x:padded_x+padded_w] = 255
+                surrounding_mask[padded_y : padded_y + padded_h, padded_x : padded_x + padded_w] = 255
                 surrounding_mask = cv2.subtract(surrounding_mask, mask)
 
                 if np.count_nonzero(surrounding_mask) > 0:
@@ -551,7 +555,7 @@ class SuggestionGenerator:
                 param1=50,
                 param2=25,  # Menos restritivo
                 minRadius=8,
-                maxRadius=100
+                maxRadius=100,
             )
 
             if circles is not None:
@@ -574,13 +578,7 @@ class SuggestionGenerator:
 
                     # Verificar forma através de máscara circular
                     mask = np.zeros(roi.shape, dtype=np.uint8)
-                    cv2.circle(
-                        mask,
-                        (radius, radius),
-                        radius,
-                        255,
-                        -1
-                    )
+                    cv2.circle(mask, (radius, radius), radius, 255, -1)
 
                     # Verificar simetria e homogeneidade - características de leveduras
                     masked_roi = cv2.bitwise_and(roi, roi, mask=mask)
@@ -600,10 +598,7 @@ class SuggestionGenerator:
                     # Confiança combinada
                     confidence = 0.4 + (0.3 * homogeneity_score) + (0.3 * size_score)
 
-                    detected.append((
-                        (int(roi_x1), int(roi_y1), int(roi_x2), int(roi_y2)),
-                        confidence
-                    ))
+                    detected.append(((int(roi_x1), int(roi_y1), int(roi_x2), int(roi_y2)), confidence))
 
             # 2. Detectar usando análise de blobs para formas ovais
             # Parâmetros para detector de blobs
@@ -651,10 +646,7 @@ class SuggestionGenerator:
                 confidence = 0.6 + (0.2 * (kp.response / 100)) + (0.2 * (kp.size / 100))
                 confidence = min(0.95, confidence)  # Limitar confiança máxima
 
-                detected.append((
-                    (int(roi_x1), int(roi_y1), int(roi_x2), int(roi_y2)),
-                    confidence
-                ))
+                detected.append(((int(roi_x1), int(roi_y1), int(roi_x2), int(roi_y2)), confidence))
 
             return detected
 
@@ -739,15 +731,11 @@ class SuggestionGenerator:
                 if is_filamentous:
                     confidence = 0.5 + (0.2 * elongation_score) + (0.2 * shape_score) + (0.1 * extent_score)
 
-                    detected.append((
-                        (int(x), int(y), int(x + box_w), int(y + box_h)),
-                        confidence
-                    ))
+                    detected.append(((int(x), int(y), int(x + box_w), int(y + box_h)), confidence))
 
             # 2. Detectar usando análise de esqueletos - método específico para estruturas filamentosas
             # Aplicar limiarização adaptativa para obter máscara binária
-            thresh = cv2.adaptiveThreshold(enhanced_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                         cv2.THRESH_BINARY_INV, 11, 2)
+            thresh = cv2.adaptiveThreshold(enhanced_img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
 
             # Aplicar operações morfológicas para limpar a máscara
             kernel = np.ones((3, 3), np.uint8)
@@ -785,16 +773,13 @@ class SuggestionGenerator:
 
                 if is_filamentous and area > 100:
                     # Calcular confiança baseada nas características
-                    elongation_score = min(1.0, max(aspect_ratio, 1.0/aspect_ratio) / 5.0)
+                    elongation_score = min(1.0, max(aspect_ratio, 1.0 / aspect_ratio) / 5.0)
                     thinness_score = 1.0 - min(1.0, extent)
                     size_score = min(1.0, area / 1000.0)
 
                     confidence = 0.4 + (0.3 * elongation_score) + (0.2 * thinness_score) + (0.1 * size_score)
 
-                    detected.append((
-                        (int(x), int(y), int(x + w), int(y + h)),
-                        confidence
-                    ))
+                    detected.append(((int(x), int(y), int(x + w), int(y + h)), confidence))
 
             return detected
 
@@ -822,7 +807,7 @@ class SuggestionGenerator:
             hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
 
             # Extrair canal de matiz (H)
-            h_channel = hsv[:,:,0]
+            h_channel = hsv[:, :, 0]
 
             # Definir máscaras para tons de verde (aproximadamente 60-170 no espaço HSV)
             lower_green = np.array([40, 10, 10])
@@ -848,8 +833,8 @@ class SuggestionGenerator:
                 x, y, box_w, box_h = cv2.boundingRect(cnt)
 
                 # Extrair região de interesse
-                roi = img_rgb[y:y+box_h, x:x+box_w]
-                hsv_roi = hsv[y:y+box_h, x:x+box_h]
+                roi = img_rgb[y : y + box_h, x : x + box_w]
+                hsv_roi = hsv[y : y + box_h, x : x + box_h]
 
                 if roi.size == 0:
                     continue
@@ -880,10 +865,7 @@ class SuggestionGenerator:
 
                 # Adicionar apenas se houver confiança razoável
                 if confidence > 0.3:
-                    detected.append((
-                        (int(x), int(y), int(x + box_w), int(y + box_h)),
-                        confidence
-                    ))
+                    detected.append(((int(x), int(y), int(x + box_w), int(y + box_h)), confidence))
 
             # 2. Segmentação baseada em textura - microalgas têm padrões texturais distintos
 
@@ -897,19 +879,27 @@ class SuggestionGenerator:
             # Implementação simplificada de LBP
             texture_features = np.zeros_like(gray)
 
-            for i in range(1, h-1):
-                for j in range(1, w-1):
+            for i in range(1, h - 1):
+                for j in range(1, w - 1):
                     center = gray[i, j]
                     code = 0
                     # Percorrer 8-vizinhança
-                    if gray[i-1, j-1] >= center: code += 1
-                    if gray[i-1, j] >= center: code += 2
-                    if gray[i-1, j+1] >= center: code += 4
-                    if gray[i, j+1] >= center: code += 8
-                    if gray[i+1, j+1] >= center: code += 16
-                    if gray[i+1, j] >= center: code += 32
-                    if gray[i+1, j-1] >= center: code += 64
-                    if gray[i, j-1] >= center: code += 128
+                    if gray[i - 1, j - 1] >= center:
+                        code += 1
+                    if gray[i - 1, j] >= center:
+                        code += 2
+                    if gray[i - 1, j + 1] >= center:
+                        code += 4
+                    if gray[i, j + 1] >= center:
+                        code += 8
+                    if gray[i + 1, j + 1] >= center:
+                        code += 16
+                    if gray[i + 1, j] >= center:
+                        code += 32
+                    if gray[i + 1, j - 1] >= center:
+                        code += 64
+                    if gray[i, j - 1] >= center:
+                        code += 128
 
                     texture_features[i, j] = code
 
@@ -944,7 +934,7 @@ class SuggestionGenerator:
                     x, y, box_w, box_h = cv2.boundingRect(cnt)
 
                     # Extrair região
-                    roi = img_rgb[y:y+box_h, x:x+box_w] if y+box_h <= h and x+box_w <= w else None
+                    roi = img_rgb[y : y + box_h, x : x + box_w] if y + box_h <= h and x + box_w <= w else None
 
                     if roi is None or roi.size == 0:
                         continue
@@ -981,10 +971,7 @@ class SuggestionGenerator:
 
                     # Adicionar apenas microalgas prováveis
                     if confidence > 0.4:
-                        detected.append((
-                            (int(x), int(y), int(x + box_w), int(y + box_h)),
-                            confidence
-                        ))
+                        detected.append(((int(x), int(y), int(x + box_w), int(y + box_h)), confidence))
 
             return detected
 
@@ -1006,7 +993,7 @@ class SuggestionGenerator:
             return []
 
         # Ordenar caixas por confiança (decrescente)
-        sorted_boxes = sorted(boxes, key=lambda x: x['confidence'], reverse=True)
+        sorted_boxes = sorted(boxes, key=lambda x: x["confidence"], reverse=True)
 
         # Lista para armazenar caixas finais após NMS
         keep_boxes = []
@@ -1021,13 +1008,13 @@ class SuggestionGenerator:
 
             for box in sorted_boxes:
                 # Se as classes forem diferentes, manter ambas
-                if box['class_id'] != current['class_id']:
+                if box["class_id"] != current["class_id"]:
                     remaining_boxes.append(box)
                     continue
 
                 # Calcular IoU
-                x1_a, y1_a, x2_a, y2_a = current['coords']
-                x1_b, y1_b, x2_b, y2_b = box['coords']
+                x1_a, y1_a, x2_a, y2_a = current["coords"]
+                x1_b, y1_b, x2_b, y2_b = box["coords"]
 
                 # Calcular área de interseção
                 x_left = max(x1_a, x1_b)
@@ -1130,7 +1117,7 @@ class SuggestionGenerator:
                     dominant_channel,
                     mean_hsv[0],  # Hue (matiz)
                     mean_hsv[1],  # Saturation (saturação)
-                    mean_hsv[2]   # Value (valor)
+                    mean_hsv[2],  # Value (valor)
                 ]
 
             # 4. Combinar características para classificação
@@ -1189,8 +1176,8 @@ class SuggestionGenerator:
             # 5. Decidir a classe final
             scores = {
                 "0": levedura_score,  # Levedura
-                "1": fungo_score,     # Fungo
-                "2": alga_score,      # Microalga
+                "1": fungo_score,  # Fungo
+                "2": alga_score,  # Microalga
             }
 
             # Encontrar a classe com maior pontuação
@@ -1248,7 +1235,7 @@ class SuggestionGenerator:
 
             # Filtrar componentes por tamanho
             min_area = w * h * 0.0002  # 0.02% da imagem
-            max_area = w * h * 0.2     # 20% da imagem
+            max_area = w * h * 0.2  # 20% da imagem
 
             # Mapa para associar classes com regiões detectadas
             class_map = {}
@@ -1267,16 +1254,14 @@ class SuggestionGenerator:
 
                     # Extrair região para classificação
                     component_mask = (labels == i).astype(np.uint8)
-                    roi = img_rgb[y:y+height, x:x+width]
+                    roi = img_rgb[y : y + height, x : x + width]
 
                     if roi.size == 0:
                         continue
 
                     # Encontrar contorno preciso para esta região
                     component_contours, _ = cv2.findContours(
-                        component_mask[y:y+height, x:x+width],
-                        cv2.RETR_EXTERNAL,
-                        cv2.CHAIN_APPROX_SIMPLE
+                        component_mask[y : y + height, x : x + width], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
                     )
 
                     if not component_contours:

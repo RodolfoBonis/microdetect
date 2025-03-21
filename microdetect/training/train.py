@@ -8,7 +8,7 @@ import os
 import shutil
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import torch
@@ -22,16 +22,16 @@ logger = logging.getLogger(__name__)
 def extract_map_from_results(results):
     """Extrai o valor mAP dos resultados do modelo, lidando com diferentes formatos."""
     try:
-        if hasattr(results, 'maps') and hasattr(results.maps, 'mean'):
+        if hasattr(results, "maps") and hasattr(results.maps, "mean"):
             return float(results.maps.mean())
         elif isinstance(results, dict):
-            if 'metrics/mAP50(B)' in results:
-                return float(results['metrics/mAP50(B)'])
-            elif 'maps' in results:
-                if hasattr(results['maps'], 'mean'):
-                    return float(results['maps'].mean())
-                elif isinstance(results['maps'], (list, np.ndarray)):
-                    return float(np.mean(results['maps']))
+            if "metrics/mAP50(B)" in results:
+                return float(results["metrics/mAP50(B)"])
+            elif "maps" in results:
+                if hasattr(results["maps"], "mean"):
+                    return float(results["maps"].mean())
+                elif isinstance(results["maps"], (list, np.ndarray)):
+                    return float(np.mean(results["maps"]))
         return 0.0
     except Exception as e:
         logger.error(f"Erro ao extrair mAP: {str(e)}")
@@ -82,6 +82,9 @@ class YOLOTrainer:
             Resultados do treinamento
         """
         # Selecionar modelo com base no tamanho
+        if not os.path.exists(data_yaml) or ".." in data_yaml:
+            raise ValueError(f"Invalid data_yaml path: {data_yaml}")
+
         model_name = f"yolov8{self.model_size}.pt" if self.pretrained else f"yolov8{self.model_size}.yaml"
 
         # Inicializar modelo
@@ -206,11 +209,7 @@ class YOLOTrainer:
             raise
 
     def find_best_hyperparameters(
-            self,
-            data_yaml: str,
-            checkpoint_dir: str = None,
-            resume: bool = False,
-            search_space: Dict[str, List] = None
+        self, data_yaml: str, checkpoint_dir: str = None, resume: bool = False, search_space: Dict[str, List] = None
     ) -> Dict[str, Any]:
         """
         Realiza uma busca por hiperparâmetros para múltiplos modelos YOLO de diferentes tamanhos,
@@ -265,6 +264,7 @@ class YOLOTrainer:
             try:
                 with open(checkpoint_file, "r") as f:
                     import json
+
                     checkpoint_data = json.load(f)
 
                 best_result = checkpoint_data.get("best_result")
@@ -303,18 +303,22 @@ class YOLOTrainer:
 
                     config_key = f"batch_{model_size}_{batch_size}_{lr}"
                     # Create a set of tested config keys for faster lookup
-                    tested_config_keys = {c.get("config_key") for c in tested_configs
-                                          if isinstance(c, dict) and "config_key" in c}
+                    tested_config_keys = {
+                        c.get("config_key") for c in tested_configs if isinstance(c, dict) and "config_key" in c
+                    }
 
                     # Check if this config has been tested
                     if config_key in tested_config_keys:
-                        logger.info(f"Pulando configuração já testada [{len(tested_configs)}/{total_configs}]: "
-                                    f"batch_size={batch_size}, lr={lr} para YOLOv8{model_size}")
+                        logger.info(
+                            f"Pulando configuração já testada [{len(tested_configs)}/{total_configs}]: "
+                            f"batch_size={batch_size}, lr={lr} para YOLOv8{model_size}"
+                        )
                         continue
 
                     run_name = f"hp_yeast_{model_size}_{batch_size}_{lr}"
                     logger.info(
-                        f"Testando configuração [{current_config}/{total_configs}]: batch_size={batch_size}, lr={lr} para YOLOv8{model_size}")
+                        f"Testando configuração [{current_config}/{total_configs}]: batch_size={batch_size}, lr={lr} para YOLOv8{model_size}"
+                    )
 
                     try:
                         # Limpar manualmente a memória da GPU e CPU antes de cada teste
@@ -358,13 +362,15 @@ class YOLOTrainer:
                                     "learning_rate": lr,
                                     "model_size": model_size,
                                     "map": float(current_map),
-                                    "timestamp": datetime.now().isoformat()
+                                    "timestamp": datetime.now().isoformat(),
                                 }
 
                                 tested_configs.append(config_result)
 
                                 if best_result is None or current_map > best_result:
-                                    logger.info(f"Nova melhor configuração encontrada para YOLO8{model_size}! mAP={current_map:.4f}")
+                                    logger.info(
+                                        f"Nova melhor configuração encontrada para YOLO8{model_size}! mAP={current_map:.4f}"
+                                    )
                                     best_result = float(current_map)
                                     best_config = {
                                         "model_size": model_size,
@@ -373,8 +379,7 @@ class YOLOTrainer:
                                         "map": float(current_map),
                                     }
                                 else:
-                                    logger.info(
-                                        f"Resultado: mAP={current_map:.4f} (melhor até agora: {best_result:.4f})")
+                                    logger.info(f"Resultado: mAP={current_map:.4f} (melhor até agora: {best_result:.4f})")
 
                                 checkpoint_data = {
                                     "best_result": best_result,
@@ -385,12 +390,13 @@ class YOLOTrainer:
                                         "total_configs": total_configs,
                                         "tested_configs": len(tested_configs),
                                         "remaining_configs": total_configs - len(tested_configs),
-                                        "percent_complete": round(len(tested_configs) / total_configs * 100, 2)
-                                    }
+                                        "percent_complete": round(len(tested_configs) / total_configs * 100, 2),
+                                    },
                                 }
 
                                 with open(checkpoint_file_tmp, "w") as f:
                                     import json
+
                                     json.dump(checkpoint_data, f, indent=4)
 
                                 # Mover arquivo temporário para o final (operação atômica)
@@ -399,8 +405,7 @@ class YOLOTrainer:
                                 logger.info(f"Checkpoint salvo: {checkpoint_file}")
                             else:
                                 # Se não conseguimos encontrar o mAP nos resultados
-                                logger.warning(
-                                    f"Não foi possível extrair o mAP dos resultados. Estrutura: {type(results)}")
+                                logger.warning(f"Não foi possível extrair o mAP dos resultados. Estrutura: {type(results)}")
                                 # Tentar imprimir informações sobre a estrutura para diagnóstico
                                 if isinstance(results, dict):
                                     logger.debug(f"Chaves disponíveis: {list(results.keys())}")
@@ -423,15 +428,13 @@ class YOLOTrainer:
                             "best_config": best_config,
                             "tested_configs": tested_configs,
                             "timestamp": datetime.now().isoformat(),
-                            "last_error": {
-                                "config": f"batch{batch_size}_lr{lr}",
-                                "message": str(e)
-                            }
+                            "last_error": {"config": f"batch{batch_size}_lr{lr}", "message": str(e)},
                         }
 
                         # Primeiro escrever em arquivo temporário, depois mover
                         with open(checkpoint_file_tmp, "w") as f:
                             import json
+
                             json.dump(checkpoint_data, f, indent=4)
 
                         # Mover arquivo temporário para o final (operação atômica)
@@ -458,6 +461,7 @@ class YOLOTrainer:
 
         # Salvar resultados em um arquivo para referência futura
         import json
+
         results_path = os.path.join(self.output_dir, "hyperparameter_search_results.json")
         with open(results_path, "w", encoding="utf-8") as f:
             json.dump(tested_configs, f, indent=4)
@@ -466,7 +470,8 @@ class YOLOTrainer:
         if best_config:
             logger.info(f"Melhor configuração encontrada: {best_config}")
             answer = input(
-                f"\nDeseja treinar o modelo YOLOv8{best_config['model_size']} com os melhores hiperparâmetros? (s/n): ")
+                f"\nDeseja treinar o modelo YOLOv8{best_config['model_size']} com os melhores hiperparâmetros? (s/n): "
+            )
             if answer.lower() in ["s", "sim", "y", "yes"]:
                 try:
                     model = YOLO(model_name)
@@ -496,11 +501,12 @@ class YOLOTrainer:
                         "final_training_results": {
                             "maps": final_map,
                             "epochs_completed": final_results.get("epoch", 0),
-                        }
+                        },
                     }
 
                     with open(checkpoint_file_tmp, "w") as f:
                         import json
+
                         json.dump(checkpoint_data, f, indent=4)
 
                     # Mover arquivo temporário para o final (operação atômica)
@@ -514,4 +520,3 @@ class YOLOTrainer:
             logger.warning("Nenhuma configuração válida foi encontrada durante a busca")
 
         return best_config or {}
-
