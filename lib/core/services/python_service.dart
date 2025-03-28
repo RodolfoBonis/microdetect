@@ -26,10 +26,10 @@ class PythonService extends GetxService {
   String? _microdetectPath;
 
   // AWS CodeArtifact configuration
-  final String _awsRegion = 'us-east-1';
-  final String _codeArtifactDomain = 'rbtech';
-  final String _codeArtifactRepository = 'microdetect';
-  final String _codeArtifactOwner = '718446585908'; // AWS Account ID
+  final String _awsRegion = '';
+  final String _codeArtifactDomain = '';
+  final String _codeArtifactRepository = '';
+  final String _codeArtifactOwner = ''; // AWS Account ID
 
   // Getters
   bool get isRunning => _isRunning.value;
@@ -825,46 +825,43 @@ class PythonService extends GetxService {
       _port.value = port;
       pythonState.value = BackendInitStep.serverStartup;
 
-      // Verificar se temos o executável microdetect
-      if (_microdetectPath == null) {
-        await _initializePythonEnvironment();
-        if (_microdetectPath == null) {
-          _addLog('Executável microdetect não encontrado');
-
-          // Verificar se o pacote está instalado
-          await checkCurrentVersion();
-          if (currentVersion.value.isEmpty) {
-            // Tentar instalar o pacote
-            final installed = await installOrUpdate();
-            if (!installed) {
-              _addLog('Não foi possível instalar o pacote microdetect');
-              return false;
-            }
-
-            // Procurar o executável novamente
-            _microdetectPath = await _findMicrodetectExecutable();
-            if (_microdetectPath == null) {
-              _addLog('Executável microdetect não encontrado mesmo após instalação');
-              return false;
-            }
-          }
-        }
-      }
-
       // Obter diretório de dados
       final dataDir = await appDataDir;
 
       _addLog('Iniciando servidor microdetect na porta $port...');
       _addLog('Diretório de dados: $dataDir');
-      _addLog('Usando executável: $_microdetectPath');
 
-      // Iniciar processo microdetect
-      _pythonProcess = await _startMicrodetectCommand(
-          ['start-server', '--port', port.toString(), '--data-dir', dataDir],
-          environment: {
-            'PYTHONUNBUFFERED': '1',
-          }
-      );
+      // CORREÇÃO: Tentar vários métodos para iniciar o servidor
+
+      // 1. Primeiro, tentar localizar o executável microdetect (método preferido)
+      String? microdetectExe = await _findExecutableInPath('microdetect');
+
+      if (microdetectExe != null) {
+        _addLog('Executável microdetect encontrado: $microdetectExe');
+
+        // Iniciar processo usando o executável diretamente
+        _pythonProcess = await Process.start(
+            microdetectExe,
+            ['start-server', '--port', port.toString(), '--data-dir', dataDir],
+            environment: {
+              'PYTHONUNBUFFERED': '1',
+            }
+        );
+      }
+      // 2. Se não encontrar, tentar via python -m microdetect.server
+      else if (_pythonPath != null) {
+        _addLog('Executável microdetect não encontrado. Tentando via módulo Python...');
+
+        _pythonProcess = await Process.start(
+            _pythonPath!,
+            ['-m', 'microdetect.server', 'start-server', '--port', port.toString(), '--data-dir', dataDir],
+            environment: {
+              'PYTHONUNBUFFERED': '1',
+            }
+        );
+      } else {
+        throw Exception('Nem Python nem microdetect encontrados no sistema');
+      }
 
       // Capturar saída padrão
       _pythonProcess!.stdout
@@ -932,6 +929,19 @@ class PythonService extends GetxService {
       pythonState.value = BackendInitStep.failed;
       return false;
     }
+  }
+
+  Future<String?> _findExecutableInPath(String executableName) async {
+    final String command = Platform.isWindows ? 'where' : 'which';
+    try {
+      final result = await Process.run(command, [executableName]);
+      if (result.exitCode == 0 && result.stdout.toString().trim().isNotEmpty) {
+        return result.stdout.toString().trim().split('\n').first;
+      }
+    } catch (e) {
+      _addLog('Erro ao procurar executável $executableName: $e');
+    }
+    return null;
   }
 
   /// Verifica a saúde do servidor
