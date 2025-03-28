@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+ - Sempre que fizer alguma alteração no backend, ao final, mude a versão no arquivo version.txt
+ - Sempre que fizer alguma alteração no backend, após mudar a versão no arquivo version.txt, zip o python_backend e jogue na pasta de assets do flutter, substituindo o que já tem lá

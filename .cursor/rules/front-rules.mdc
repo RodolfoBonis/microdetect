@@ -1,0 +1,1090 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rule - Frontend Flutter e Design System para MicroDetect
+
+# Cursor Rule: Frontend Flutter e Design System do MicroDetect
+
+## I. Introdução e Princípios Gerais
+
+### Visão Geral
+
+Este documento define os padrões de desenvolvimento, arquitetura e design para a aplicação MicroDetect em Flutter Desktop. A aplicação integra-se com um backend Python para detecção e análise de microorganismos através de imagens microscópicas.
+
+### Princípios de Design
+
+1. **Consistência Visual**: Todos os componentes devem seguir o design system baseado no Airbnb.
+2. **Experiência de Usuário Intuitiva**: Fluxo de trabalho lógico para cientistas e pesquisadores.
+3. **Performance Otimizada**: Minimizar freezes na UI durante operações intensivas.
+4. **Modularidade**: Código organizado e reutilizável.
+5. **Responsividade**: Adaptar-se a diferentes resoluções de tela.
+
+### Tecnologias Fundamentais
+
+- **Flutter**: Framework para UI multiplataforma
+- **Provider**: Gerenciamento de estado
+- **dio**: Cliente HTTP
+- **web_socket_channel**: Comunicação via WebSockets
+- **camera**: Acesso a webcams e câmeras USB
+- **image**: Manipulação de imagens
+
+## II. Design System
+
+### 1. Tokens de Design
+
+#### 1.1 Cores
+
+- **Paleta Principal**
+  - `primary`: #FF5A5F (Coral - cor principal do Airbnb)
+  - `secondary`: #00A699 (Turquesa)
+  - `tertiary`: #484848 (Chumbo)
+
+- **Cores Neutras**
+  - `black`: #000000
+  - `darkGrey`: #484848
+  - `grey`: #767676
+  - `lightGrey`: #DDDDDD
+  - `offWhite`: #F7F7F7
+  - `white`: #FFFFFF
+
+- **Cores de Estado**
+  - `success`: #00A699 (Turquesa)
+  - `warning`: #FFB400 (Amarelo)
+  - `error`: #FF5A5F (Coral/Vermelho)
+  - `info`: #007A87 (Azul esverdeado)
+
+- **Cores de Fundo**
+  - `background`: #FFFFFF
+  - `surfaceLight`: #F7F7F7
+  - `surfaceMedium`: #EEEEEE
+  - `surfaceDark`: #DDDDDD
+
+#### 1.2 Tipografia
+
+- **Família de Fontes**: Cereal (Airbnb) ou Inter como alternativa
+- **Hierarquia de Texto**:
+  - Display: 32px, 28px, 24px (bold)
+  - Headline: 22px, 20px, 18px (semibold)
+  - Body: 16px, 14px, 12px (regular)
+  - Label: 14px, 12px, 10px (semibold)
+
+#### 1.3 Espaçamento
+
+- **Sistema de Grid**: Baseado em múltiplos de 4px
+  - `xxxSmall`: 2px
+  - `xxSmall`: 4px
+  - `xSmall`: 8px
+  - `small`: 12px
+  - `medium`: 16px
+  - `large`: 24px
+  - `xLarge`: 32px
+  - `xxLarge`: 48px
+  - `xxxLarge`: 64px
+
+#### 1.4 Sombras
+
+- **Níveis de Elevação**:
+  - `none`: sem sombra
+  - `low`: 0px 2px 4px rgba(0, 0, 0, 0.05)
+  - `medium`: 0px 4px 8px rgba(0, 0, 0, 0.1)
+  - `high`: 0px 8px 16px rgba(0, 0, 0, 0.15)
+  - `critical`: 0px 16px 24px rgba(0, 0, 0, 0.2)
+
+#### 1.5 Bordas e Raios
+
+- **Espessuras de Borda**:
+  - `thin`: 1px
+  - `medium`: 2px
+  - `thick`: 3px
+
+- **Raios de Borda**:
+  - `radiusNone`: 0px
+  - `radiusSmall`: 4px
+  - `radiusMedium`: 8px
+  - `radiusLarge`: 12px
+  - `radiusFull`: 9999px
+
+#### 1.6 Animações
+
+- **Durações**:
+  - `fast`: 150ms
+  - `medium`: 300ms
+  - `slow`: 500ms
+
+- **Curvas**:
+  - `standard`: Cubic(0.2, 0.0, 0.0, 1.0)
+  - `accelerate`: Cubic(0.4, 0.0, 1.0, 1.0)
+  - `decelerate`: Cubic(0.0, 0.0, 0.2, 1.0)
+
+### 2. Componentes
+
+
+
+#### 2.1 Botões
+
+- **Botão Principal (`AppButton`)**
+  - Variantes: primário, secundário, terciário
+  - Tamanhos: pequeno, médio, grande
+  - Estados: normal, hover, pressionado, desabilitado, carregando
+
+- **Botão de Ícone (`AppIconButton`)**
+  - Variantes: padrão, ghost, circle
+  - Tamanhos: pequeno, médio, grande
+
+- **Grupo de Botões (`AppButtonGroup`)**
+  - Orientações: horizontal, vertical
+  - Seleção: única, múltipla
+
+#### 2.2 Campos de Entrada
+
+- **Campo de Texto (`AppTextField`)**
+  - Variantes: padrão, com label, com ícone, com contador
+  - Estados: normal, foco, erro, desabilitado
+  - Tipos: texto, número, senha, área de texto
+
+- **Seleção (`AppDropdown`)**
+  - Variantes: simples, com busca, com ícones
+  - Estados: normal, aberto, desabilitado
+
+- **Controles (`AppSlider`, `AppCheckbox`, `AppSwitch`)**
+  - Estados: selecionado, não selecionado, desabilitado
+  - Variantes: padrão, personalizado
+
+#### 2.3 Componentes de Feedback
+
+- **Indicadores de Carregamento (`AppLoading`)**
+  - Tipos: circular, linear, pulse
+  - Tamanhos: pequeno, médio, grande
+
+- **Barras de Progresso (`AppProgress`)**
+  - Tipos: determinate, indeterminate
+  - Variantes: linear, circular, stepped
+
+- **Alertas e Notificações (`AppAlert`, `AppToast`)**
+  - Tipos: sucesso, erro, aviso, informação
+  - Variantes: inline, toast, modal
+
+#### 2.4 Navegação
+
+- **Barra Lateral Colapsável (`CollapsibleSidebar`)**
+  - Estados: expandido, colapsado
+  - Suporte a subitens e seções
+
+- **Barra Superior (`AppBar`)**
+  - Variantes: padrão, com ações, com busca
+  - Responsiva a diferentes tamanhos de tela
+
+#### 2.5 Exibição de Dados
+
+- **Card (`AppCard`)**
+  - Variantes: padrão, com imagem, com ícone, interativo
+  - Tamanhos: pequeno, médio, grande, personalizado
+
+- **Tabela (`AppTable`)**
+  - Recursos: ordenação, filtragem, paginação
+  - Variantes: compacta, normal, expansível
+
+- **Visualizador de Imagem (`ImageViewer`)**
+  - Recursos: zoom, pan, comparação, anotação
+  - Variantes: galeria, tela cheia, modal
+
+### 3. Layouts
+
+- **Layout Principal (`AppLayout`)**
+  - Estrutura: sidebar + conteúdo principal
+  - Reponsividade: redimensionamento, ajuste de sidebar
+
+- **Contêineres (`AppContainer`)**
+  - Variantes: com borda, com sombra, com fundo
+  - Propriedades: padding, margin, raio de borda
+
+- **Sistema de Grid (`AppGrid`)**
+  - Colunas: 12 colunas responsivas
+  - Breakpoints: desktop, tablet, mobile
+
+## III. Módulos da Aplicação
+
+### 1. Módulo Home
+
+Página inicial com visão geral do sistema e acesso rápido às principais funcionalidades.
+
+**Componentes:**
+- Dashboard com estatísticas gerais
+- Lista de datasets recentes
+- Atalhos para ações comuns
+- Status do sistema (GPU, espaço disponível)
+
+### 2. Módulo Datasets
+
+Gerenciamento de conjuntos de dados para treinamento e teste.
+
+**Telas:**
+- Lista de datasets com filtros e busca
+- Detalhes de dataset específico
+- Criação/edição de dataset
+- Visualização de imagens no dataset
+- Interface de importação/exportação
+
+**Funcionalidades:**
+- Upload de imagens (arrastar e soltar)
+- Divisão treino/validação/teste
+- Augmentação de dados
+- Estatísticas do dataset
+
+### 3. Módulo Annotation
+
+Interface para anotação manual e revisão de microorganismos nas imagens.
+
+**Componentes:**
+- Canvas de anotação com ferramentas de desenho
+- Controles de zoom e navegação
+- Seletor de classes para anotação
+- Histórico de ações (desfazer/refazer)
+- Ferramentas de anotação automática
+
+**Fluxo:**
+1. Seleção de imagem
+2. Escolha da ferramenta (retângulo, polígono)
+3. Desenho da anotação
+4. Atribuição de classe
+5. Revisão e ajuste fino
+
+
+
+### 4. Módulo Training
+
+Interface para configuração, execução e monitoramento de treinamento de modelos.
+
+**Telas:**
+- Configuração de treinamento
+- Monitoramento em tempo real
+- Histórico de treinamentos
+- Detalhes de treinamento específico
+
+**Funcionalidades:**
+- Seleção de dataset e parâmetros
+- Visualização de métricas em tempo real
+- Gráficos de progresso (loss, accuracy, etc.)
+- Early stopping e checkpoints
+- Configuração de hiperparâmetros
+
+### 5. Módulo Inference
+
+Interface para detecção em novas imagens usando modelos treinados.
+
+**Telas:**
+- Inferência em imagem única
+- Inferência em lote
+- Visualização de resultados
+
+**Funcionalidades:**
+- Upload de imagem ou seleção da câmera
+- Ajuste de limiares de confiança
+- Visualização de detecções
+- Exportação de resultados
+
+### 6. Módulo Analysis
+
+Ferramentas para análise de desempenho e insights sobre modelos e dados.
+
+**Telas:**
+- Dashboard de análise
+- Análise de erros
+- Análise estatística
+- Comparação de modelos
+
+**Visualizações:**
+- Matriz de confusão
+- Curvas de precisão/recall
+- Distribuição de tamanhos
+- Mapas de densidade
+
+### 7. Módulo Camera
+
+Interface para captura e pré-processamento de imagens via câmera USB.
+
+**Componentes:**
+- Stream de pré-visualização da câmera
+- Controles de captura
+- Painéis de ajustes (brilho, contraste, etc.)
+- Aplicação de filtros em tempo real
+- Galeria de imagens capturadas
+
+
+
+
+
+### 8. Módulo Settings
+
+Configurações da aplicação e integração com backend.
+
+**Telas:**
+- Configurações gerais
+- Configurações de câmera
+- Gerenciamento de API Python
+
+## IV. Gerenciamento de Estado e Comunicação
+
+### 1. Padrão de Gerenciamento de Estado
+
+A aplicação utilizará o Provider para gerenciamento de estado:
+
+- **StateNotifier/Provider**: Para estados complexos e compartilhados
+- **ChangeNotifier**: Para controllers de tela
+- **ValueNotifier**: Para estados simples e locais
+
+### 2. Comunicação com Backend Python
+
+
+
+
+
+#### 2.1 Python Service
+
+Responsável por:
+- Iniciar o backend Python como processo filho
+- Monitorar o estado do backend
+- Reiniciar em caso de falha
+- Fornecer configurações ao backend
+
+#### 2.2 API Service
+
+Responsável por:
+- Realizar chamadas HTTP para o backend
+- Gerenciar autenticação e tokens
+- Lidar com respostas e erros
+- Deserializar dados
+
+#### 2.3 WebSocket Service
+
+Responsável por:
+- Manter conexão WebSocket com o backend
+- Receber atualizações em tempo real (progresso de treinamento)
+- Gerenciar reconexões
+
+### 3. Gerenciamento do Processo Python
+
+
+
+
+
+## V. Integração com Câmera USB
+
+### 1. Detecção e Configuração
+
+- Detecção automática de câmeras USB conectadas
+- Suporte para múltiplas câmeras simultaneamente
+- Capacidade de alternar entre dispositivos
+- Configuração de parâmetros (resolução, taxa de frames, etc.)
+
+### 2. Controle e Captura
+
+- Stream de pré-visualização em tempo real
+- Capture de frames individuais
+- Ajustes em tempo real:
+  - Brilho (-1.0 a 1.0)
+  - Contraste (-1.0 a 1.0)
+  - Saturação (-1.0 a 1.0)
+  - Nitidez (0.0 a 1.0)
+
+### 3. Filtros e Processamento
+
+- Filtros pré-definidos:
+  - Normal (sem filtro)
+  - Escala de cinza
+  - Inversão
+  - Sépia
+  - Alto contraste
+  - Realce de bordas
+  - Outros filtros específicos para microscopia
+
+- Pipeline de processamento customizável
+
+### 4. Integração com Galeria
+
+- Visualização de imagens capturadas recentemente
+- Organização por dataset ou pasta
+- Uso direto de imagens da galeria para anotação ou inferência
+
+## VI. Navegação e Routing
+
+### 1. Estrutura de Rotas
+
+- Rotas nomeadas para todas as telas principais
+- Estrutura hierárquica para módulos com subrotas
+- Geração automática de navegação via `go_router`
+
+### 2. Componentes de Navegação
+
+- Layout principal com menu lateral colapsável
+- Suporte a navegação aninhada
+- Navegação baseada em histórico
+- Navegação em tabs para certas seções
+
+## VII. Convenções e Padrões de Código
+
+### 1. Estilo de Código
+
+- Seguir o [Effective Dart](mdc:https:/dart.dev/guides/language/effective-dart) para estilo de código
+- Usar `lints` com regras rigorosas
+- Usar `analysis_options.yaml` para configuração de análise
+
+### 2. Arquitetura de Módulos
+
+- Estrutura Feature-first
+- Cada módulo tem sua pasta com screens, widgets, controllers e models
+- Componentes compartilhados no diretório `shared`
+
+### 3. Nomenclatura
+
+- **Widgets**: PascalCase (ex: `DatasetCard`)
+- **Métodos e variáveis**: camelCase (ex: `fetchDatasets()`)
+- **Constantes**: SNAKE_CASE em maiúsculas (ex: `MAX_BATCH_SIZE`)
+- **Arquivos**: snake_case (ex: `dataset_detail_screen.dart`)
+
+## VIII. Considerações de Deployment
+
+### 1. Empacotamento
+
+- Empacotar aplicação Flutter com backend Python
+- Incluir ambiente virtual Python com dependências
+- Construir executáveis para Windows, macOS e Linux
+
+### 2. Atualizações
+
+- Mecanismo de verificação de atualizações
+- Download e instalação de novas versões
+- Migração de dados de configuração
+
+## IX. Melhores Práticas e Recomendações
+
+1. **Performance**:
+   - Evitar reconstruções de árvore de widgets desnecessárias
+   - Usar `const` para widgets imutáveis
+   - Implementar lazy loading para datasets grandes
+
+2. **UI Responsiva**:
+   - Testar com diferentes resoluções de tela
+   - Implementar layouts fluidos que se adaptam
+   - Ajustar densidades de UI para diferentes tipos de display
+
+3. **Manipulação de Imagens**:
+   - Implementar caching de imagens processadas
+   - Carregar thumbnails antes de imagens completas
+   - Usar paginação para galerias grandes
+
+4. **Tratamento de Erros**:
+   - Implementar tratamento abrangente de exceções
+   - Fornecer feedback claro ao usuário
+   - Implementar recovery automático quando possível
+
+5. **Câmeras USB**:
+   - Testar com diferentes tipos e modelos de câmeras
+   - Implementar fallbacks para recursos não suportados
+   - Considerar latência para ajustes em tempo real
+</thinking>
+
+# Cursor Rule: Frontend Flutter e Design System para MicroDetect
+
+## I. Estrutura do Projeto
+
+### Organização de Pastas
+
+```
+microdetect_app/
+├── lib/
+│   ├── main.dart                        # Ponto de entrada principal
+│   ├── app.dart                         # Configuração da aplicação
+│   ├── config/                          # Configurações
+│   ├── core/                            # Lógica core e serviços
+│   ├── design_system/                   # Design System
+│   ├── features/                        # Módulos da aplicação
+│   └── shared/                          # Widgets compartilhados
+├── assets/                              # Recursos estáticos
+├── python_backend/                      # Backend Python
+└── test/                                # Testes
+```
+
+### Convenções de Codificação
+
+- **Arquivos**: snake_case.dart
+- **Classes**: PascalCase
+- **Variáveis/Métodos**: camelCase
+- **Constantes**: SNAKE_CASE
+
+## II. Design System (Inspirado no Airbnb)
+
+### Tokens de Design
+
+#### Cores
+```dart
+/// Paleta de cores inspirada no Airbnb
+class AppColors {
+  // Cores primárias
+  static const Color primary = Color(0xFFFF5A5F);        // Coral
+  static const Color secondary = Color(0xFF00A699);      // Turquesa
+  static const Color tertiary = Color(0xFF484848);       // Chumbo
+
+  // Cores neutras
+  static const Color black = Color(0xFF000000);
+  static const Color darkGrey = Color(0xFF484848);
+  static const Color grey = Color(0xFF767676);
+  static const Color lightGrey = Color(0xFFDDDDDD);
+  static const Color offWhite = Color(0xFFF7F7F7);
+  static const Color white = Color(0xFFFFFFFF);
+
+  // Cores de estado
+  static const Color success = Color(0xFF00A699);
+  static const Color warning = Color(0xFFFFB400);
+  static const Color error = Color(0xFFFF5A5F);
+  static const Color info = Color(0xFF007A87);
+
+  // Cores de fundo
+  static const Color background = Color(0xFFFFFFFF);
+  static const Color surfaceLight = Color(0xFFF7F7F7);
+  static const Color surfaceMedium = Color(0xFFEEEEEE);
+  static const Color surfaceDark = Color(0xFFDDDDDD);
+}
+```
+
+#### Tipografia
+```dart
+/// Tipografia inspirada no design system do Airbnb
+class AppTypography {
+  static const String fontFamily = 'Cereal';  // Font do Airbnb
+
+  // Headings (Bold)
+  static const TextStyle displayLarge = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 32.0,
+    fontWeight: FontWeight.w700,
+    letterSpacing: -0.5,
+  );
+
+  // Body (Regular)
+  static const TextStyle bodyLarge = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 16.0,
+    fontWeight: FontWeight.w400,
+    letterSpacing: 0,
+  );
+
+  // Labels (SemiBold)
+  static const TextStyle labelLarge = TextStyle(
+    fontFamily: fontFamily,
+    fontSize: 14.0,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.75,
+  );
+}
+```
+
+#### Espaçamento
+```dart
+/// Sistema de espaçamento baseado em múltiplos de 4
+class AppSpacing {
+  static const double xxxSmall = 2.0;
+  static const double xxSmall = 4.0;
+  static const double xSmall = 8.0;
+  static const double small = 12.0;
+  static const double medium = 16.0;
+  static const double large = 24.0;
+  static const double xLarge = 32.0;
+  static const double xxLarge = 48.0;
+  static const double xxxLarge = 64.0;
+}
+```
+
+#### Bordas
+```dart
+/// Sistema de bordas com raios consistentes
+class AppBorders {
+  static const double radiusNone = 0.0;
+  static const double radiusSmall = 4.0;
+  static const double radiusMedium = 8.0;
+  static const double radiusLarge = 12.0;
+  static const double radiusFull = 9999.0;
+}
+```
+
+### Componentes
+
+#### Botões
+```dart
+class AppButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool isLoading;
+  final bool isFullWidth;
+  final AppButtonType type;
+  final AppButtonSize size;
+
+  const AppButton({
+    Key? key,
+    required this.label,
+    this.onPressed,
+    this.isLoading = false,
+    this.isFullWidth = false,
+    this.type = AppButtonType.primary,
+    this.size = AppButtonSize.medium,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    /* Implementação do botão com diferentes estados */
+  }
+}
+
+enum AppButtonType {
+  primary,
+  secondary,
+  tertiary,
+}
+
+enum AppButtonSize {
+  small,
+  medium,
+  large,
+}
+```
+
+#### Campos de Texto
+```dart
+class AppTextField extends StatelessWidget {
+  final String? label;
+  final String? placeholder;
+  final String? errorText;
+  final IconData? prefixIcon;
+  final IconData? suffixIcon;
+  final bool isPassword;
+  final int? maxLength;
+  final TextInputType keyboardType;
+  final Function(String) onChanged;
+  final VoidCallback? onSuffixIconPressed;
+
+  const AppTextField({
+    Key? key,
+    this.label,
+    this.placeholder,
+    this.errorText,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.isPassword = false,
+    this.maxLength,
+    this.keyboardType = TextInputType.text,
+    required this.onChanged,
+    this.onSuffixIconPressed,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    /* Implementação do campo de texto com diferentes estados */
+  }
+}
+```
+
+#### Menu Lateral Colapsável
+```dart
+class CollapsibleSidebar extends StatefulWidget {
+  final List<SidebarItem> items;
+  final String selectedRoute;
+  final Function(String) onRouteSelected;
+  final bool isExpanded;
+  final Function(bool) onExpandedChanged;
+  final String appName;
+  final Widget? appLogo;
+
+  const CollapsibleSidebar({
+    Key? key,
+    required this.items,
+    required this.selectedRoute,
+    required this.onRouteSelected,
+    required this.isExpanded,
+    required this.onExpandedChanged,
+    required this.appName,
+    this.appLogo,
+  }) : super(key: key);
+
+  @override
+  _CollapsibleSidebarState createState() => _CollapsibleSidebarState();
+}
+
+class _CollapsibleSidebarState extends State<CollapsibleSidebar> {
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: widget.isExpanded ? 250 : 70,
+      /* Implementação do menu lateral com estados expandido/colapsado */
+    );
+  }
+}
+```
+
+## III. Módulos Principais
+
+### Módulo de Câmera (Implementação Frontend)
+
+```dart
+class CameraScreen extends StatefulWidget {
+  final String? datasetId;
+  const CameraScreen({Key? key, this.datasetId}) : super(key: key);
+
+  @override
+  _CameraScreenState createState() => _CameraScreenState();
+}
+
+class _CameraScreenState extends State<CameraScreen> {
+  // Estado da câmera
+  List<UsbDevice> _devices = [];
+  UsbPort? _port;
+  bool _isConnected = false;
+  
+  // Estado da imagem
+  Uint8List? _currentFrame;
+  Uint8List? _capturedImage;
+  
+  // Ajustes de imagem
+  double _brightness = 0.0;    // -1.0 a 1.0
+  double _contrast = 0.0;      // -1.0 a 1.0
+  double _saturation = 0.0;    // -1.0 a 1.0
+  double _sharpness = 0.0;     // -1.0 a 1.0
+  String _selectedFilter = "none";
+  
+  // UI state
+  bool _isSettingsPanelOpen = false;
+  bool _isGalleryViewOpen = false;
+  List<Map<String, dynamic>> _galleryImages = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    _initCamera();
+    _loadGalleryImages();
+  }
+  
+  Future<void> _initCamera() async {
+    // Inicialização da câmera USB
+  }
+  
+  Future<void> _captureImage() async {
+    // Captura da imagem com ajustes aplicados
+  }
+  
+  Future<Uint8List> _processImage(Uint8List imageData) async {
+    // Aplicação de ajustes e filtros
+  }
+  
+  Future<void> _saveImage() async {
+    // Envio da imagem para o backend
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Microscópio'),
+        actions: [
+          // Controles da câmera
+        ],
+      ),
+      body: Row(
+        children: [
+          // Área principal (câmera/imagem)
+          Expanded(
+            child: Stack(
+              children: [
+                // Preview da câmera ou imagem capturada
+                Center(
+                  child: _capturedImage != null
+                    ? Image.memory(_capturedImage!)
+                    : _currentFrame != null
+                      ? Image.memory(_currentFrame!)
+                      : Container(/* Placeholder */),
+                ),
+                
+                // Controles da câmera (parte inferior)
+                Positioned(
+                  bottom: 20,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Botões de captura, salvar, descartar
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Painel de ajustes (condicional)
+          if (_isSettingsPanelOpen)
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              width: 300,
+              child: Column(
+                children: [
+                  // Sliders para ajustes
+                  // Seleção de filtros
+                ],
+              ),
+            ),
+          
+          // Galeria (condicional)
+          if (_isGalleryViewOpen)
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              width: 300,
+              child: /* Galeria de imagens */,
+            ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+### Integração com Backend Python
+
+```dart
+class ApiService {
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+  
+  late final Dio _dio;
+  final PythonService _pythonService = PythonService();
+  
+  String get baseUrl => 'http://localhost:${_pythonService.port}';
+  
+  ApiService._internal() {
+    _dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+    ));
+  }
+  
+  /// Inicializa a conexão com o backend
+  Future<bool> initialize() async {
+    try {
+      // Inicia o servidor Python como processo secundário
+      await _pythonService.startServer();
+      
+      // Verifica se o servidor está rodando
+      await checkHealth();
+      
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// Upload de imagem capturada para a galeria
+  Future<Map<String, dynamic>> uploadCapturedImage(
+    Uint8List imageData, {
+    String? name,
+    String? datasetId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      // Salvar temporariamente a imagem
+      final tempDir = await getTemporaryDirectory();
+      final fileName = name ?? 'capture_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final filePath = '${tempDir.path}/$fileName';
+      
+      final File tempFile = File(filePath);
+      await tempFile.writeAsBytes(imageData);
+      
+      // Preparar formData
+      FormData formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(tempFile.path, filename: fileName),
+        if (datasetId != null) 'dataset_id': datasetId,
+        if (metadata != null) 'metadata': jsonEncode(metadata),
+      });
+      
+      // Fazer upload
+      final response = await _dio.post('/gallery/upload', data: formData);
+      
+      // Limpar arquivo temporário
+      await tempFile.delete();
+      
+      return response.data;
+    } catch (e) {
+      rethrow;
+    }
+  }
+  
+  /// Listar imagens da galeria
+  Future<List<Map<String, dynamic>>> getGalleryImages({
+    String? datasetId,
+    String? tag,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/gallery/images',
+        queryParameters: {
+          'limit': limit,
+          'offset': offset,
+          if (datasetId != null) 'dataset_id': datasetId,
+          if (tag != null) 'tag': tag,
+        },
+      );
+      
+      return List<Map<String, dynamic>>.from(response.data['images']);
+    } catch (e) {
+      return [];
+    }
+  }
+}
+```
+
+### Gerenciamento do Python Backend
+
+```dart
+class PythonService {
+  static final PythonService _instance = PythonService._internal();
+  factory PythonService() => _instance;
+  
+  // Processo Python
+  Process? _pythonProcess;
+  bool _isRunning = false;
+  
+  // Configurações
+  final int _port = 8000;
+  
+  // Getters
+  int get port => _port;
+  bool get isRunning => _isRunning;
+  
+  PythonService._internal();
+  
+  /// Inicia o servidor Python
+  Future<bool> startServer() async {
+    if (_isRunning) return true;
+    
+    try {
+      // Determinar caminho para o executável Python e script
+      final pythonPath = await _getPythonPath();
+      final scriptPath = await _getServerScriptPath();
+      
+      // Verificar se os arquivos existem
+      if (!File(pythonPath).existsSync()) {
+        throw Exception('Executável Python não encontrado: $pythonPath');
+      }
+      
+      if (!File(scriptPath).existsSync()) {
+        throw Exception('Script do servidor não encontrado: $scriptPath');
+      }
+      
+      // Iniciar o processo Python
+      _pythonProcess = await Process.start(
+        pythonPath,
+        [scriptPath, '--port', _port.toString()],
+      );
+      
+      // Aguardar o servidor iniciar
+      await Future.delayed(Duration(seconds: 3));
+      
+      _isRunning = true;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// Para o servidor Python
+  Future<void> stopServer() async {
+    if (!_isRunning || _pythonProcess == null) return;
+    
+    try {
+      if (Platform.isWindows) {
+        _pythonProcess!.kill();
+      } else {
+        Process.killPid(_pythonProcess!.pid, ProcessSignal.sigterm);
+      }
+      
+      _pythonProcess = null;
+      _isRunning = false;
+    } catch (e) {
+      // Handle error
+    }
+  }
+}
+```
+
+## IV. Outros Módulos
+
+### Módulo de Datasets
+- Gerenciamento de datasets para treinamento
+- Upload e organização de imagens
+- Divisão em conjuntos de treino/validação/teste
+- Estatísticas e visualização 
+
+### Módulo de Anotação
+- Interface para marcação de objetos (bounding boxes)
+- Ferramentas de zoom e navegação
+- Seleção de classes para anotação
+- Suporte a desfazer/refazer
+
+### Módulo de Treinamento
+- Configuração de parâmetros de treinamento
+- Monitoramento em tempo real do processo
+- Visualização de métricas e gráficos
+- Suporte a múltiplos modelos
+
+### Módulo de Inferência
+- Detecção em novas imagens
+- Ajuste de limiares de confiança
+- Processamento em lote
+- Exportação de resultados
+
+### Módulo de Análise
+- Visualização de resultados
+- Estatísticas de desempenho
+- Comparação de modelos
+- Análise de erros
+
+## V. Padrões de Implementação
+
+### Gerenciamento de Estado
+- Provider para gerenciamento de estado
+- Controllers por módulo para lógica de negócios
+- Serviços compartilhados para funcionalidades comuns
+
+### Navegação
+- Sistema de rotas nomeadas
+- Menu lateral colapsável para navegação principal
+- Navegação baseada em pilha para fluxos complexos
+
+### Tratamento de Erros
+- Camada centralizada de tratamento de erros
+- Feedback visual para o usuário
+- Logs detalhados para depuração
+
+### Responsividade
+- Layout flexível usando Row/Column e Expanded
+- Media queries para ajuste a diferentes tamanhos de tela
+- Componentes que se adaptam ao espaço disponível
+
+## VI. Considerações Finais
+
+### Performance
+- Uso de const widgets quando possível
+- Evitar reconstruções desnecessárias
+- Processamento pesado em isolates separados
+
+### Integração com Câmera
+- Suporte a diversos modelos de câmera USB
+- Tratamento de erros de conexão
+- Buffer para frames capturados
+
+### Empacotamento
+- Distribuição do app com Python embutido
+- Instalação de dependências durante setup
+- Scripts de atualização e manutenção

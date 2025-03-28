@@ -1,0 +1,25 @@
+name: camera_access
+description: A Flutter plugin for native camera access on Windows and macOS
+version: 0.0.1
+repository: https://github.com/yourusername/camera_access
+
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+  flutter: ">=2.5.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  plugin:
+    platforms:
+      macos:
+        pluginClass: CameraAccessPlugin
+      windows:
+        pluginClass: CameraAccessPlugin

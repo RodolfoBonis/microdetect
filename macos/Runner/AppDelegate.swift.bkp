@@ -1,0 +1,184 @@
+import Cocoa
+import FlutterMacOS
+
+@NSApplicationMain
+class AppDelegate: FlutterAppDelegate {
+  var mainFlutterWindow: NSWindow?
+  
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    let flutterViewController = mainFlutterWindow?.contentViewController as? FlutterViewController
+    
+    guard let binaryMessenger = flutterViewController?.engine.binaryMessenger else {
+      return
+    }
+    
+    // Configuração do método channel para câmera
+    let cameraChannel = FlutterMethodChannel(name: "microdetect.app/camera", 
+                                          binaryMessenger: binaryMessenger)
+    
+    cameraChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard let self = self else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      
+      switch call.method {
+      case "availableCameras":
+        self.listCameras(result: result)
+      case "initializeCamera":
+        // Verificar se foi fornecido um ID de câmera
+        guard let args = call.arguments as? [String: Any],
+              let cameraId = args["cameraId"] as? String else {
+          result(FlutterError(code: "INVALID_ARGS", message: "ID da câmera não fornecido", details: nil))
+          return
+        }
+        // Simular inicialização bem-sucedida
+        result(true)
+      case "captureImage":
+        // Capturar imagem simulada
+        self.captureSimulatedImage(result: result)
+      case "setConfiguration":
+        // Verificar argumentos
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "INVALID_ARGS", message: "Configuração inválida", details: nil))
+          return
+        }
+        // Simular configuração bem-sucedida
+        result(true)
+      case "disposeCamera":
+        // Simular desconexão bem-sucedida
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    
+    super.applicationDidFinishLaunching(notification)
+    
+    // Registro do canal para interagir com a câmera
+    self.registerCameraMethodChannel()
+  }
+  
+  // Função para listar câmeras disponíveis
+  private func listCameras(result: @escaping FlutterResult) {
+    let cameras: [[String: Any]] = [
+      [
+        "id": "built_in_camera",
+        "name": "Câmera integrada",
+        "metadata": [
+          "position": 1,
+          "manufacturer": "Apple",
+          "modelID": "Built-in"
+        ]
+      ]
+    ]
+    
+    result(cameras)
+  }
+
+  // Função para capturar uma imagem simulada
+  private func captureSimulatedImage(result: @escaping FlutterResult) {
+    // Criar uma imagem simulada - um círculo azul em fundo branco
+    let width = 640
+    let height = 480
+    
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+    
+    guard let context = CGContext(
+      data: nil,
+      width: width,
+      height: height,
+      bitsPerComponent: 8,
+      bytesPerRow: 0,
+      space: colorSpace,
+      bitmapInfo: bitmapInfo.rawValue
+    ) else {
+      result(FlutterError(code: "IMAGE_ERROR", message: "Não foi possível criar a imagem", details: nil))
+      return
+    }
+    
+    // Fundo branco
+    context.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
+    context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+    
+    // Círculo azul no centro
+    context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.8, alpha: 1.0))
+    context.fillEllipse(in: CGRect(x: width/4, y: height/4, width: width/2, height: height/2))
+    
+    // Obter a imagem como PNG
+    guard let image = context.makeImage() else {
+      result(FlutterError(code: "IMAGE_ERROR", message: "Não foi possível criar a imagem", details: nil))
+      return
+    }
+    
+    let nsImage = NSImage(cgImage: image, size: NSSize(width: width, height: height))
+    
+    guard let tiffData = nsImage.tiffRepresentation,
+          let bitmapRep = NSBitmapImageRep(data: tiffData),
+          let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+      result(FlutterError(code: "IMAGE_ERROR", message: "Não foi possível criar a imagem", details: nil))
+      return
+    }
+    
+    result(FlutterStandardTypedData(bytes: pngData))
+  }
+
+  // Registra o canal de método para a câmera
+  private func registerCameraMethodChannel() {
+    // Pega a janela principal da aplicação
+    guard let mainWindows = NSApp.windows.first,
+          let flutterViewController = mainWindows.contentViewController as? FlutterViewController else {
+      return
+    }
+    
+    // Configuração do método channel para câmera
+    let cameraChannel = FlutterMethodChannel(name: "microdetect.app/camera", 
+                                          binaryMessenger: flutterViewController.engine.binaryMessenger)
+    
+    cameraChannel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+      guard let self = self else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      
+      switch call.method {
+      case "availableCameras":
+        self.listCameras(result: result)
+      case "initializeCamera":
+        // Verificar se foi fornecido um ID de câmera
+        guard let args = call.arguments as? [String: Any],
+              let cameraId = args["cameraId"] as? String else {
+          result(FlutterError(code: "INVALID_ARGS", message: "ID da câmera não fornecido", details: nil))
+          return
+        }
+        // Simular inicialização bem-sucedida
+        result(true)
+      case "captureImage":
+        // Capturar imagem simulada
+        self.captureSimulatedImage(result: result)
+      case "setConfiguration":
+        // Verificar argumentos
+        guard let args = call.arguments as? [String: Any] else {
+          result(FlutterError(code: "INVALID_ARGS", message: "Configuração inválida", details: nil))
+          return
+        }
+        // Simular configuração bem-sucedida
+        result(true)
+      case "disposeCamera":
+        // Simular desconexão bem-sucedida
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    return true
+  }
+
+  override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+    return true
+  }
+}

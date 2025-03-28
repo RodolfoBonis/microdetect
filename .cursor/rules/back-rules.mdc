@@ -1,0 +1,301 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Cursor Rule: Backend Python e Arquitetura para MicroDetect
+
+## I. Introdução e Princípios Gerais
+
+### Visão Geral
+
+Este documento define os padrões de desenvolvimento, arquitetura e design para o backend Python do MicroDetect. O backend oferece uma API para a interface Flutter, funcionalidades de detecção de microorganismos usando modelos YOLOv8.
+
+### Princípios Arquiteturais
+
+1. **Modularidade**: Código organizado em módulos funcionais independentes
+2. **Desacoplamento**: Baixo acoplamento entre componentes
+3. **Escalabilidade**: Arquitetura que permite crescimento e expansão futura
+4. **Performance**: Otimização para processamento de imagens e operações com modelos de ML
+5. **Manutenibilidade**: Código limpo, documentado e testável
+
+### Tecnologias Fundamentais
+
+- **FastAPI**: Framework para API REST
+- **PyTorch/Ultralytics**: Biblioteca para modelos YOLO
+- **OpenCV**: Processamento de imagens
+- **SQLite/SQLAlchemy**: Armazenamento de metadados
+- **Pydantic**: Validação de dados e serialização
+
+## II. Estrutura do Projeto
+
+### Organização de Pastas
+
+```
+microdetect_backend/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                    # Ponto de entrada da aplicação
+│   ├── config/                    # Configurações da aplicação
+│   ├── api/                       # Rotas da API
+│   ├── core/                      # Funcionalidades principais
+│   ├── database/                  # Modelos e conexão com banco
+│   ├── models/                    # Modelos ML
+│   ├── schemas/                   # Esquemas Pydantic
+│   ├── services/                  # Serviços
+│   └── utils/                     # Utilitários
+├── tests/                         # Testes
+├── alembic/                       # Migrações do banco de dados
+├── scripts/                       # Scripts utilitários
+└── data/                          # Diretório para dados
+    ├── datasets/                  # Diretórios de datasets
+    ├── models/                    # Modelos treinados
+    ├── gallery/                   # Imagens capturadas
+    └── temp/                      # Arquivos temporários
+```
+
+### Convenções de Codificação
+
+- **Arquivos/Módulos**: snake_case.py
+- **Classes**: PascalCase
+- **Funções/Variáveis**: snake_case
+- **Constantes**: SNAKE_CASE
+
+## III. API Design
+
+### Princípios da API
+
+1. **RESTful**: Seguir princípios RESTful para design de endpoints
+2. **Versionamento**: Suporte a versionamento de API (/api/v1/...)
+3. **Consistência**: Padrões consistentes para endpoints e respostas
+4. **Documentação**: Documentação automática via FastAPI/Swagger
+
+### Estrutura de Endpoints
+
+- **/api/v1/datasets**: Gerenciamento de datasets
+- **/api/v1/gallery**: Gerenciamento de imagens capturadas
+- **/api/v1/annotations**: Gerenciamento de anotações
+- **/api/v1/training**: Gerenciamento de treinamento de modelos
+- **/api/v1/models**: Gerenciamento de modelos treinados
+- **/api/v1/inference**: Endpoints para inferência
+- **/api/v1/analysis**: Análise de dados e estatísticas
+- **/api/v1/system**: Informações e configurações do sistema
+
+### WebSockets
+
+- **/ws/training/{id}**: Streaming de progresso de treinamento
+- **/ws/inference/{id}**: Streaming de resultados de inferência
+
+## IV. Banco de Dados
+
+### Modelos Principais
+
+1. **Dataset**: Coleção de imagens para treinamento/validação/teste
+2. **Image**: Imagens individuais com metadados
+3. **Annotation**: Anotações para imagens (bounding boxes, classes)
+4. **TrainingSession**: Sessões de treinamento de modelos
+5. **Model**: Modelos treinados com metadados
+6. **InferenceResult**: Resultados de inferência
+
+### Relacionamentos
+
+- Um Dataset contém muitas Images
+- Uma Image pode ter muitas Annotations
+- Um Dataset está associado a muitas TrainingSessions
+- Uma TrainingSession resulta em um Model
+- Um Model gera muitos InferenceResults
+
+## V. Processamento de Imagens
+
+### Pipeline de Processamento
+
+1. **Aquisição**: Captura de imagens (câmera USB, upload)
+2. **Pré-processamento**: Normalização, ajustes básicos
+3. **Conversão**: Conversão entre formatos de imagem
+4. **Augmentação**: Técnicas de augmentação para treinamento
+5. **Processamento**: Filtros, realce, detecção de características
+6. **Anotação**: Ferramentas para anotação manual e automática
+
+### Otimizações
+
+- Processamento em lote para grandes conjuntos de imagens
+- Caching de resultados intermediários
+- Processamento paralelo quando apropriado
+- Uso eficiente de NumPy para operações vetorizadas
+
+## VI. Treinamento e Inferência
+
+### Processo de Treinamento
+
+1. **Preparação de Dados**: Criação de dataset estruturado
+2. **Configuração**: Definição de hiperparâmetros
+3. **Inicialização**: Carregamento de pesos pré-treinados
+4. **Treinamento**: Execução do treinamento com callbacks
+5. **Validação**: Avaliação em conjunto de validação
+6. **Exportação**: Salvamento do modelo treinado
+
+### Sistema de Inferência
+
+1. **Carregamento de Modelo**: Inicialização de modelo treinado
+2. **Pré-processamento**: Preparação de imagens para inferência
+3. **Detecção**: Execução da inferência
+4. **Pós-processamento**: Filtragem de resultados, NMS
+5. **Visualização**: Renderização dos resultados
+
+### Agendamento e Monitoramento
+
+- Agendamento de treinamentos longos
+- Monitoramento de recursos (CPU, GPU, memória)
+- Checkpoints automáticos
+- Early stopping e estratégias de ajuste de learning rate
+
+## VII. Sistema de Arquivos
+
+### Gerenciamento de Arquivos
+
+1. **Estrutura de Diretórios**: Organização clara e padronizada
+2. **Nomeação**: Convenções consistentes de nomeação
+3. **Metadados**: Armazenamento de metadados junto com arquivos
+4. **Limpeza**: Rotinas para limpeza de arquivos temporários
+
+### Formatos Suportados
+
+- **Imagens**: PNG, JPG, TIFF
+- **Anotações**: YOLO, COCO, Pascal VOC
+- **Modelos**: PyTorch (.pt), ONNX
+- **Configurações**: YAML, JSON
+
+## VIII. Execução do Backend
+
+### Modos de Operação
+
+1. **Standalone**: Execução como serviço independente
+2. **Integrado**: Iniciado pelo aplicativo Flutter
+3. **CLI**: Interface de linha de comando para scripts
+
+### Ambiente de Execução
+
+- **Virtual Environment**: Isolamento de dependências
+- **Multi-threading**: Para operações paralelas
+- **Configuração**: Variáveis de ambiente e arquivos de configuração
+
+## IX. Tratamento de Erros
+
+### Estratégia de Tratamento de Erros
+
+1. **Hierarquia de Exceções**: Exceções customizadas para diferentes tipos de erro
+2. **Logging**: Sistema de logging abrangente com níveis apropriados
+3. **Recuperação**: Estratégias de fallback e recovery
+4. **Feedback**: Mensagens de erro claras e acionáveis
+
+### Monitoramento e Diagnóstico
+
+- Logs estruturados para facilitar análise
+- Captura de telemetria para diagnóstico
+- Alertas para condições críticas
+
+## X. Testes
+
+### Estratégia de Testes
+
+1. **Testes Unitários**: Para funções e métodos individuais
+2. **Testes de Integração**: Para fluxos completos
+3. **Testes de API**: Para verificar endpoints
+4. **Testes de Performance**: Para operações críticas
+
+### Ferramentas de Teste
+
+- **pytest**: Framework principal de testes
+- **pytest-cov**: Cobertura de código
+- **pytest-asyncio**: Testes para código assíncrono
+- **pytest-mock**: Mock de dependências
+
+## XI. Padrões de Desenvolvimento
+
+### Padrões Arquiteturais
+
+1. **Repository Pattern**: Para acesso a dados
+2. **Service Layer**: Para lógica de negócios
+3. **Dependency Injection**: Para desacoplamento
+4. **Command Pattern**: Para operações assíncronas
+
+### Práticas Recomendadas
+
+1. **Tipo Estático**: Uso de type hints
+2. **Documentação**: Docstrings para todas as funções públicas
+3. **Imutabilidade**: Preferência por estruturas imutáveis
+4. **Funções Puras**: Minimizar efeitos colaterais
+
+## XII. Considerações de Deployment
+
+### Empacotamento
+
+- Empacotamento com a aplicação Flutter
+- Distribuição de ambiente virtual completo
+- Scripts de instalação e atualização
+
+### Compatibilidade
+
+- Suporte para Windows, macOS e Linux
+- Gestão de dependências nativas
+- Detecção e configuração de hardware
+
+## XIII. Performance e Otimização
+
+### Otimizações Críticas
+
+1. **Processamento de Imagens**: Algoritmos otimizados para CPU/GPU
+2. **Inferência de Modelos**: Uso de TensorRT ou ONNX Runtime
+3. **I/O de Arquivo**: Acesso eficiente para grandes conjuntos de dados
+4. **API Responses**: Caching e paginação
+
+### Profile e Benchmarking
+
+- Ferramentas para identificação de gargalos
+- Benchmarks para operações críticas
+- Monitoramento contínuo de performance
+
+## XIV. Segurança
+
+### Práticas de Segurança
+
+1. **Validação de Entrada**: Validação rigorosa de todos os inputs
+2. **Sanitização de Paths**: Prevenção de path traversal
+3. **Configuração Segura**: Práticas seguras para configuração
+4. **Limitação de Recursos**: Prevenção de ataques DoS
+
+## XV. Integração com Frontend
+
+### Comunicação com Flutter
+
+1. **REST API**: Para operações síncronas principais
+2. **WebSockets**: Para streaming e notificações
+3. **Arquivos**: Para transferência de dados volumosos
+4. **Sistema de Eventos**: Para notificações assíncronas
+
+### Interface de Comunicação
+
+- Contratos claros via schemas Pydantic
+- Versionamento explícito da API
+- Documentação de endpoints
+
+## XVI. Considerações Éticas e Legais
+
+### Proteção de Dados
+
+- Anonimização de dados sensíveis
+- Opções para exclusão de dados
+- Conformidade com regulamentações de privacidade
+
+### Propriedade Intelectual
+
+- Licenciamento adequado de bibliotecas
+- Atribuição apropriada para modelos pré-treinados
+- Documentação de limitações e restrições
+
+## XVII. Referências e Recursos
+
+- Documentação oficial do Ultralytics YOLOv8
+- Documentação do FastAPI
+- Guias de melhores práticas para Python (PEP 8, PEP 257)
+- Literatura sobre visão computacional e processamento de imagens microscópicas
