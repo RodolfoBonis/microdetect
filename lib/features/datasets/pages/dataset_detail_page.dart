@@ -11,6 +11,7 @@ import 'package:microdetect/features/datasets/controllers/dataset_detail_control
 import 'package:microdetect/features/datasets/widgets/class_distribution_chart.dart';
 import 'package:microdetect/features/datasets/widgets/dataset_images_grid.dart';
 import 'package:microdetect/features/datasets/widgets/gallery_selector_widget.dart';
+import 'package:microdetect/routes/app_pages.dart';
 
 class DatasetDetailPage extends GetView<DatasetDetailController> {
   const DatasetDetailPage({Key? key}) : super(key: key);
@@ -21,6 +22,13 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
       appBar: AppBar(
         title: Obx(() => Text(controller.dataset?.name ?? 'Detalhes do Dataset')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Anotar Dataset',
+            onPressed: () {
+              Get.toNamed(AppRoutes.annotations);
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Atualizar',
@@ -873,5 +881,26 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
 
   String _formatDateTime(DateTime dateTime) {
     return '${_formatDate(dateTime)} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildActions() {
+    return Row(
+      children: [
+        // ... existing code para outros botões ...
+        
+        const SizedBox(width: 8),
+        
+        AppButton(
+          label: 'Anotações',
+          suffixIcon: Icons.edit_outlined,
+          onPressed: () {
+            // Navegar para a tela de anotação
+            Get.toNamed(AppRoutes.annotations);
+          },
+        ),
+        
+        // ... existing code para outros botões ...
+      ],
+    );
   }
 } 

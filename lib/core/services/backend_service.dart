@@ -105,32 +105,32 @@ class BackendService extends GetxService {
       }
 
       // Verificar se o pacote está instalado e atualizado
-      currentInitStep.value = BackendInitStep.installationCheck;
+      currentInitStep.value = BackendInitStep.checkingEnvironment;
       progressValue.value = 0.2;
 
       // Verificar versão atual
       if (_pythonService.currentVersion.value.isEmpty) {
         _addLog('Pacote microdetect não encontrado. Instalando...');
-
-        // Instalar o pacote
-        currentInitStep.value = BackendInitStep.backendInstallation;
-        progressValue.value = 0.4;
-
-        final installSuccess = await _pythonService.installOrUpdate();
-        if (!installSuccess) {
-          _setStatus(BackendStatus.error, 'Falha ao instalar o pacote microdetect');
-          lastError.value = 'Falha na instalação do pacote';
-          isInitializing.value = false;
-          return false;
-        }
-
-        _addLog('Pacote microdetect instalado com sucesso: ${_pythonService.currentVersion.value}');
       } else {
-        _addLog('Pacote microdetect encontrado: ${_pythonService.currentVersion.value}');
+        _addLog('Pacote microdetect encontrado: ${_pythonService.currentVersion.value}. Reinstalando para garantir versão correta...');
       }
 
+      // Instalar ou reinstalar o pacote
+      currentInitStep.value = BackendInitStep.installation;
+      progressValue.value = 0.4;
+
+      final installSuccess = await _pythonService.installOrUpdate(force: true);
+      if (!installSuccess) {
+        _setStatus(BackendStatus.error, 'Falha ao instalar o pacote microdetect');
+        lastError.value = 'Falha na instalação do pacote';
+        isInitializing.value = false;
+        return false;
+      }
+
+      _addLog('Pacote microdetect instalado com sucesso: ${_pythonService.currentVersion.value}');
+
       // Verificar saúde do Python
-      currentInitStep.value = BackendInitStep.pythonEnvironmentCheck;
+      currentInitStep.value = BackendInitStep.checkingEnvironment;
       progressValue.value = 0.6;
 
       // Iniciar o servidor
@@ -148,7 +148,7 @@ class BackendService extends GetxService {
       _addLog('Servidor iniciado com sucesso');
 
       // Verificar saúde do servidor
-      currentInitStep.value = BackendInitStep.healthCheck;
+      currentInitStep.value = BackendInitStep.serverStartup;
       progressValue.value = 0.9;
 
       // Iniciar timer para verificar saúde periodicamente

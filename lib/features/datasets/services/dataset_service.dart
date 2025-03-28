@@ -12,10 +12,19 @@ class DatasetService extends ApiService {
   Future<List<Dataset>> getDatasets() async {
     try {
       final response = await get('/api/v1/datasets');
-      LoggerUtil.info('Datasets carregados: ${response.data.length}');
-      return response.data
-          .map<Dataset>((json) => Dataset.fromJson(json))
-          .toList();
+      // Verificar se a resposta está no formato esperado
+      if (response.data is Map && response.data.containsKey('data')) {
+        final dataList = response.data['data'];
+        LoggerUtil.info('Datasets carregados: ${dataList.length}');
+        return dataList.map<Dataset>((json) => Dataset.fromJson(json)).toList();
+      } else if (response.data is List) {
+        // Formato de lista direta
+        LoggerUtil.info('Datasets carregados: ${response.data.length}');
+        return response.data.map<Dataset>((json) => Dataset.fromJson(json)).toList();
+      } else {
+        LoggerUtil.warning('Formato de resposta inesperado para datasets');
+        return [];
+      }
     } catch (e) {
       LoggerUtil.error('Erro ao carregar datasets', e);
       return [];
@@ -26,7 +35,17 @@ class DatasetService extends ApiService {
   Future<Dataset?> getDataset(int id) async {
     try {
       final response = await get('/api/v1/datasets/$id');
-      return Dataset.fromJson(response.data);
+      // Verificar se a resposta está no formato esperado
+      if (response.data is Map) {
+        if (response.data.containsKey('data')) {
+          return Dataset.fromJson(response.data['data']);
+        } else {
+          return Dataset.fromJson(response.data);
+        }
+      } else {
+        LoggerUtil.warning('Formato de resposta inesperado para dataset $id');
+        return null;
+      }
     } catch (e) {
       LoggerUtil.error('Erro ao carregar dataset $id', e);
       return null;
@@ -134,7 +153,16 @@ class DatasetService extends ApiService {
           await get('/api/v1/datasets/$datasetId/class-distribution');
       LoggerUtil.info(
           'Distribuição de classes carregada para o dataset $datasetId');
-      return List<Map<String, dynamic>>.from(response.data);
+      
+      // Verificar se a resposta está no formato esperado
+      if (response.data is Map && response.data.containsKey('data')) {
+        return List<Map<String, dynamic>>.from(response.data['data']);
+      } else if (response.data is List) {
+        return List<Map<String, dynamic>>.from(response.data);
+      } else {
+        LoggerUtil.warning('Formato de resposta inesperado para distribuição de classes');
+        return [];
+      }
     } catch (e) {
       LoggerUtil.error(
           'Erro ao carregar distribuição de classes para o dataset $datasetId',
@@ -148,11 +176,39 @@ class DatasetService extends ApiService {
     try {
       final response = await get('/api/v1/datasets/$datasetId/stats');
       LoggerUtil.info('Estatísticas carregadas para o dataset $datasetId');
-      return DatasetStatistics.fromJson(response.data);
+      
+      // Verificar se a resposta está no formato esperado
+      if (response.data is Map) {
+        if (response.data.containsKey('data')) {
+          return DatasetStatistics.fromJson(response.data['data']);
+        } else {
+          return DatasetStatistics.fromJson(response.data);
+        }
+      } else {
+        LoggerUtil.warning('Formato de resposta inesperado para estatísticas do dataset $datasetId');
+        // Retornar estatísticas vazias em vez de null para evitar erros na UI
+        return DatasetStatistics(
+          totalImages: 0,
+          totalAnnotations: 0,
+          annotatedImages: 0,
+          unannotatedImages: 0,
+          averageObjectsPerImage: 0,
+          averageObjectDensity: 0,
+        );
+      }
     } catch (e) {
       LoggerUtil.error(
           'Erro ao carregar estatísticas para o dataset $datasetId', e);
-      return null;
+      
+      // Retornar estatísticas vazias em vez de null para prevenir erros na UI
+      return DatasetStatistics(
+        totalImages: 0,
+        totalAnnotations: 0,
+        annotatedImages: 0,
+        unannotatedImages: 0,
+        averageObjectsPerImage: 0,
+        averageObjectDensity: 0,
+      );
     }
   }
 

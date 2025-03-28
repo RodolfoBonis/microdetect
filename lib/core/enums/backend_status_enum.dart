@@ -2,40 +2,25 @@
 
 /// Define as etapas de inicialização do backend com precisão
 enum BackendInitStep {
-  /// Inicialização do sistema principal
+  /// Inicialização do sistema (localizando Python, pip, etc.)
   systemInitialization,
-
-  /// Configuração de diretórios da aplicação
-  directorySetup,
-
-  /// Verificação da instalação do backend
-  installationCheck,
-
-  /// Verificação de atualizações disponíveis
-  updateCheck,
-
-  /// Instalação ou atualização do backend
-  backendInstallation,
-
-  /// Configuração dos diretórios de dados
-  dataDirectorySetup,
-
-  /// Verificação do ambiente Python
-  pythonEnvironmentCheck,
-
-  /// Instalação de dependências Python
-  dependenciesInstallation,
-
-  /// Inicialização do servidor Python
+  
+  /// Verificando ambiente e versão atual instalada
+  checkingEnvironment,
+  
+  /// Verificando atualizações disponíveis
+  checkingUpdates,
+  
+  /// Instalação/atualização do pacote microdetect
+  installation,
+  
+  /// Inicialização do servidor
   serverStartup,
-
-  /// Verificação da saúde do servidor
-  healthCheck,
-
-  /// Processo de inicialização concluído
+  
+  /// Inicialização completa com sucesso
   completed,
-
-  /// Falha na inicialização
+  
+  /// Falha em alguma etapa da inicialização
   failed
 }
 

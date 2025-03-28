@@ -15,6 +15,8 @@ import 'package:microdetect/features/datasets/bindings/dataset_binding.dart';
 import 'package:microdetect/features/datasets/bindings/dataset_detail_binding.dart';
 import 'package:microdetect/features/datasets/pages/dataset_detail_page.dart';
 import 'package:microdetect/features/datasets/pages/datasets_page.dart';
+import 'package:microdetect/features/annotation/bindings/annotation_binding.dart';
+import 'package:microdetect/features/annotation/screens/annotation_screen.dart';
 
 part 'app_routes.dart';
 
@@ -53,7 +55,12 @@ abstract class AppPages {
             ),
           ]
         ),
-
+        GetPage(
+          name: _Paths.annotations.path,
+          page: () => const AnnotationScreen(),
+          binding: AnnotationBinding(),
+          transition: Transition.fade,
+        ),
         // GetPage(
         //   name: _Paths.annotations.path,
         //   page: () => AnnotationsView(),

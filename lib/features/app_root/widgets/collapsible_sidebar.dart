@@ -126,8 +126,8 @@ class CollapsibleSidebar extends StatelessWidget {
                 isDarkMode: isDarkMode,
               ),
               _buildNavItem(
-                icon: Icons.edit,
-                label: 'Anotação',
+                icon: Icons.draw_outlined,
+                label: 'Editor de Anotações',
                 route: AppRoutes.annotations,
                 iconColor: iconColor,
                 textColor: textColor,

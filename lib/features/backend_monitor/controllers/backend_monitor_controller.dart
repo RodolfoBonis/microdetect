@@ -318,32 +318,43 @@ class BackendMonitorController extends GetxController {
     rootRoute = route;
   }
 
-  // Check for updates
+  // Método melhorado para verificar atualizações sem ficar no estado "Carregando..."
   Future<void> checkForUpdates() async {
-    LoggerUtil.info('Checking for backend updates...');
-
-    AppToast.info(
-      'Verificação',
-      description: 'Verificando atualizações disponíveis...',
-    );
-
+    LoggerUtil.info('Verificando atualizações manualmente...');
+    
+    // Definir valores temporários para não mostrar "Carregando..."
+    if (currentVersion.value.isEmpty) {
+      currentVersion.value = "Verificando...";
+    }
+    
+    if (latestVersion.value.isEmpty) {
+      latestVersion.value = "Verificando...";
+    }
+    
+    // Aguardar um momento para UI atualizar
+    await Future.delayed(const Duration(milliseconds: 100));
+    
     try {
-      final hasUpdate = await _backendService.checkForUpdates();
-
+      // Verificar versão atual primeiro
+      await _pythonService.checkCurrentVersion();
+      
+      // Verificar atualizações disponíveis
+      final hasUpdate = await _pythonService.checkForUpdates();
+      
       if (hasUpdate) {
+        LoggerUtil.info('Atualização disponível: ${currentVersion.value} -> ${latestVersion.value}');
         AppToast.info(
-          'Atualização Disponível',
-          description: 'Nova versão ${latestVersion.value} disponível!',
+          'Atualização disponível',
+          description: 'Nova versão ${latestVersion.value} disponível para instalação.',
         );
-
-        // Reset to show prompt again
-        updatePromptShown.value = false;
-        _promptToUpdate();
       } else {
-        AppToast.success(
-          'Atualizado',
-          description: 'Você já está usando a versão mais recente (${currentVersion.value}).',
-        );
+        LoggerUtil.info('Nenhuma atualização disponível. Versão atual: ${currentVersion.value}');
+        if (currentVersion.value.isNotEmpty) {
+          AppToast.success(
+            'Sistema atualizado',
+            description: 'Você já está usando a versão mais recente (${currentVersion.value}).',
+          );
+        }
       }
     } catch (e) {
       LoggerUtil.error('Erro ao verificar atualizações: $e');
@@ -351,6 +362,20 @@ class BackendMonitorController extends GetxController {
         'Erro',
         description: 'Falha ao verificar atualizações: $e',
       );
+      
+      // Em caso de erro, definir valores padrão se estiverem vazios
+      if (currentVersion.value == "Verificando...") {
+        await _pythonService.checkCurrentVersion();
+        if (currentVersion.value.isEmpty) {
+          currentVersion.value = "Desconhecida";
+        }
+      }
+      
+      if (latestVersion.value == "Verificando...") {
+        latestVersion.value = currentVersion.value.isNotEmpty 
+            ? currentVersion.value 
+            : "Desconhecida";
+      }
     }
   }
 
@@ -419,7 +444,7 @@ class BackendMonitorController extends GetxController {
   // Monitor health check stalls
   void _monitorHealthCheck() {
     // Implementation remains the same
-    if (currentInitStep.value == BackendInitStep.healthCheck && isInitializing.value) {
+    if (currentInitStep.value == BackendInitStep.serverStartup && isInitializing.value) {
       healthCheckStalls.value++;
 
       if (healthCheckStalls.value >= 6) {

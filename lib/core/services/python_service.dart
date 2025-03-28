@@ -1,12 +1,16 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+import 'package:microdetect/core/services/health_service.dart';
+import 'package:microdetect/core/services/system_status_service.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import '../utils/logger_util.dart';
 import '../enums/backend_status_enum.dart';
 import '../../config/app_directories.dart';
+import 'package:microdetect/core/services/api_service.dart';
 
 class PythonService extends GetxService {
   // Observable state
@@ -26,10 +30,21 @@ class PythonService extends GetxService {
   String? _microdetectPath;
 
   // AWS CodeArtifact configuration
-  final String _awsRegion = '';
-  final String _codeArtifactDomain = '';
-  final String _codeArtifactRepository = '';
-  final String _codeArtifactOwner = ''; // AWS Account ID
+  String get _awsRegion => _getAwsVar('AWS_REGION', '');
+  String get _codeArtifactDomain => _getAwsVar('CODE_ARTIFACT_DOMAIN', '');
+  String get _codeArtifactRepository => _getAwsVar('CODE_ARTIFACT_REPOSITORY', '');
+  String get _codeArtifactOwner => _getAwsVar('CODE_ARTIFACT_OWNER', ''); // AWS Account ID
+
+  // Recupera variáveis AWS do backup para uso na instalação
+  String _getAwsVar(String name, String defaultValue) {
+    try {
+      final Map<String, String> awsVars = Get.find<Map<String, String>>(tag: 'awsVars');
+      return awsVars[name] ?? defaultValue;
+    } catch (e) {
+      // Se não encontrar no backup, tenta no dotenv como fallback
+      return dotenv.env[name] ?? defaultValue;
+    }
+  }
 
   // Getters
   bool get isRunning => _isRunning.value;
@@ -47,8 +62,7 @@ class PythonService extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    // Localizar executáveis Python durante inicialização
-    _initializePythonEnvironment();
+    _initializeService();
   }
 
   @override
@@ -536,21 +550,108 @@ class PythonService extends GetxService {
         }
       }
 
+      // Testar usando pip list primeiro (mais confiável em alguns casos)
+      final listResult = await _runPipCommand(['list', '--format=json']);
+      if (listResult.exitCode == 0) {
+        try {
+          final jsonOutput = listResult.stdout.toString();
+          final List<dynamic> packages = jsonDecode(jsonOutput);
+
+          for (final package in packages) {
+            if (package['name'].toString().toLowerCase() == 'microdetect') {
+              currentVersion.value = package['version'].toString();
+              _addLog('Versão atual do microdetect (via pip list): ${currentVersion.value}');
+              return;
+            }
+          }
+
+          // Se chegou aqui, não encontrou no pip list
+          _addLog('Microdetect não encontrado na lista de pacotes pip');
+        } catch (e) {
+          _addLog('Erro ao processar saída do pip list: $e');
+          // Continuar com o método alternativo
+        }
+      }
+
+      // Método alternativo: pip show
       final result = await _runPipCommand(['show', 'microdetect']);
+
+      // Log da saída completa para diagnóstico
+      _addLog('Saída do pip show: ${result.stdout.toString().trim()}');
 
       if (result.exitCode == 0) {
         // Extrair versão da saída do pip show (formato: "Version: X.Y.Z")
         final output = result.stdout.toString();
-        final versionMatch = RegExp(r'Version:\s+(\d+\.\d+\.\d+)').firstMatch(output);
+
+        // Tentar extrair com diferentes padrões para maior robustez
+        RegExpMatch? versionMatch = RegExp(r'Version:\s+(\d+\.\d+\.\d+)').firstMatch(output);
+
+        if (versionMatch == null) {
+          // Tentar padrão alternativo
+          versionMatch = RegExp(r'version\s*[:=]\s*(\d+\.\d+\.\d+)').firstMatch(output.toLowerCase());
+        }
+
+        if (versionMatch == null) {
+          // Tentar encontrar qualquer sequência de versão no formato X.Y.Z
+          versionMatch = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(output);
+        }
 
         if (versionMatch != null) {
           currentVersion.value = versionMatch.group(1)!;
           _addLog('Versão atual do microdetect: ${currentVersion.value}');
         } else {
-          _addLog('Não foi possível determinar a versão atual do microdetect');
+          _addLog('Não foi possível extrair a versão da saída do pip show');
+
+          // Tente verificar se o executável microdetect está disponível e usá-lo para obter a versão
+          final microdetectExe = await _findExecutableInPath('microdetect');
+          if (microdetectExe != null) {
+            try {
+              final versionResult = await Process.run(
+                microdetectExe,
+                ['version'],
+                stdoutEncoding: utf8
+              );
+
+              if (versionResult.exitCode == 0) {
+                final output = versionResult.stdout.toString().trim();
+                final match = RegExp(r'(\d+\.\d+\.\d+)').firstMatch(output);
+
+                if (match != null) {
+                  currentVersion.value = match.group(1)!;
+                  _addLog('Versão atual do microdetect (via CLI): ${currentVersion.value}');
+                  return;
+                }
+              }
+            } catch (e) {
+              _addLog('Erro ao obter versão via CLI: $e');
+            }
+          }
+
           currentVersion.value = '';
         }
       } else {
+        // Se pip show falhou, tente verificar a presença do módulo via Python
+        if (_pythonPath != null) {
+          try {
+            final moduleResult = await Process.run(
+              _pythonPath!,
+              ['-c', 'import microdetect; print(microdetect.__version__)'],
+              stdoutEncoding: utf8
+            );
+
+            if (moduleResult.exitCode == 0 && moduleResult.stdout.toString().trim().isNotEmpty) {
+              final version = moduleResult.stdout.toString().trim();
+              if (RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
+                currentVersion.value = version;
+                _addLog('Versão atual do microdetect (via módulo Python): ${currentVersion.value}');
+                return;
+              }
+            }
+          } catch (e) {
+            _addLog('Erro ao verificar módulo Python: $e');
+          }
+        }
+
         _addLog('Pacote microdetect não está instalado');
         currentVersion.value = '';
       }
@@ -704,41 +805,31 @@ class PythonService extends GetxService {
     return null;
   }
 
-  /// Configura as credenciais da AWS
-  Future<bool> _configureAwsCredentials(String accessKeyId, String secretAccessKey) async {
+  Future<void> loginIntoAWS() async {
+    // Implementar lógica de login na AWS se necessário
+    final awsExecutable = await _findAwsExecutable();
+
+    if (awsExecutable == null) {
+      _addLog('AWS CLI não encontrado, não é possível fazer login');
+      return;
+    }
+
     try {
-      final awsPath = await _findAwsExecutable();
-      if (awsPath == null) {
-        _addLog('AWS CLI não encontrado no sistema');
-        return false;
+      // aws codeartifact login --tool pip --repository microdetect --domain rbtech --domain-owner 718446585908 --region us-east-1
+      final result = await Process.run(
+        awsExecutable,
+        ['codeartifact', 'login', '--tool', 'pip', '--repository', _codeArtifactRepository, '--domain', _codeArtifactDomain, '--domain-owner', _codeArtifactOwner, '--region', _awsRegion],
+        stdoutEncoding: utf8,
+        stderrEncoding: utf8
+      );
+
+      if (result.exitCode == 0) {
+        _addLog('Login na AWS realizado com sucesso');
+      } else {
+        _addLog('Erro ao fazer login na AWS: ${result.stderr}');
       }
-
-      // Configurar AWS CLI
-      await Process.run(
-          awsPath,
-          ['configure', 'set', 'aws_access_key_id', accessKeyId],
-          stdoutEncoding: utf8,
-          stderrEncoding: utf8
-      );
-
-      await Process.run(
-          awsPath,
-          ['configure', 'set', 'aws_secret_access_key', secretAccessKey],
-          stdoutEncoding: utf8,
-          stderrEncoding: utf8
-      );
-
-      await Process.run(
-          awsPath,
-          ['configure', 'set', 'region', _awsRegion],
-          stdoutEncoding: utf8,
-          stderrEncoding: utf8
-      );
-
-      return true;
     } catch (e) {
-      _addLog('Erro ao configurar credenciais AWS: $e');
-      return false;
+      _addLog('Exceção ao fazer login na AWS: $e');
     }
   }
 
@@ -755,59 +846,62 @@ class PythonService extends GetxService {
         }
       }
 
-      // Verificar versão atual
-      if (!force) {
-        await checkCurrentVersion();
-      }
-
-      // Criar mapa de ambiente que evita a solicitação de entrada interativa
+      // Ambiente limpo para instalação
       final environment = {
-        'PIP_NO_INPUT': '1',           // Evita que o pip solicite qualquer entrada
-        'PIP_DISABLE_PIP_VERSION_CHECK': '1', // Evita verificação de versão do pip
-        'PYTHONIOENCODING': 'utf-8',   // Garante codificação correta
-        'PYTHONUNBUFFERED': '1',       // Evita buffering da saída
+        'PIP_NO_INPUT': '1',
+        'PIP_DISABLE_PIP_VERSION_CHECK': '1',
+        'PYTHONIOENCODING': 'utf-8',
+        'PYTHONUNBUFFERED': '1',
       };
 
-      // Usar o PyPI padrão em vez do AWS CodeArtifact para evitar problemas de autenticação
-      _addLog('Instalando pacote microdetect do PyPI...');
+      // Primeiro, vamos limpar qualquer instalação existente
+      _addLog('Desinstalando versão existente do microdetect...');
+      final uninstallResult = await _runPipCommand(
+          ['uninstall', 'microdetect', '-y'],
+          environment: environment
+      );
+      
+      // Mesmo se a desinstalação falhar, continue com a instalação
+      if (uninstallResult.exitCode != 0) {
+        _addLog('Aviso: Falha ao desinstalar versão atual, continuando com a instalação...');
+      }
 
-      // Instalar com opções seguras para evitar entrada interativa
+      // Tentar instalar do PyPI primeiro (mais simples)
+      _addLog('Instalando microdetect do PyPI...');
       final result = await _runPipCommand(
-          ['install', 'microdetect', '--upgrade', '--no-input', '--quiet',
-            '--user', '--no-cache-dir', '--default-timeout', '60',
-            '--retries', '3', '--index-url', 'https://pypi.org/simple'],
+          ['install', 'microdetect', '--user'],
           environment: environment
       );
 
       if (result.exitCode == 0) {
-        _addLog('Pacote microdetect instalado/atualizado com sucesso');
-
-        // Atualizar versão atual e procurar o executável microdetect
+        _addLog('Pacote microdetect instalado com sucesso do PyPI');
+        
+        // Atualizar versão atual
         await checkCurrentVersion();
         _microdetectPath = await _findMicrodetectExecutable();
-
+        
         return true;
-      } else {
-        // Tentar novamente com configuração mais simples em caso de falha
-        _addLog('Primeira tentativa falhou, tentando com opções mais simples...');
-
-        final secondAttempt = await _runPipCommand(
-            ['install', 'microdetect', '--user', '--no-input'],
-            environment: environment
-        );
-
-        if (secondAttempt.exitCode == 0) {
-          _addLog('Pacote microdetect instalado com sucesso na segunda tentativa');
-
-          await checkCurrentVersion();
-          _microdetectPath = await _findMicrodetectExecutable();
-
-          return true;
-        }
-
-        _addLog('Erro ao instalar pacote: ${result.stderr}');
-        return false;
       }
+
+      // Se falhar, tentar com mais opções
+      _addLog('Primeira tentativa falhou, tentando com opções alternativas...');
+      
+      final secondAttempt = await _runPipCommand(
+          ['install', 'microdetect', '--user', '--no-cache-dir'],
+          environment: environment
+      );
+      
+      if (secondAttempt.exitCode == 0) {
+        _addLog('Pacote microdetect instalado com sucesso na segunda tentativa');
+        
+        await checkCurrentVersion();
+        _microdetectPath = await _findMicrodetectExecutable();
+        
+        return true;
+      }
+
+      _addLog('Todas as tentativas de instalação falharam. Erro: ${result.stderr}');
+      return false;
     } catch (e) {
       _addLog('Erro ao instalar/atualizar pacote: $e');
       return false;
@@ -831,8 +925,13 @@ class PythonService extends GetxService {
       _addLog('Iniciando servidor microdetect na porta $port...');
       _addLog('Diretório de dados: $dataDir');
 
-      // CORREÇÃO: Tentar vários métodos para iniciar o servidor
+      // Definir variáveis de ambiente para o servidor
+      final Map<String, String> serverEnvironment = {
+        'PYTHONUNBUFFERED': '1',
+        'MICRODETECT_DATA_DIR': dataDir,
+      };
 
+      // Tentar vários métodos para iniciar o servidor
       // 1. Primeiro, tentar localizar o executável microdetect (método preferido)
       String? microdetectExe = await _findExecutableInPath('microdetect');
 
@@ -842,10 +941,8 @@ class PythonService extends GetxService {
         // Iniciar processo usando o executável diretamente
         _pythonProcess = await Process.start(
             microdetectExe,
-            ['start-server', '--port', port.toString(), '--data-dir', dataDir],
-            environment: {
-              'PYTHONUNBUFFERED': '1',
-            }
+            ['start-server', '--port', port.toString()],
+            environment: serverEnvironment
         );
       }
       // 2. Se não encontrar, tentar via python -m microdetect.server
@@ -854,14 +951,15 @@ class PythonService extends GetxService {
 
         _pythonProcess = await Process.start(
             _pythonPath!,
-            ['-m', 'microdetect.server', 'start-server', '--port', port.toString(), '--data-dir', dataDir],
-            environment: {
-              'PYTHONUNBUFFERED': '1',
-            }
+            ['-m', 'microdetect.server', 'start-server', '--port', port.toString()],
+            environment: serverEnvironment
         );
       } else {
         throw Exception('Nem Python nem microdetect encontrados no sistema');
       }
+
+      // Flag para detectar quando o servidor está pronto
+      bool serverStartupDetected = false;
 
       // Capturar saída padrão
       _pythonProcess!.stdout
@@ -877,6 +975,7 @@ class PythonService extends GetxService {
           _isRunning.value = true;
           _status.value = true;
           pythonState.value = BackendInitStep.completed;
+          serverStartupDetected = true;
         }
       });
 
@@ -905,6 +1004,48 @@ class PythonService extends GetxService {
       // Aguardar um tempo para o servidor iniciar
       await Future.delayed(const Duration(seconds: 5));
 
+      // Verificar se o servidor foi detectado como iniciado pelos logs
+      if (serverStartupDetected) {
+        _addLog('Servidor detectado como iniciado através do log');
+        _isRunning.value = true;
+        _status.value = true;
+        pythonState.value = BackendInitStep.completed;
+
+        // Aguardar tempo adicional antes de tentar health check
+        _addLog('Aguardando tempo adicional para o servidor inicializar completamente...');
+        await Future.delayed(const Duration(seconds: 5));
+
+        // Tentar health check mesmo com servidor já detectado como iniciado
+        try {
+          final isHealthy = await checkServerHealth();
+          if (isHealthy) {
+            _addLog('Servidor respondendo ao health check com sucesso');
+          } else {
+            _addLog('Servidor iniciado, mas ainda não está respondendo ao health check');
+            // Confirmar que o servidor está em execução, mesmo com health check falhando
+            if (_pythonProcess != null) {
+              _addLog('Processo Python ainda em execução, considerando servidor como ativo');
+              _isRunning.value = true;
+              _status.value = true;
+            }
+          }
+        } catch (e) {
+          _addLog('Erro ao verificar health check após inicialização: $e');
+          // Mesmo com erro no health check, se o processo está rodando, considerar como ativo
+          if (_pythonProcess != null) {
+            _addLog('Processo Python ainda em execução, considerando servidor como ativo');
+            _isRunning.value = true;
+            _status.value = true;
+          }
+        }
+
+        return true;
+      }
+
+      // Se o servidor não foi detectado pelos logs, aguardar mais tempo
+      _addLog('Aguardando tempo adicional para o servidor inicializar...');
+      await Future.delayed(const Duration(seconds: 10));
+
       // Verificar saúde do servidor
       final isHealthy = await checkServerHealth();
 
@@ -914,15 +1055,37 @@ class PythonService extends GetxService {
         _status.value = true;
         pythonState.value = BackendInitStep.completed;
         return true;
-      } else if (_isRunning.value) {
-        // Se o processo está rodando, mas não responde à verificação de saúde,
-        // ainda consideramos como em execução mas logamos um aviso
-        _addLog('Servidor iniciado, mas não está respondendo ao health check');
-        return true;
       } else {
-        _addLog('Erro ao iniciar servidor, processo não está em execução');
-        pythonState.value = BackendInitStep.failed;
-        return false;
+        // Verificar se o processo ainda está em execução
+        bool isProcessRunning = _pythonProcess != null;
+
+        if (isProcessRunning) {
+          _addLog('Servidor iniciado, mas não está respondendo ao health check');
+          _addLog('Considerando servidor como em execução mesmo sem health check');
+          _isRunning.value = true;
+          _status.value = true;
+          pythonState.value = BackendInitStep.completed;
+
+          // Programar uma verificação de saúde após um tempo maior
+          Future.delayed(const Duration(seconds: 20)).then((_) async {
+            try {
+              final isHealthy = await checkServerHealth();
+              if (isHealthy) {
+                _addLog('Servidor agora está respondendo ao health check');
+              } else {
+                _addLog('Servidor ainda não está respondendo ao health check após tempo adicional');
+              }
+            } catch (e) {
+              _addLog('Erro ao verificar health check secundário: $e');
+            }
+          });
+
+          return true;
+        } else {
+          _addLog('Erro ao iniciar servidor, processo não está em execução');
+          pythonState.value = BackendInitStep.failed;
+          return false;
+        }
       }
     } catch (e) {
       _addLog('Erro ao iniciar servidor: $e');
@@ -947,31 +1110,34 @@ class PythonService extends GetxService {
   /// Verifica a saúde do servidor
   Future<bool> checkServerHealth() async {
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 5);
+      final healthService = Get.find<HealthService>();
 
-      final url = 'http://${_host.value}:${_port.value}/health';
+      try {
+        final health = await healthService.checkHealth();
 
-      final request = await client.getUrl(Uri.parse(url))
-          .timeout(const Duration(seconds: 5));
+        // Verificar o campo status do mapa retornado pelo health check
+        final status = health['status']?.toString().toLowerCase() ?? '';
+        return status == 'healthy' || status == 'ok';
+      } catch (healthError) {
+        // Verificação alternativa para o caso de erro no endpoint /health
+        _addLog('Erro ao verificar endpoint /health específico: $healthError');
 
-      final response = await request.close()
-          .timeout(const Duration(seconds: 5));
-
-      final responseBody = await response.transform(utf8.decoder).join();
-      client.close();
-
-      if (response.statusCode == 200) {
+        // Tentar uma chamada alternativa para verificar se o servidor está respondendo
         try {
-          final data = jsonDecode(responseBody);
-          return data['status'] == 'healthy';
-        } catch (e) {
-          // Se não conseguir decodificar o JSON, pelo menos respondeu com 200
-          return true;
-        }
-      }
+          // Verificar se o Uvicorn está respondendo em qualquer endpoint
+          final systemStatusService = Get.find<SystemStatusService>();
+          final systemStatus = await systemStatusService.getSystemStatus();
 
-      return false;
+          // Se conseguimos obter o status do sistema, o servidor está respondendo
+          _addLog('Endpoint de status respondendo, considerando servidor como ativo');
+          return true;
+        } catch (alternativeError) {
+          _addLog('Erro na verificação alternativa: $alternativeError');
+        }
+
+        // Se chegou aqui, ambas as verificações falharam
+        return false;
+      }
     } on TimeoutException {
       _addLog('Timeout ao verificar saúde do servidor');
       return false;
@@ -1112,5 +1278,116 @@ class PythonService extends GetxService {
 
     // Também logar para debug se necessário
     LoggerUtil.debug('[PythonService] $cleanedMessage');
+  }
+
+
+  /// Run a command for a specific Python subprocess
+  Future<ProcessResult> runPythonScript(List<String> args) async {
+    if (_pythonPath == null) {
+      await _initializePythonEnvironment();
+      if (_pythonPath == null) {
+        throw Exception('Python não encontrado no sistema');
+      }
+    }
+
+    return await Process.run(_pythonPath!, args);
+  }
+
+  // Inicializa o serviço
+  Future<void> _initializeService() async {
+    try {
+      _addLog('Inicializando serviço Python...');
+      pythonState.value = BackendInitStep.systemInitialization;
+
+      // 1. Verificar se o ambiente Python está disponível
+      _addLog('Passo 1/5: Verificando ambiente Python...');
+      await _initializePythonEnvironment();
+
+      if (_pythonPath == null) {
+        _addLog('Python não encontrado. Não é possível continuar.');
+        pythonState.value = BackendInitStep.failed;
+        return;
+      }
+
+      // 2. Verificar se o microdetect está instalado
+      _addLog('Passo 2/5: Verificando instalação do microdetect...');
+      pythonState.value = BackendInitStep.checkingEnvironment;
+      await checkCurrentVersion();
+
+      // 3. Verificar atualizações disponíveis
+      _addLog('Passo 3/5: Verificando atualizações...');
+
+      // Primeiro, tentar verificar a versão mais recente no PyPI diretamente (mais confiável)
+      bool updateAvailable = false;
+      try {
+        final result = await _runPipCommand(['index', 'versions', 'microdetect']);
+        if (result.exitCode == 0) {
+          final output = result.stdout.toString();
+          final versionRegex = RegExp(r'Available versions: ([\d\., ]+)');
+          final match = versionRegex.firstMatch(output);
+
+          if (match != null) {
+            final versions = match.group(1)!.split(',').map((v) => v.trim()).toList();
+            if (versions.isNotEmpty) {
+              latestVersion.value = versions.first;
+              updateAvailable = currentVersion.value.isEmpty ||
+                                latestVersion.value != currentVersion.value;
+            }
+          }
+        } else {
+          // Se o comando não estiver disponível, usar o método alternativo
+          updateAvailable = await checkForUpdates();
+        }
+      } catch (e) {
+        _addLog('Erro ao verificar versões no PyPI: $e');
+        // Fallback para o método alternativo
+        updateAvailable = await checkForUpdates();
+      }
+
+      // 4. Instalar ou atualizar o pacote se necessário
+      _addLog('Passo 4/5: ${currentVersion.value.isEmpty ? "Instalando" : updateAvailable ? "Atualizando" : "Verificando"} microdetect...');
+      pythonState.value = BackendInitStep.installation;
+
+      bool shouldInstall = currentVersion.value.isEmpty || updateAvailable;
+
+      if (shouldInstall) {
+        if (currentVersion.value.isEmpty) {
+          _addLog('Microdetect não instalado. Instalando...');
+        } else if (updateAvailable) {
+          _addLog('Atualização disponível: ${currentVersion.value} -> ${latestVersion.value}. Atualizando...');
+        }
+
+        bool installSuccess = await installOrUpdate(force: updateAvailable);
+        if (!installSuccess) {
+          _addLog('Falha ao instalar/atualizar microdetect.');
+          if (currentVersion.value.isEmpty) {
+            pythonState.value = BackendInitStep.failed;
+            return;
+          }
+          // Se já temos uma versão instalada, continuar mesmo com falha na atualização
+          _addLog('Continuando com a versão atual: ${currentVersion.value}');
+        } else {
+          _addLog('Microdetect instalado/atualizado com sucesso para versão: ${currentVersion.value}');
+        }
+      } else {
+        _addLog('Microdetect já está na versão mais recente: ${currentVersion.value}');
+      }
+
+      // 5. Iniciar o servidor
+      _addLog('Passo 5/5: Iniciando servidor...');
+      pythonState.value = BackendInitStep.serverStartup;
+
+      final startResult = await startServer();
+      if (startResult) {
+        _addLog('Servidor iniciado com sucesso.');
+        pythonState.value = BackendInitStep.completed;
+      } else {
+        _addLog('Falha ao iniciar o servidor.');
+        pythonState.value = BackendInitStep.failed;
+      }
+    } catch (e) {
+      _addLog('Erro durante inicialização: $e');
+      pythonState.value = BackendInitStep.failed;
+    }
   }
 }

@@ -65,6 +65,8 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.17
   fl_chart: ^0.70.2
+  flutter_dotenv: ^5.2.1
+  vector_math: ^2.1.4
 
   # Pacotes para manipulação de imagens
   flutter_image_compress: ^2.4.0
@@ -96,6 +98,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/fonts/
+    - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

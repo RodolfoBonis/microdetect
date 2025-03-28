@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:microdetect/config/app_directories.dart';
@@ -27,6 +28,12 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   // Garantir que a inicialização do Flutter seja concluída antes de qualquer outra operação
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Carrega o .env com variáveis de configuração
+  await dotenv.load(fileName: ".env");
+  
+  // Registra as variáveis AWS no dotenv mas garante que não sejam passadas ao processo Python
+  _sanitizeEnvironmentVariables();
 
   // Inicializar o sistema de diretórios primeiro
   await AppDirectories.instance.initialize();
@@ -167,6 +174,36 @@ Future<void> _killRemainingPythonProcesses() async {
   } catch (e) {
     LoggerUtil.error('Erro ao verificar processos restantes', e);
   }
+}
+
+// Função para evitar que variáveis AWS do .env afetem o processo Python
+void _sanitizeEnvironmentVariables() {
+  // Preservar as variáveis em Map separado para uso interno do app
+  // mas removê-las do objeto dotenv.env que é usado ao iniciar processos
+  final awsVars = [
+    'AWS_REGION',
+    'CODE_ARTIFACT_DOMAIN',
+    'CODE_ARTIFACT_REPOSITORY',
+    'CODE_ARTIFACT_OWNER',
+  ];
+  
+  // Reaplicar as variáveis no dotenv.env para uso interno
+  final backupAwsVars = <String, String>{};
+  
+  // Backup das variáveis importantes
+  for (final varName in awsVars) {
+    if (dotenv.env.containsKey(varName)) {
+      backupAwsVars[varName] = dotenv.env[varName]!;
+      // Não é possível remover do dotenv.env, mas podemos substituir por string vazia
+      // para que não interfira com o Pydantic do microdetect
+      dotenv.env[varName] = '';
+    }
+  }
+  
+  // Store backup in a global variable for later use
+  Get.put(backupAwsVars, tag: 'awsVars');
+  
+  LoggerUtil.info('Variáveis AWS isoladas para evitar conflitos com Pydantic');
 }
 
 class MicrodetectApp extends StatefulWidget {

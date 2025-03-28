@@ -14,6 +14,9 @@ enum AppButtonType {
   
   /// Botão terciário com aparência mínima
   tertiary,
+
+  /// Botão de sucesso com cor verde
+  success,
 }
 
 /// Tamanho de botão
@@ -179,6 +182,24 @@ class AppButton extends StatelessWidget {
           ),
           child: content,
         );
+        
+      case AppButtonType.success:
+        return ElevatedButton(
+          onPressed: isLoading ? null : onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: textColor,
+            disabledBackgroundColor: disabledBackgroundColor,
+            disabledForegroundColor: disabledForegroundColor,
+            elevation: 0,
+            padding: padding,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppBorders.radiusMedium),
+            ),
+            textStyle: textStyle.copyWith(inherit: true),
+          ),
+          child: content,
+        );
     }
   }
 
@@ -235,6 +256,8 @@ class AppButton extends StatelessWidget {
         return Colors.transparent;
       case AppButtonType.tertiary:
         return Colors.transparent;
+      case AppButtonType.success:
+        return AppColors.success;
     }
   }
 
@@ -248,10 +271,13 @@ class AppButton extends StatelessWidget {
 
     switch (type) {
       case AppButtonType.primary:
-        return AppColors.white;
+        return Colors.white;
       case AppButtonType.secondary:
+        return AppColors.primary;
       case AppButtonType.tertiary:
         return AppColors.primary;
+      case AppButtonType.success:
+        return Colors.white;
     }
   }
 
@@ -480,6 +506,24 @@ class AppIconButton extends StatelessWidget {
             child: content,
           ),
         );
+        
+      case AppButtonType.success:
+        return SizedBox(
+          width: buttonSize,
+          height: buttonSize,
+          child: ElevatedButton(
+            onPressed: isLoading ? null : onPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: backgroundColor,
+              disabledBackgroundColor: disabledBackgroundColor,
+              disabledForegroundColor: disabledForegroundColor,
+              padding: EdgeInsets.zero,
+              shape: shape,
+              minimumSize: Size.zero,
+            ),
+            child: content,
+          ),
+        );
     }
   }
   
@@ -519,6 +563,8 @@ class AppIconButton extends StatelessWidget {
       case AppButtonType.secondary:
       case AppButtonType.tertiary:
         return Colors.transparent;
+      case AppButtonType.success:
+        return AppColors.success;
     }
   }
   
@@ -536,6 +582,8 @@ class AppIconButton extends StatelessWidget {
       case AppButtonType.secondary:
       case AppButtonType.tertiary:
         return AppColors.primary;
+      case AppButtonType.success:
+        return Colors.white;
     }
   }
   

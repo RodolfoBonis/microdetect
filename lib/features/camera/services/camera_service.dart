@@ -37,8 +37,20 @@ class CameraService extends ApiService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        final List<GalleryImage> images = data.map((item) => GalleryImage.fromJson(item)).toList();
+        // Verificar se a resposta está no formato esperado
+        List<dynamic> imageData;
+        if (response.data is Map && response.data.containsKey('data')) {
+          imageData = response.data['data'];
+          LoggerUtil.info('Imagens carregadas: ${imageData.length}');
+        } else if (response.data is List) {
+          imageData = response.data;
+          LoggerUtil.info('Imagens carregadas: ${imageData.length}');
+        } else {
+          LoggerUtil.warning('Formato de resposta inesperado para imagens');
+          return [];
+        }
+
+        final List<GalleryImage> images = imageData.map((item) => GalleryImage.fromJson(item)).toList();
 
         // Ordenar por data de criação (mais recentes primeiro)
         images.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -147,7 +159,17 @@ class CameraService extends ApiService {
       final response = await get('/api/v1/images/$imageId/');
 
       if (response.statusCode == 200) {
-        return GalleryImage.fromJson(response.data);
+        // Verificar se a resposta está no formato esperado
+        if (response.data is Map) {
+          if (response.data.containsKey('data')) {
+            return GalleryImage.fromJson(response.data['data']);
+          } else {
+            return GalleryImage.fromJson(response.data);
+          }
+        } else {
+          LoggerUtil.warning('Formato de resposta inesperado para detalhes da imagem');
+          return null;
+        }
       }
 
       return null;

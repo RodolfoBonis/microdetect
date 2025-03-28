@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:microdetect/features/annotation/models/annotation.dart';
 import 'package:microdetect/features/datasets/models/dataset.dart';
 import 'package:intl/intl.dart';
 
@@ -39,6 +40,8 @@ class GalleryImage {
 
   /// Lista de datasets associados à imagem
   final List<DatasetSummary> datasets;
+
+  final List<Annotation> annotations;
 
   /// Metadados adicionais da imagem
   final Map<String, dynamic>? imageMetadata;
@@ -83,6 +86,7 @@ class GalleryImage {
     this.fileSize = 0,
     this.datasetId,
     this.datasets = const [],
+    this.annotations = const [],
     this.imageMetadata,
     this.bytes,
   }) :
@@ -96,6 +100,13 @@ class GalleryImage {
     if (json['datasets'] != null) {
       datasetsList = (json['datasets'] as List)
           .map((dataset) => DatasetSummary.fromJson(dataset))
+          .toList();
+    }
+
+    List<Annotation> annotationsList = [];
+    if (json['annotations'] != null) {
+      annotationsList = (json['annotations'] as List)
+          .map((annotation) => Annotation.fromJson(annotation))
           .toList();
     }
 
@@ -115,6 +126,7 @@ class GalleryImage {
       fileSize: json['file_size'] ?? 0,
       datasetId: json['dataset_id'],
       datasets: datasetsList,
+      annotations: annotationsList,
       imageMetadata: json['image_metadata'],
       bytes: json['bytes'],
     );
@@ -134,6 +146,7 @@ class GalleryImage {
       'file_size': fileSize,
       'dataset_id': datasetId,
       'datasets': datasets.map((d) => d.toJson()).toList(),
+      'annotations': annotations.map((a) => a.toJson()).toList(),
       'image_metadata': imageMetadata,
     };
   }
