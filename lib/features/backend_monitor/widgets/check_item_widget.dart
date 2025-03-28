@@ -20,7 +20,6 @@ class CheckItemWidget extends StatelessWidget {
     Color color;
 
     switch (status) {
-      case CheckStatus.success:
       case CheckStatus.completed:
         icon = Icons.check_circle;
         color = AppColors.success;
@@ -29,7 +28,6 @@ class CheckItemWidget extends StatelessWidget {
         icon = Icons.error;
         color = AppColors.error;
         break;
-      case CheckStatus.loading:
       case CheckStatus.inProgress:
         icon = Icons.hourglass_empty;
         color = AppColors.warning;

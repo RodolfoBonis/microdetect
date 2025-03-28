@@ -75,7 +75,7 @@ class CollapsibleSidebar extends StatelessWidget {
         children: [
           Icon(
             Icons.biotech,
-            size: isExpanded ? 32 : 24, // Smaller icon when collapsed
+            size: isExpanded ? 28 : 24, // Smaller icon when collapsed
             color: iconColor,
           ),
           if (isExpanded) ...[
@@ -83,7 +83,8 @@ class CollapsibleSidebar extends StatelessWidget {
             Expanded(  // Prevent text overflow
               child: Text(
                 'MicroDetect',
-                overflow: TextOverflow.ellipsis,
+                overflow: TextOverflow.clip,
+                maxLines: 1,
                 style: AppTypography.textTheme.titleLarge?.copyWith(
                   color: textColor,
                   fontWeight: FontWeight.bold,

@@ -10,6 +10,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:microdetect/config/app_directories.dart';
 import 'package:microdetect/core/bindings/app_binding.dart';
 import 'package:microdetect/core/services/backend_service.dart';
+import 'package:microdetect/core/services/port_checker_service.dart';
 import 'package:microdetect/core/services/python_service.dart';
 import 'package:microdetect/core/utils/logger_util.dart';
 import 'package:microdetect/features/not-found/pages/not_found_page.dart';
@@ -29,10 +30,10 @@ void main() async {
 
   // Inicializar o sistema de diretórios primeiro
   await AppDirectories.instance.initialize();
-  
+
   // Inicializar apenas o novo sistema de configurações
   await SettingsInitializer.initialize();
-  
+
   // Inicializar formatação de data para a localidade atual
   await initializeDateFormatting();
 
@@ -44,7 +45,7 @@ void main() async {
       LoggerUtil.info('Recebido sinal SIGINT - Encerrando processos...');
       _cleanupAndExit();
     });
-    
+
     if (!Platform.isWindows) {
       // SIGTERM geralmente é enviado quando o sistema operacional deseja encerrar o processo
       ProcessSignal.sigterm.watch().listen((_) {
@@ -67,30 +68,61 @@ void main() async {
     });
   });
 
+  // Registrar os bindings iniciais
+  AppBinding().dependencies();
+
+  // Verificar e limpar a porta 8000 antes de iniciar
+  await _ensurePortIsAvailable();
+
   runApp(MicrodetectApp());
+}
+
+// Garantir que a porta 8000 esteja disponível
+Future<void> _ensurePortIsAvailable() async {
+  try {
+    final portChecker = Get.find<PortCheckerService>();
+    final defaultPort = 8000;
+
+    LoggerUtil.info('Verificando se a porta $defaultPort está disponível antes de iniciar...');
+
+    final cleared = await portChecker.checkAndKillProcessOnPort(defaultPort);
+    if (cleared) {
+      LoggerUtil.info('Porta $defaultPort liberada com sucesso');
+    } else {
+      LoggerUtil.warning('Aviso: Não foi possível liberar a porta $defaultPort completamente');
+    }
+  } catch (e) {
+    LoggerUtil.error('Erro ao verificar disponibilidade da porta', e);
+  }
 }
 
 // Função para limpar recursos e encerrar o aplicativo adequadamente
 Future<void> _cleanupAndExit() async {
   try {
     LoggerUtil.info('Preparando para encerrar a aplicação...');
-    
+
     // Tentar obter e parar serviços apenas se já estiverem registrados
     if (Get.isRegistered<BackendService>()) {
       await Get.find<BackendService>().forceStop();
       LoggerUtil.info('BackendService encerrado');
     }
-    
+
     if (Get.isRegistered<PythonService>()) {
       await Get.find<PythonService>().stopServer(force: true);
       LoggerUtil.info('PythonService encerrado');
     }
-    
+
     // Em plataformas que suportam, verificar processos restantes
-    if (Platform.isMacOS || Platform.isLinux) {
+    if (!kIsWeb && (Platform.isMacOS || Platform.isLinux)) {
       await _killRemainingPythonProcesses();
     }
-    
+
+    // Liberar a porta 8000 antes de sair
+    if (Get.isRegistered<PortCheckerService>()) {
+      await Get.find<PortCheckerService>().checkAndKillProcessOnPort(8000);
+      LoggerUtil.info('Porta 8000 liberada');
+    }
+
     // Encerrar o aplicativo
     LoggerUtil.info('Encerrando aplicação');
     await Future.delayed(const Duration(milliseconds: 500));
@@ -106,18 +138,18 @@ Future<void> _killRemainingPythonProcesses() async {
   try {
     // Buscar processos Python
     final result = await Process.run(
-      'ps', 
+      'ps',
       ['-ef'],
       stdoutEncoding: utf8,
     );
-    
+
     if (result.exitCode == 0) {
       final output = result.stdout as String;
       final lines = output.split('\n');
-      
+
       // Filtra processos do backend
       for (final line in lines) {
-        if (line.contains('python') && 
+        if (line.contains('python') &&
             (line.contains('start_backend.py') || line.contains('microdetect'))) {
           final parts = line.trim().split(RegExp(r'\s+'));
           if (parts.length > 1) {
@@ -152,7 +184,7 @@ class _MicrodetectAppState extends State<MicrodetectApp> {
     super.initState();
     _setupAppCloseHandler();
   }
-  
+
   // Configurar handler para quando o aplicativo for fechado
   void _setupAppCloseHandler() {
     print('Configurando handler para fechar a aplicação...');
@@ -166,11 +198,16 @@ class _MicrodetectAppState extends State<MicrodetectApp> {
     if (Get.isRegistered<BackendService>()) {
       Get.find<BackendService>().forceStop();
     }
-    
+
     if (Get.isRegistered<PythonService>()) {
       Get.find<PythonService>().stopServer(force: true);
     }
-    
+
+    // Liberar portas
+    if (Get.isRegistered<PortCheckerService>()) {
+      Get.find<PortCheckerService>().checkAndKillProcessOnPort(8000);
+    }
+
     Get.deleteAll();
     super.dispose();
   }

@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/backend_monitor_controller.dart';
-import '../widgets/loading_screen_widget.dart';
-import '../widgets/error_screen_widget.dart';
-import '../widgets/stalled_screen_widget.dart';
-import '../widgets/status_info_widget.dart';
-import '../widgets/progress_steps_widget.dart';
-import '../widgets/log_console_widget.dart';
-import '../../../core/enums/backend_status_enum.dart';
+import 'package:microdetect/core/enums/backend_status_enum.dart';
 import 'package:microdetect/design_system/app_colors.dart';
 import 'package:microdetect/design_system/app_spacing.dart';
 import 'package:microdetect/design_system/app_typography.dart';
+import 'package:microdetect/features/backend_monitor/controllers/backend_monitor_controller.dart';
+import 'package:microdetect/features/backend_monitor/widgets/log_console_widget.dart';
+import 'package:microdetect/features/backend_monitor/widgets/progress_steps_widget.dart';
+import 'package:microdetect/features/backend_monitor/widgets/status_info_widget.dart';
 
 class BackendMonitorPage extends GetView<BackendMonitorController> {
   // Rota para a qual navegaremos quando o backend estiver rodando
@@ -23,90 +20,281 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
   Widget build(BuildContext context) {
     // Definir a rota de destino no controller
     controller.setRootRoute(rootRoute);
-    
+
     return Scaffold(
       backgroundColor: Get.isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.large),
-          child: Obx(() => _buildContent()),
+          child: Obx(() => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Cabeçalho com alerta se necessário (erro, travamento, etc)
+              _buildHeaderAlert(context),
+
+              const SizedBox(height: AppSpacing.medium),
+
+              // Informações de status e versão
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Status e informações gerais do backend
+                  Expanded(
+                    flex: 3,
+                    child: StatusInfoWidget(
+                      status: controller.status.value,
+                      statusMessage: controller.statusMessage.value,
+                      isRunning: controller.isRunning.value,
+                      isInitializing: controller.isInitializing.value,
+                      initTime: controller.initializationTime.value,
+                    ),
+                  ),
+
+                  // Informações de versão e botões de atualização
+                  Expanded(
+                    flex: 2,
+                    child: _buildVersionInfo(context),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.medium),
+
+              // Steps de progresso
+              Obx(() => ProgressStepsWidget(
+                checkItems: controller.getCheckItems(),
+                active: controller.isInitializing.value,
+              )),
+
+              const SizedBox(height: AppSpacing.medium),
+
+              // Console de logs
+              Expanded(
+                  child: LogConsoleWidget(
+                    logs: controller.logs,
+                    scrollToBottom: true,
+                  )),
+
+              const SizedBox(height: AppSpacing.medium),
+
+              // Botões de ação
+              _buildActionButtons(context),
+            ],
+          )),
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
-    // Verificar se há algum erro ou se a inicialização está demorando muito
+  // Construir alerta de cabeçalho para estados especiais (erro, travamento, etc)
+  Widget _buildHeaderAlert(BuildContext context) {
+    // Se estiver em erro
     if (controller.status.value == BackendStatus.error) {
-      return ErrorScreenWidget();
-    } else if (controller.isLongRunning.value || controller.noActivity.value) {
-      return const StalledScreenWidget();
-    } else if (controller.isInitializing.value && !controller.isRunning.value) {
-      return const LoadingScreenWidget();
+      return _buildErrorAlert(context);
     }
+    // Se estiver demorando muito ou sem atividade
+    else if (controller.isLongRunning.value || controller.noActivity.value) {
+      return _buildStalledAlert(context);
+    }
+    // Se estiver inicializando
+    else if (controller.isInitializing.value && !controller.isRunning.value) {
+      return _buildLoadingAlert(context);
+    }
+    // Estado normal - sem alerta
+    return const SizedBox.shrink();
+  }
 
-    // Layout normal
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: AppSpacing.medium),
-
-        // Informações de status e versão
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // Alerta para estado de erro
+  Widget _buildErrorAlert(BuildContext context) {
+    return Card(
+      color: AppColors.error.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: AppColors.error),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        child: Column(
           children: [
-            // Status e informações gerais do backend
-            Expanded(
-              flex: 3,
-              child: StatusInfoWidget(
-                status: controller.status.value,
-                statusMessage: controller.statusMessage.value,
-                isRunning: controller.isRunning.value,
-                isInitializing: controller.isInitializing.value,
-                initTime: controller.initializationTime.value,
-              ),
+            Row(
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: AppColors.error,
+                  size: 32,
+                ),
+                const SizedBox(width: AppSpacing.medium),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Erro no Backend',
+                        style: AppTypography.titleLarge(context).copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xSmall),
+                      Text(
+                        controller.getDetailedErrorMessage(),
+                        style: AppTypography.bodyMedium(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-
-            // Informações de versão e botões de atualização
-            Expanded(
-              flex: 2,
-              child: _buildVersionInfo(),
+            const SizedBox(height: AppSpacing.medium),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: controller.runDiagnostics,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Diagnóstico'),
+                ),
+                const SizedBox(width: AppSpacing.medium),
+                ElevatedButton.icon(
+                  onPressed: controller.forceRestartBackend,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reiniciar'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-
-        const SizedBox(height: AppSpacing.medium),
-
-        // Steps de progresso
-        Obx(() => ProgressStepsWidget(
-              checkItems: controller.getCheckItems(),
-              active: controller.isInitializing.value,
-            )),
-
-        const SizedBox(height: AppSpacing.medium),
-
-        // Console de logs
-        Expanded(
-            child: LogConsoleWidget(
-          logs: controller.logs,
-          scrollToBottom: true,
-        )),
-
-        const SizedBox(height: AppSpacing.medium),
-
-        // Botões de ação
-        _buildActionButtons(),
-      ],
+      ),
     );
   }
 
-  Widget _buildVersionInfo() {
+  // Alerta para inicialização travada ou sem atividade
+  Widget _buildStalledAlert(BuildContext context) {
     return Card(
-      elevation: 2,
-      color: ThemeColors.surface(Get.context!),
+      color: AppColors.warning.withOpacity(0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: ThemeColors.border(Get.context!)),
+        side: BorderSide(color: AppColors.warning),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.hourglass_top,
+                  color: AppColors.warning,
+                  size: 32,
+                ),
+                const SizedBox(width: AppSpacing.medium),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.noActivity.value
+                            ? 'Sem Atividade Detectada'
+                            : 'Inicialização Demorada',
+                        style: AppTypography.titleLarge(context).copyWith(
+                          color: AppColors.warning,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xSmall),
+                      Text(
+                        controller.noActivity.value
+                            ? 'O backend não está respondendo. Não foi detectada atividade nos últimos minutos.'
+                            : 'A inicialização do backend está demorando mais do que o esperado.',
+                        style: AppTypography.bodyMedium(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: controller.continueWaiting,
+                  icon: const Icon(Icons.timelapse),
+                  label: const Text('Continuar Aguardando'),
+                ),
+                const SizedBox(width: AppSpacing.medium),
+                ElevatedButton.icon(
+                  onPressed: controller.forceRestartBackend,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Reiniciar'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Alerta para estado de carregamento/inicialização
+  Widget _buildLoadingAlert(BuildContext context) {
+    return Card(
+      color: AppColors.info.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: AppColors.info),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.info),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.medium),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Inicializando Backend',
+                    style: AppTypography.titleLarge(context).copyWith(
+                      color: AppColors.info,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xSmall),
+                  Text(
+                    'O processo de inicialização está em andamento. ' +
+                        'Tempo decorrido: ${_formatDuration(controller.initializationTime.value)}',
+                    style: AppTypography.bodyMedium(context),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVersionInfo(BuildContext context) {
+    return Card(
+      elevation: 2,
+      color: ThemeColors.surface(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: ThemeColors.border(context)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.medium),
@@ -116,7 +304,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
           children: [
             Text(
               'Informações de Versão',
-              style: AppTypography.titleMedium(Get.context!),
+              style: AppTypography.titleMedium(context),
             ),
             const SizedBox(height: AppSpacing.small),
 
@@ -125,7 +313,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
               children: [
                 Text(
                   'Versão atual:',
-                  style: AppTypography.bodyMedium(Get.context!).copyWith(
+                  style: AppTypography.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -134,7 +322,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
                     controller.currentVersion.value.isEmpty
                         ? 'Carregando...'
                         : controller.currentVersion.value,
-                    style: AppTypography.bodyMedium(Get.context!))),
+                    style: AppTypography.bodyMedium(context))),
               ],
             ),
             const SizedBox(height: AppSpacing.xSmall),
@@ -144,7 +332,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
               children: [
                 Text(
                   'Versão disponível:',
-                  style: AppTypography.bodyMedium(Get.context!).copyWith(
+                  style: AppTypography.bodyMedium(context).copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -153,7 +341,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
                     controller.assetVersion.value.isEmpty
                         ? 'Carregando...'
                         : controller.assetVersion.value,
-                    style: AppTypography.bodyMedium(Get.context!))),
+                    style: AppTypography.bodyMedium(context))),
               ],
             ),
             const SizedBox(height: AppSpacing.small),
@@ -161,38 +349,38 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
             // Status de atualização
             Obx(() => controller.updateAvailable
                 ? Row(
-                    children: [
-                      Icon(
-                        Icons.new_releases,
-                        color: AppColors.primary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Atualização disponível!',
-                        style: AppTypography.bodySmall(Get.context!).copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
+              children: [
+                Icon(
+                  Icons.new_releases,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Atualização disponível!',
+                  style: AppTypography.bodySmall(context).copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            )
                 : Row(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: AppColors.success,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Versão atualizada',
-                        style: AppTypography.bodySmall(Get.context!).copyWith(
-                          color: AppColors.success,
-                        ),
-                      ),
-                    ],
-                  )),
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: AppColors.success,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Versão atualizada',
+                  style: AppTypography.bodySmall(context).copyWith(
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            )),
 
             const SizedBox(height: AppSpacing.medium),
 
@@ -203,7 +391,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
                 // Botão verificar atualizações
                 OutlinedButton.icon(
                   onPressed: controller.isInitializing.value ||
-                          controller.isUpdating.value
+                      controller.isUpdating.value
                       ? null
                       : controller.checkForUpdates,
                   icon: const Icon(Icons.refresh, size: 16),
@@ -222,37 +410,37 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
 
                 // Botão atualizar
                 Obx(() => ElevatedButton.icon(
-                      onPressed: controller.isInitializing.value ||
-                              controller.isUpdating.value ||
-                              !controller.updateAvailable
-                          ? null
-                          : controller.updateBackend,
-                      icon: controller.isUpdating.value
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : const Icon(Icons.system_update, size: 16),
-                      label: Text(controller.isUpdating.value
-                          ? 'Atualizando...'
-                          : 'Atualizar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.small,
-                          vertical: 4,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                    )),
+                  onPressed: controller.isInitializing.value ||
+                      controller.isUpdating.value ||
+                      !controller.updateAvailable
+                      ? null
+                      : controller.updateBackend,
+                  icon: controller.isUpdating.value
+                      ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor:
+                      AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : const Icon(Icons.system_update, size: 16),
+                  label: Text(controller.isUpdating.value
+                      ? 'Atualizando...'
+                      : 'Atualizar'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.small,
+                      vertical: 4,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                )),
               ],
             ),
           ],
@@ -261,7 +449,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -270,9 +458,9 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
           icon: const Icon(Icons.refresh),
           label: const Text('Reiniciar Backend'),
           onPressed:
-              controller.isInitializing.value || controller.isUpdating.value
-                  ? null
-                  : controller.restartBackend,
+          controller.isInitializing.value || controller.isUpdating.value
+              ? null
+              : controller.restartBackend,
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.medium,
@@ -287,9 +475,9 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
           icon: const Icon(Icons.restart_alt),
           label: const Text('Forçar Reinício'),
           onPressed:
-              controller.isInitializing.value || controller.isUpdating.value
-                  ? null
-                  : controller.forceRestartBackend,
+          controller.isInitializing.value || controller.isUpdating.value
+              ? null
+              : controller.forceRestartBackend,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.error,
             foregroundColor: Colors.white,
@@ -306,9 +494,9 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
           icon: const Icon(Icons.bug_report),
           label: const Text('Diagnóstico'),
           onPressed:
-              controller.isInitializing.value || controller.isUpdating.value
-                  ? null
-                  : controller.runDiagnostics,
+          controller.isInitializing.value || controller.isUpdating.value
+              ? null
+              : controller.runDiagnostics,
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.medium,
@@ -318,5 +506,17 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
         ),
       ],
     );
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+
+    if (duration.inHours > 0) {
+      return '${duration.inHours}:$twoDigitMinutes:$twoDigitSeconds';
+    } else {
+      return '$twoDigitMinutes:$twoDigitSeconds';
+    }
   }
 }

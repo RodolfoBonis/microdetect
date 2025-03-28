@@ -37,7 +37,6 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
         case BackendStatus.checking:
           statusColor = AppColors.warning;
           break;
-        case BackendStatus.failed:
         case BackendStatus.error:
           statusColor = AppColors.error;
           break;
@@ -65,7 +64,6 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
         case BackendStatus.checking:
           statusText = 'Verificando...';
           break;
-        case BackendStatus.failed:
         case BackendStatus.error:
           statusText = 'Erro';
           break;
@@ -143,7 +141,7 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
                   const SizedBox(width: 8),
                   
                   // Botão para tentar resolver automaticamente os problemas
-                  if (controller.status.value == BackendStatus.failed)
+                  if (controller.status.value == BackendStatus.error)
                     OutlinedButton(
                       onPressed: () async {
                         final result = await backendService.cleanAndReinitialize();
@@ -157,11 +155,11 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
                     ),
                   
                   // Espaçador só adicionado se houver botão de reparação
-                  if (controller.status.value == BackendStatus.failed)
+                  if (controller.status.value == BackendStatus.error)
                     const SizedBox(width: 8),
                     
                   // Botão para atualizar o backend
-                  if (controller.status.value == BackendStatus.failed)
+                  if (controller.status.value == BackendStatus.error)
                     OutlinedButton(
                       onPressed: controller.isInitializing.value
                           ? null

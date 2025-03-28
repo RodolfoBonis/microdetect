@@ -1,95 +1,118 @@
 // lib/core/enums/backend_status_enum.dart
 
+/// Define as etapas de inicialização do backend com precisão
+enum BackendInitStep {
+  /// Inicialização do sistema principal
+  systemInitialization,
 
-enum BackendSteps {
-  /// Inicialização do sistema
-  initialize,
+  /// Configuração de diretórios da aplicação
+  directorySetup,
 
-  /// Inicialização do backend
-  backend,
+  /// Verificação da instalação do backend
+  installationCheck,
 
-  /// Inicialização do Python
-  python,
+  /// Verificação de atualizações disponíveis
+  updateCheck,
 
-  /// Inicialização do servidor
-  server,
+  /// Instalação ou atualização do backend
+  backendInstallation,
 
-  /// Instalando dependências
-  dependencies,
+  /// Configuração dos diretórios de dados
+  dataDirectorySetup,
 
-  /// Inicialização do sistema de diretórios
-  directories,
+  /// Verificação do ambiente Python
+  pythonEnvironmentCheck,
 
-  /// Inicialização do sistema de configurações
-  settings,
+  /// Instalação de dependências Python
+  dependenciesInstallation,
 
-  /// Inicialização do sistema de notificações
-  notifications,
+  /// Inicialização do servidor Python
+  serverStartup,
 
-  /// Inicialização do sistema de temas
-  themes,
+  /// Verificação da saúde do servidor
+  healthCheck,
 
-  /// Inicialização do sistema de logs
-  logs,
+  /// Processo de inicialização concluído
+  completed,
 
-  /// Inicialização do sistema de atualizações
-  updates,
-
-  /// Inicialização do sistema de armazenamento
-  storage,
-
-  /// Inicialização do sistema de eventos
-  events,
-
+  /// Falha na inicialização
+  failed
 }
 
-/// Enum que representa os diferentes estados do backend
+/// Status geral do backend
 enum BackendStatus {
   /// Inicializando o sistema
   initializing,
-  
+
   /// Verificando o status ou disponibilidade
   checking,
-  
-  /// Iniciando o serviço ou iniciando o processo de inicialização
+
+  /// Iniciando o serviço
   starting,
-  
+
   /// Servidor está rodando normalmente
   running,
-  
+
   /// Servidor está em processo de encerramento
   stopping,
-  
+
   /// Servidor está parado (intencionalmente)
   stopped,
-  
+
   /// Erro ocorreu durante a operação do servidor
   error,
-  
-  /// Erro ocorreu durante a operação do servidor (alias para 'error')
-  failed,
-  
+
   /// Estado desconhecido ou não definido
   unknown,
 }
 
-/// Enum para representar o status de um item de verificação (check item)
+/// Status de uma verificação ou operação específica
 enum CheckStatus {
   /// Pendente, ainda não iniciado
   pending,
-  
-  /// Em progresso de verificação ou processamento
+
+  /// Em progresso
   inProgress,
-  
-  /// Em progresso de verificação ou processamento (alias para 'inProgress')
-  loading,
-  
+
   /// Concluído com sucesso
   completed,
-  
-  /// Concluído com sucesso (alias para 'completed')
-  success,
-  
-  /// Erro durante a verificação
+
+  /// Falha na verificação ou operação
   error,
+}
+
+/// Tipo de operação de atualização do backend
+enum UpdateOperation {
+  /// Verificando se existe atualização
+  checking,
+
+  /// Baixando atualização
+  downloading,
+
+  /// Instalando atualização
+  installing,
+
+  /// Reiniciando após atualização
+  restarting,
+
+  /// Nenhuma operação de atualização em andamento
+  none,
+}
+
+/// Resultado de uma operação no backend
+enum OperationResult {
+  /// Operação bem-sucedida
+  success,
+
+  /// Operação falhou
+  failure,
+
+  /// Operação cancelada
+  cancelled,
+
+  /// Operação em andamento
+  inProgress,
+
+  /// Operação aguardando alguma condição
+  pending,
 }
