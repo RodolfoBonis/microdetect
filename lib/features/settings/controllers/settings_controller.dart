@@ -4,14 +4,13 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:microdetect/core/services/python_service.dart';
 import 'package:microdetect/design_system/app_colors.dart';
-import 'package:microdetect/design_system/app_spacing.dart';
 import 'package:microdetect/design_system/app_toast.dart';
 import 'package:microdetect/design_system/app_typography.dart';
 import 'package:microdetect/features/shared/events/screen_events.dart';
 import 'package:microdetect/features/shared/events/event_manager.dart';
 import '../../../core/services/backend_service.dart';
-import '../../../core/services/backend_installer_service.dart';
 import '../../../core/utils/logger_util.dart';
 import '../../../features/backend_monitor/controllers/backend_monitor_controller.dart';
 import '../models/settings_model.dart';
@@ -22,7 +21,7 @@ class SettingsController extends GetxController {
   // Referências aos serviços
   final SettingsService settingsService;
   final BackendService backendService;
-  final BackendInstallerService installerService;
+  final PythonService pythonService;
 
   // Estados observáveis derivados do modelo
   final Rx<SettingsModel> settings = SettingsModel().obs;
@@ -51,7 +50,7 @@ class SettingsController extends GetxController {
   SettingsController({
     required this.settingsService,
     required this.backendService,
-    required this.installerService,
+    required this.pythonService,
   });
 
   @override
@@ -146,7 +145,7 @@ class SettingsController extends GetxController {
       backendVersion.value = version;
       
       // Verificar se há atualização disponível
-      final hasUpdate = await installerService.isUpdateAvailable();
+      final hasUpdate = await pythonService.checkForUpdates();
       updateAvailable.value = hasUpdate;
       
       isCheckingUpdate.value = false;
@@ -159,11 +158,13 @@ class SettingsController extends GetxController {
   /// Atualiza o backend para a versão mais recente
   Future<void> updateBackend() async {
     try {
-      // Redirecionar para a tela de monitoramento do backend e iniciar atualização
+      // Usar o método estático do BackendMonitorController para
+      // navegar para a tela de monitoramento e iniciar a atualização
       BackendMonitorController.navigateToMonitorAndUpdate();
     } catch (e) {
       AppToast.error(
-        'Falha ao iniciar atualização do backend: ${e.toString()}',
+        'Falha ao iniciar atualização do backend',
+        description: e.toString(),
       );
       LoggerUtil.error('Erro ao iniciar atualização do backend', e);
     }

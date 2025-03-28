@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:microdetect/core/enums/backend_status_enum.dart';
 import '../controllers/backend_monitor_controller.dart';
 import '../../../core/services/backend_service.dart';
-import '../../../core/services/backend_installer_service.dart';
 import '../../../core/utils/logger_util.dart';
 import '../../../design_system/app_colors.dart';
 import '../../../design_system/app_typography.dart';
@@ -140,20 +139,6 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
                   ),
                   const SizedBox(width: 8),
                   
-                  // Botão para tentar resolver automaticamente os problemas
-                  if (controller.status.value == BackendStatus.error)
-                    OutlinedButton(
-                      onPressed: () async {
-                        final result = await backendService.cleanAndReinitialize();
-                        LoggerUtil.info(
-                          result 
-                              ? 'Backend reinicializado com sucesso' 
-                              : 'Não foi possível reinicializar automaticamente'
-                        );
-                      },
-                      child: const Text('Reparar'),
-                    ),
-                  
                   // Espaçador só adicionado se houver botão de reparação
                   if (controller.status.value == BackendStatus.error)
                     const SizedBox(width: 8),
@@ -225,13 +210,7 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
     );
     
     try {
-      // Obter o instalador usando o padrão singleton
-      final installer = BackendInstallerService.to;
-      
-      // Obter versões - agora já observáveis
-      await installer.getCurrentVersion();
-      await installer.getAssetVersion();
-      final updateAvailable = await installer.isUpdateAvailable();
+      final updateAvailable = controller.updateAvailable;
       
       // Fechar diálogo de loading
       Get.back();
@@ -244,9 +223,9 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Obx(() => Text('Versão instalada: ${installer.currentVersion.value}')),
+              Obx(() => Text('Versão instalada: ${controller.currentVersion.value}')),
               const SizedBox(height: 8),
-              Obx(() => Text('Versão disponível: ${installer.assetVersion.value}')),
+              Obx(() => Text('Versão disponível: ${controller.latestVersion.value}')),
               const SizedBox(height: 16),
               updateAvailable
                   ? const Text(
@@ -282,35 +261,21 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
                           const SizedBox(height: 8),
                           // Mostrar progresso de instalação
                           Obx(() => LinearProgressIndicator(
-                            value: installer.installProgress.value,
+                            value: controller.progressValue.value,
                           )),
                           const SizedBox(height: 8),
                           Obx(() => Text(
-                            '${(installer.installProgress.value * 100).toInt()}%'
+                            '${(controller.progressValue.value * 100).toInt()}%'
                           )),
                         ],
                       ),
                     ),
                     barrierDismissible: false,
                   );
-                  
-                  // Atualizar backend
-                  final success = await installer.update();
-                  
-                  // Fechar diálogo de progresso
+
+                  await controller.updateBackend();
+
                   Get.back();
-                  
-                  // Mostrar resultado
-                  LoggerUtil.info(
-                    success
-                        ? 'Backend atualizado com sucesso! Reiniciando...'
-                        : 'Falha ao atualizar backend.'
-                  );
-                  
-                  // Se atualização foi bem sucedida, reiniciar o backend
-                  if (success) {
-                    controller.restartBackend();
-                  }
                 },
                 child: const Text('Atualizar'),
               ),
@@ -374,24 +339,6 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Center(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Get.back();
-                    
-                    // Atualizar backend com o caminho detectado
-                    final success = await backendService.updateBackendFromSource(detectedBackendPath);
-                    
-                    LoggerUtil.info(
-                      success 
-                          ? 'Backend Python atualizado com sucesso'
-                          : 'Falha ao atualizar o backend Python'
-                    );
-                  },
-                  child: const Text('Usar Pasta Detectada'),
-                ),
-              ),
               const SizedBox(height: 16),
               const Center(
                 child: Text(
@@ -407,37 +354,6 @@ class BackendStatusWidget extends GetView<BackendMonitorController> {
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Get.back();
-              
-              // Selecionar diretório do backend Python
-              String? selectedDirectory = await FilePicker.platform.getDirectoryPath(
-                dialogTitle: 'Selecione a pasta do backend Python',
-              );
-              
-              if (selectedDirectory != null) {
-                // Verificar se o diretório contém start_backend.py
-                final scriptFile = File('$selectedDirectory/start_backend.py');
-                if (!await scriptFile.exists()) {
-                  LoggerUtil.error(
-                    'Pasta inválida: Não contém start_backend.py'
-                  );
-                  return;
-                }
-                
-                // Atualizar o backend
-                final success = await backendService.updateBackendFromSource(selectedDirectory);
-                
-                LoggerUtil.info(
-                  success 
-                      ? 'Backend Python atualizado com sucesso'
-                      : 'Falha ao atualizar o backend Python'
-                );
-              }
-            },
-            child: const Text('Selecionar Pasta Manualmente'),
           ),
         ],
       ),

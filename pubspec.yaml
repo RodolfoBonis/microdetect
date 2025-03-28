@@ -96,7 +96,6 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/fonts/
-    - assets/python_backend.zip
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

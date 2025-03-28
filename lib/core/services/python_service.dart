@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
-import 'dart:math' as Math;
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -18,9 +16,20 @@ class PythonService extends GetxService {
   final _logs = <String>[].obs;
   final _status = false.obs;
   final pythonState = Rx<BackendInitStep>(BackendInitStep.systemInitialization);
+  final currentVersion = ''.obs;
+  final latestVersion = ''.obs;
 
   // Private variables
   Process? _pythonProcess;
+  String? _pythonPath;
+  String? _pipPath;
+  String? _microdetectPath;
+
+  // AWS CodeArtifact configuration
+  final String _awsRegion = 'us-east-1';
+  final String _codeArtifactDomain = 'your-domain';
+  final String _codeArtifactRepository = 'your-repository';
+  final String _codeArtifactOwner = '123456789012'; // AWS Account ID
 
   // Getters
   bool get isRunning => _isRunning.value;
@@ -29,528 +38,892 @@ class PythonService extends GetxService {
   List<String> get logs => _logs.toList();
   Stream<bool> get statusStream => _status.stream;
 
-  @override
-  void onInit() {
-    super.onInit();
-    // Configuração inicial se necessário
-    LoggerUtil.debug('PythonService inicializado');
-  }
-
-  @override
-  void onClose() {
-    stopServer(force: true).then((_) {
-      // Garantir que todos os processos Python relacionados sejam encerrados
-      if (Platform.isMacOS || Platform.isLinux) {
-        _killPythonProcesses();
-      } else if (Platform.isWindows) {
-        _killPythonProcessesWindows();
-      }
-    });
-    super.onClose();
-  }
-
-  // Diretório do backend Python
-  Future<String> get pythonBackendPath async {
-    await AppDirectories.instance.ensureInitialized();
-    return AppDirectories.instance.pythonBackendDir.path;
-  }
-
-  // Diretório de dados separado
-  Future<String> get dataPath async {
+  // Diretório para os dados do aplicativo
+  Future<String> get appDataDir async {
     await AppDirectories.instance.ensureInitialized();
     return AppDirectories.instance.dataDir.path;
   }
 
-  // Caminho para o executável Python no ambiente virtual
-  Future<String> get pythonExecutable async {
-    final backendPath = await pythonBackendPath;
+  @override
+  void onInit() {
+    super.onInit();
+    // Localizar executáveis Python durante inicialização
+    _initializePythonEnvironment();
+  }
+
+  @override
+  void onClose() {
+    stopServer(force: true);
+    super.onClose();
+  }
+
+  /// Inicializa o ambiente Python localizando executáveis
+  Future<void> _initializePythonEnvironment() async {
+    _addLog('Inicializando ambiente Python...');
+
+    try {
+      // Localizar o Python
+      _pythonPath = await _findPythonExecutable();
+      if (_pythonPath != null) {
+        _addLog('Python encontrado: $_pythonPath');
+      } else {
+        _addLog('AVISO: Python não encontrado no sistema');
+      }
+
+      // Localizar PIP
+      _pipPath = await _findPipExecutable();
+      if (_pipPath != null) {
+        _addLog('Pip encontrado: $_pipPath');
+      } else {
+        _addLog('AVISO: Pip não encontrado no sistema');
+      }
+
+      // Verificar se o microdetect está instalado
+      await checkCurrentVersion();
+
+      // Localizar comando microdetect (se instalado)
+      if (currentVersion.value.isNotEmpty) {
+        _microdetectPath = await _findMicrodetectExecutable();
+        if (_microdetectPath != null) {
+          _addLog('Microdetect encontrado: $_microdetectPath');
+        } else {
+          _addLog('AVISO: Executable microdetect não encontrado');
+        }
+      }
+    } catch (e) {
+      _addLog('Erro ao inicializar ambiente Python: $e');
+    }
+  }
+
+  Future<bool> pythonIsAvailable() async {
+    final pythonExecutable = await _findPythonExecutable();
+
+    return pythonExecutable != null;
+  }
+
+  Future<bool> pipIsAvailble() async {
+    final pipExecutable = await _findPipExecutable();
+
+    return pipExecutable != null;
+  }
+
+  /// Localiza o executável Python no sistema
+  Future<String?> _findPythonExecutable() async {
+    List<String> possibleCommands = [];
 
     if (Platform.isWindows) {
-      return path.join(backendPath, 'venv', 'Scripts', 'python.exe');
+      possibleCommands = [
+        'python',
+        'python3',
+        r'C:\Python39\python.exe',
+        r'C:\Python310\python.exe',
+        r'C:\Python311\python.exe',
+        r'C:\Program Files\Python39\python.exe',
+        r'C:\Program Files\Python310\python.exe',
+        r'C:\Program Files\Python311\python.exe',
+        r'C:\Program Files (x86)\Python39\python.exe',
+        r'C:\Program Files (x86)\Python310\python.exe',
+        r'C:\Program Files (x86)\Python311\python.exe',
+      ];
     } else {
-      return path.join(backendPath, 'venv', 'bin', 'python');
-    }
-  }
-
-  // Caminho para o script principal
-  Future<String> get startScriptPath async {
-    final backendPath = await pythonBackendPath;
-    final scriptPath = path.join(backendPath, 'start_backend.py');
-
-    // Verificar se o script existe
-    if (await File(scriptPath).exists()) {
-      return scriptPath;
-    }
-
-    // Se não existir, verificar no subdiretório python_backend (caso ainda não tenha sido corrigido)
-    final nestedScriptPath = path.join(backendPath, 'python_backend', 'start_backend.py');
-    if (await File(nestedScriptPath).exists()) {
-      return nestedScriptPath;
-    }
-
-    // Retornar o caminho original mesmo se não existir
-    return scriptPath;
-  }
-
-  Future<bool> initialize({int port = 8000}) async {
-    try {
-      if (_isRunning.value) {
-        _addLog('Backend Python já está em execução');
-        return true;
-      }
-
-      _status.value = false;
-      _port.value = port;
-      _addLog('Inicializando serviço Python na porta $port...');
-      pythonState.value = BackendInitStep.systemInitialization;
-
-      // DEBUGGING: Verificar diretórios antes de começar
-      try {
-        final backendPath = await pythonBackendPath;
-        final pathData = await dataPath;
-
-        _addLog('Checando diretórios antes da inicialização:');
-        _addLog('- Backend path: $backendPath');
-        _addLog('- Data path: $pathData');
-
-        // Verificar se os diretórios existem
-        final backendExists = await Directory(backendPath).exists();
-        final dataExists = await Directory(pathData).exists();
-
-        _addLog('- Backend directory exists: $backendExists');
-        _addLog('- Data directory exists: $dataExists');
-
-        // Verificar conteúdo do diretório backend
-        if (backendExists) {
-          final files = await Directory(backendPath).list().toList();
-          _addLog('- Backend dir contém ${files.length} arquivos/diretórios');
-
-          // Mostrar alguns arquivos para verificação
-          for (var i = 0; i < Math.min(5, files.length); i++) {
-            _addLog('  - ${path.basename(files[i].path)}');
-          }
-        }
-      } catch (dirError) {
-        _addLog('Erro ao verificar diretórios: $dirError');
-        // Apenas log, continuar com a inicialização
-      }
-
-      // Verificar se os arquivos do backend existem
-      final backendPath = await pythonBackendPath;
-      if (!await Directory(backendPath).exists()) {
-        _addLog('Diretório do backend não encontrado: $backendPath');
-        pythonState.value = BackendInitStep.failed;
-        return false;
-      }
-
-      _addLog('Diretório do backend encontrado: $backendPath');
-      pythonState.value = BackendInitStep.directorySetup;
-
-      // Verificar script principal
-      final startScript = await startScriptPath;
-      _addLog('Procurando script principal em: $startScript');
-
-      if (!await File(startScript).exists()) {
-        _addLog('Script principal não encontrado: $startScript');
-
-        // Tentar procurar em outros locais possíveis
-        _addLog('Tentando encontrar script em locais alternativos...');
-        final possibleLocations = [
-          path.join(backendPath, 'start_backend.py'),
-          path.join(backendPath, 'python_backend', 'start_backend.py'),
-          path.join(backendPath, 'app', 'start_backend.py'),
-          path.join(path.dirname(backendPath), 'start_backend.py'),
-        ];
-
-        bool found = false;
-        for (final location in possibleLocations) {
-          _addLog('Verificando: $location');
-          if (await File(location).exists()) {
-            _addLog('Script encontrado em local alternativo: $location');
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          _addLog('Script não encontrado em nenhum local alternativo');
-          pythonState.value = BackendInitStep.failed;
-          return false;
-        }
-      }
-
-      _addLog('Script principal encontrado: $startScript');
-      pythonState.value = BackendInitStep.pythonEnvironmentCheck;
-
-      // Verificar se o Python está disponível
-      _addLog('Verificando disponibilidade do Python...');
-      final result = await checkPythonAvailability();
-      if (!result) {
-        _addLog('Python não está disponível no sistema');
-        _addLog('Verifique se o Python está instalado e acessível');
-        pythonState.value = BackendInitStep.failed;
-        return false;
-      }
-
-      _addLog('Python encontrado e disponível!');
-
-      // Verificar ambiente virtual e criar se necessário
-      _addLog('Verificando ambiente virtual...');
-      final venvResult = await createVirtualEnvIfNeeded();
-      _addLog('Resultado da verificação do ambiente virtual: ${venvResult ? 'Sucesso' : 'Falha'}');
-
-      pythonState.value = BackendInitStep.serverStartup;
-      // Iniciar o servidor
-      _addLog('Iniciando servidor Python...');
-      return await startServer(port: port);
-    } catch (e) {
-      _addLog('Erro ao inicializar: $e');
-      pythonState.value = BackendInitStep.failed;
-      return false;
-    }
-  }
-
-  Future<bool> checkPythonAvailability() async {
-    try {
-      // Primeiro, tentar usar o Python do ambiente virtual embutido
-      final pyExec = await pythonExecutable;
-      final pyExecFile = File(pyExec);
-
-      if (await pyExecFile.exists()) {
-        _addLog('Python encontrado em: $pyExec');
-        return true;
-      }
-
-      // Se estamos no macOS, verificar caminhos conhecidos
-      if (Platform.isMacOS) {
-        final commonPaths = [
-          '/usr/bin/python3',
-          '/usr/local/bin/python3',
-          '/opt/homebrew/bin/python3',
-          '/usr/bin/python',
-        ];
-
-        for (final pythonPath in commonPaths) {
-          final file = File(pythonPath);
-          if (await file.exists()) {
-            _addLog('Python encontrado em: $pythonPath');
-            return true;
-          }
-        }
-      }
-
-      // Em último caso, tente usar o Python do sistema
-      try {
-        final result = await Process.run('python', ['--version']);
-        if (result.exitCode == 0) {
-          _addLog('Python do sistema encontrado via comando');
-          return true;
-        }
-      } catch (e) {
-        _addLog('Erro ao verificar Python via comando: $e');
-      }
-
-      try {
-        final result = await Process.run('python3', ['--version']);
-        if (result.exitCode == 0) {
-          _addLog('Python3 do sistema encontrado via comando');
-          return true;
-        }
-      } catch (e) {
-        _addLog('Erro ao verificar Python3 via comando: $e');
-      }
-
-      _addLog('Python não encontrado no sistema');
-      return false;
-    } catch (e) {
-      _addLog('Erro ao verificar Python: $e');
-      return false;
-    }
-  }
-
-  Future<bool> startServer({int port = 8000}) async {
-    if (_isRunning.value) {
-      LoggerUtil.debug('O servidor Python já está em execução');
-      return true;
-    }
-
-    try {
-      _port.value = port;
-      pythonState.value = BackendInitStep.serverStartup;
-
-      // Obter caminho para o executável Python
-      final pythonPath = await findPythonPath();
-      if (pythonPath == null) {
-        _addLog('Erro: Python não encontrado no sistema');
-        pythonState.value = BackendInitStep.failed;
-        return false;
-      }
-
-      // Obter caminho para o script do backend
-      final backendPath = await pythonBackendPath;
-      final pathStartScript = await startScriptPath;
-      final dataDir = await dataPath;
-
-      // Verificar se o script existe
-      if (!await File(pathStartScript).exists()) {
-        _addLog('Erro: Script start_backend.py não encontrado em $backendPath');
-        pythonState.value = BackendInitStep.failed;
-        return false;
-      }
-
-      // ETAPA 1: Primeiro instalar apenas as dependências
-      _addLog('Etapa 1/2: Instalando dependências Python...');
-      pythonState.value = BackendInitStep.dependenciesInstallation;
-
-      // Preparar os argumentos para instalação de dependências
-      List<String> installArgs = [
-        pathStartScript,
-        '--install-only',  // Apenas instalar, não iniciar o servidor
-      ];
-
-      // Definir ambiente para o processo de instalação
-      Map<String, String> installEnv = {
-        ...Platform.environment,
-        'PYTHONUNBUFFERED': '1',      // Desativar buffer para output em tempo real
-        'PYTHONIOENCODING': 'utf-8',  // Garantir codificação correta
-        'DATA_DIR': dataDir,          // Informar o diretório de dados separado
-      };
-
-      // Adicionar o caminho do backend ao PYTHONPATH
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        installEnv['PYTHONPATH'] = backendPath;
-      }
-
-      // Iniciar o processo Python para instalação
-      final installProcess = await Process.start(
-        pythonPath,
-        installArgs,
-        workingDirectory: backendPath,
-        environment: installEnv,
-      );
-
-      // Escutar a saída do processo de instalação
-      StringBuffer installOutput = StringBuffer();
-
-      // Capturar e processar stdout
-      installProcess.stdout.transform(utf8.decoder).listen((data) {
-        _addLog(data);
-        installOutput.write(data);
-      });
-
-      // Capturar e processar stderr
-      installProcess.stderr.transform(utf8.decoder).listen((data) {
-        _addLog('ERR: $data');
-        installOutput.write('ERR: $data');
-      });
-
-      // Aguardar até que o processo de instalação termine
-      final installExitCode = await installProcess.exitCode;
-      _addLog('Instalação concluída com código: $installExitCode');
-
-      // Verificar se a instalação foi bem-sucedida
-      if (installExitCode != 0) {
-        _addLog('Erro na instalação de dependências (código $installExitCode)');
-        pythonState.value = BackendInitStep.failed;
-        return false;
-      }
-
-      // Verificar se houve erros na saída
-      if (installOutput.toString().contains("falha ao instalar") ||
-          installOutput.toString().contains("failed to install") ||
-          installOutput.toString().toLowerCase().contains("error:")) {
-        _addLog('Erros detectados durante instalação de dependências');
-        _addLog('Tentando iniciar o servidor mesmo assim...');
-      } else {
-        _addLog('Dependências instaladas com sucesso');
-      }
-
-      // Aguardar um momento antes de iniciar o servidor
-      await Future.delayed(const Duration(seconds: 2));
-
-      // ETAPA 2: Agora iniciar o servidor sem reinstalar dependências
-      _addLog('Etapa 2/2: Iniciando servidor Python na porta $port...');
-      pythonState.value = BackendInitStep.serverStartup;
-
-      // Preparar os argumentos para o servidor
-      List<String> serverArgs = [
-        pathStartScript,
-        '--port', port.toString(), // Especificar o diretório de dados
-      ];
-
-      // Definir ambiente para o processo do servidor
-      Map<String, String> serverEnv = {
-        ...Platform.environment,
-        'INSTALL_DEPS_FIRST': 'false', // Não reinstalar dependências
-        'PYTHONUNBUFFERED': '1',       // Desativar buffer para output em tempo real
-        'PORT': port.toString(),
-        'PYTHONIOENCODING': 'utf-8',   // Garantir codificação correta
-        'DATA_DIR': dataDir,           // Informar o diretório de dados separado
-      };
-
-      // Adicionar o caminho do backend ao PYTHONPATH
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        serverEnv['PYTHONPATH'] = backendPath;
-      }
-
-      // Iniciar o processo Python para o servidor
-      _pythonProcess = await Process.start(
-        pythonPath,
-        serverArgs,
-        workingDirectory: backendPath,
-        environment: serverEnv,
-      );
-
-      // Escutar stdout para detectar quando o servidor está rodando
-      _pythonProcess!.stdout.transform(utf8.decoder).listen((data) {
-        _addLog(data);
-
-        // Verificar se o servidor está rodando
-        if (data.contains('Uvicorn running on') ||
-            data.contains('Application startup complete') ||
-            data.contains('Iniciando servidor na porta')) {
-          _isRunning.value = true;
-          _status.value = true;
-          _addLog('Servidor iniciado com sucesso na porta $port');
-          pythonState.value = BackendInitStep.completed;
-        }
-      });
-
-      // Escutar stderr
-      _pythonProcess!.stderr.transform(utf8.decoder).listen((data) {
-        _addLog('ERR: $data');
-
-        // Detectar erros comuns
-        if (data.contains('Address already in use') || data.contains('Erro ao iniciar servidor')) {
-          _addLog('ERRO: Porta $port já está em uso. Tente encerrar outros processos ou usar outra porta.');
-          pythonState.value = BackendInitStep.failed;
-        }
-      });
-
-      // Monitorar o processo para detectar quando ele encerra
-      _pythonProcess!.exitCode.then((exitCode) {
-        LoggerUtil.debug('Processo Python encerrou com código: $exitCode');
-
-        if (exitCode < 0) {
-          // Se o processo foi terminado com sinal negativo (ex: SIGTERM, SIGKILL)
-          _addLog('Processo recebeu sinal de terminação (código $exitCode)');
-        } else {
-          _addLog('Servidor encerrado (código $exitCode)');
-        }
-
-        _isRunning.value = false;
-        _pythonProcess = null;
-        _status.value = false;
-      });
-
-      // Dar um tempo para o servidor iniciar
-      await Future.delayed(const Duration(seconds: 2));
-
-      // Definir servidor como em execução, mesmo antes da verificação de saúde
-      _isRunning.value = true;
-      _status.value = true;
-      pythonState.value = BackendInitStep.healthCheck;
-
-      return true;
-    } catch (e) {
-      LoggerUtil.error('Erro ao iniciar servidor Python', e);
-      _addLog('Erro ao iniciar servidor: $e');
-      _isRunning.value = false;
-      pythonState.value = BackendInitStep.failed;
-      return false;
-    }
-  }
-
-  Future<String?> findPythonPath() async {
-    // Tentar primeiro o Python do ambiente virtual
-    final pythonExe = await pythonExecutable;
-    if (await File(pythonExe).exists()) {
-      return pythonExe;
-    }
-
-    // Verificar caminhos conhecidos no macOS
-    if (Platform.isMacOS) {
-      final commonPaths = [
+      // macOS e Linux
+      possibleCommands = [
         '/usr/bin/python3',
         '/usr/local/bin/python3',
         '/opt/homebrew/bin/python3',
         '/usr/bin/python',
+        'python3',
+        'python',
       ];
+    }
 
-      for (final pythonPath in commonPaths) {
-        if (await File(pythonPath).exists()) {
-          return pythonPath;
+    // Verificar se o executável existe diretamente (para caminhos absolutos)
+    for (final command in possibleCommands) {
+      if (command.startsWith('/') || command.contains(':')) {
+        if (await File(command).exists()) {
+          // Testar se realmente é o Python executando uma verificação de versão
+          try {
+            final result = await Process.run(
+                command,
+                ['--version'],
+                stdoutEncoding: utf8,
+                stderrEncoding: utf8
+            );
+
+            if (result.exitCode == 0 &&
+                (result.stdout.toString().toLowerCase().contains('python') ||
+                    result.stderr.toString().toLowerCase().contains('python'))) {
+              return command;
+            }
+          } catch (_) {
+            // Continuar para a próxima tentativa
+          }
         }
       }
     }
 
-    // Em último caso, tentar 'python3' e 'python'
-    try {
-      final result = await Process.run('python3', ['--version']);
-      if (result.exitCode == 0) {
-        return 'python3';
+    // Verificar comandos usando where/which
+    final whereCommand = Platform.isWindows ? 'where' : 'which';
+
+    for (final command in possibleCommands) {
+      if (!command.startsWith('/') && !command.contains(':')) {
+        try {
+          final result = await Process.run(
+              whereCommand,
+              [command],
+              stdoutEncoding: utf8,
+              stderrEncoding: utf8
+          );
+
+          if (result.exitCode == 0) {
+            // Pegar a primeira linha da saída (pode haver múltiplos caminhos)
+            final foundPath = result.stdout.toString().trim().split('\n').first;
+
+            // Verificar se o arquivo existe
+            if (await File(foundPath).exists()) {
+              return foundPath;
+            }
+          }
+        } catch (_) {
+          // Continuar para a próxima tentativa
+        }
       }
-    } catch (e) {
-      // Tentar 'python' se 'python3' falhar
     }
 
-    return 'python';
+    // Se chegamos aqui, não conseguimos encontrar o Python
+    return null;
   }
 
+  /// Localiza o executável pip no sistema
+  Future<String?> _findPipExecutable() async {
+    // Se já temos o Python, tente usar o pip via módulo Python
+    if (_pythonPath != null) {
+      try {
+        return _pythonPath; // Usaremos -m pip para execução
+      } catch (_) {
+        // Continuar com outras tentativas
+      }
+    }
+
+    List<String> possibleCommands = [];
+
+    if (Platform.isWindows) {
+      possibleCommands = [
+        'pip',
+        'pip3',
+        r'C:\Python39\Scripts\pip.exe',
+        r'C:\Python310\Scripts\pip.exe',
+        r'C:\Python311\Scripts\pip.exe',
+        r'C:\Program Files\Python39\Scripts\pip.exe',
+        r'C:\Program Files\Python310\Scripts\pip.exe',
+        r'C:\Program Files\Python311\Scripts\pip.exe',
+      ];
+    } else {
+      // macOS e Linux
+      possibleCommands = [
+        '/usr/bin/pip3',
+        '/usr/local/bin/pip3',
+        '/opt/homebrew/bin/pip3',
+        '/usr/bin/pip',
+        'pip3',
+        'pip',
+      ];
+    }
+
+    // Verificar se o executável existe diretamente
+    for (final command in possibleCommands) {
+      if (command.startsWith('/') || command.contains(':')) {
+        if (await File(command).exists()) {
+          try {
+            final result = await Process.run(
+                command,
+                ['--version'],
+                stdoutEncoding: utf8,
+                stderrEncoding: utf8
+            );
+
+            if (result.exitCode == 0 &&
+                result.stdout.toString().toLowerCase().contains('pip')) {
+              return command;
+            }
+          } catch (_) {
+            // Continuar para a próxima tentativa
+          }
+        }
+      }
+    }
+
+    // Verificar comandos usando where/which
+    final whereCommand = Platform.isWindows ? 'where' : 'which';
+
+    for (final command in possibleCommands) {
+      if (!command.startsWith('/') && !command.contains(':')) {
+        try {
+          final result = await Process.run(
+              whereCommand,
+              [command],
+              stdoutEncoding: utf8,
+              stderrEncoding: utf8
+          );
+
+          if (result.exitCode == 0) {
+            final foundPath = result.stdout.toString().trim().split('\n').first;
+            if (await File(foundPath).exists()) {
+              return foundPath;
+            }
+          }
+        } catch (_) {
+          // Continuar para a próxima tentativa
+        }
+      }
+    }
+
+    // Se chegamos aqui, não conseguimos encontrar o pip
+    return null;
+  }
+
+  /// Localiza o executável microdetect
+  Future<String?> _findMicrodetectExecutable() async {
+    List<String> possibleCommands = [];
+
+    if (Platform.isWindows) {
+      possibleCommands = [
+        'microdetect',
+        r'C:\Python39\Scripts\microdetect.exe',
+        r'C:\Python310\Scripts\microdetect.exe',
+        r'C:\Python311\Scripts\microdetect.exe',
+        r'C:\Program Files\Python39\Scripts\microdetect.exe',
+        r'C:\Program Files\Python310\Scripts\microdetect.exe',
+        r'C:\Program Files\Python311\Scripts\microdetect.exe',
+      ];
+    } else {
+      // macOS e Linux
+      possibleCommands = [
+        '/usr/bin/microdetect',
+        '/usr/local/bin/microdetect',
+        '/opt/homebrew/bin/microdetect',
+        'microdetect',
+      ];
+    }
+
+    // Verificar se o executável existe diretamente
+    for (final command in possibleCommands) {
+      if (command.startsWith('/') || command.contains(':')) {
+        if (await File(command).exists()) {
+          try {
+            final result = await Process.run(
+                command,
+                ['version'],
+                stdoutEncoding: utf8,
+                stderrEncoding: utf8
+            );
+
+            if (result.exitCode == 0 &&
+                result.stdout.toString().toLowerCase().contains('microdetect')) {
+              return command;
+            }
+          } catch (_) {
+            // Continuar para a próxima tentativa
+          }
+        }
+      }
+    }
+
+    // Verificar comandos usando where/which
+    final whereCommand = Platform.isWindows ? 'where' : 'which';
+
+    for (final command in possibleCommands) {
+      if (!command.startsWith('/') && !command.contains(':')) {
+        try {
+          final result = await Process.run(
+              whereCommand,
+              [command],
+              stdoutEncoding: utf8,
+              stderrEncoding: utf8
+          );
+
+          if (result.exitCode == 0) {
+            final foundPath = result.stdout.toString().trim().split('\n').first;
+            if (await File(foundPath).exists()) {
+              return foundPath;
+            }
+          }
+        } catch (_) {
+          // Continuar para a próxima tentativa
+        }
+      }
+    }
+
+    // Se temos Python mas não encontramos o microdetect diretamente,
+    // podemos usar o módulo como fallback
+    if (_pythonPath != null) {
+      return _pythonPath; // Usaremos -m microdetect para execução
+    }
+
+    return null;
+  }
+
+  /// Executa um comando pip com o caminho completo do executável
+  Future<ProcessResult> _runPipCommand(List<String> args, {Map<String, String>? environment}) async {
+    if (_pipPath == null) {
+      // Se não encontramos o pip diretamente, usar python -m pip
+      if (_pythonPath == null) {
+        throw Exception('Python não encontrado no sistema');
+      }
+
+      return Process.run(
+          _pythonPath!,
+          ['-m', 'pip', ...args],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+          environment: environment
+      );
+    } else if (_pipPath == _pythonPath) {
+      // Se estamos usando python -m pip
+      return Process.run(
+          _pythonPath!,
+          ['-m', 'pip', ...args],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+          environment: environment
+      );
+    } else {
+      // Usar o pip diretamente
+      return Process.run(
+          _pipPath!,
+          args,
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+          environment: environment
+      );
+    }
+  }
+
+  /// Executa um comando microdetect com o caminho completo do executável
+  Future<Process> _startMicrodetectCommand(List<String> args, {Map<String, String>? environment}) async {
+    if (_microdetectPath == null) {
+      throw Exception('Microdetect não encontrado no sistema');
+    }
+
+    if (_microdetectPath == _pythonPath) {
+      // Se estamos usando python -m microdetect
+      return Process.start(
+          _pythonPath!,
+          ['-m', 'microdetect', ...args],
+          environment: environment
+      );
+    } else {
+      // Usar o microdetect diretamente
+      return Process.start(
+          _microdetectPath!,
+          args,
+          environment: environment
+      );
+    }
+  }
+
+  /// Método legado para compatibilidade com BackendInstallerService
+  Future<bool> createVirtualEnvIfNeeded() async {
+    // Essa função não é mais necessária com a abordagem pip, mas mantida por compatibilidade
+    try {
+      // Verificar se os executáveis Python foram localizados
+      if (_pythonPath == null) {
+        _pythonPath = await _findPythonExecutable();
+        if (_pythonPath == null) {
+          _addLog('Python não encontrado no sistema');
+          return false;
+        }
+      }
+
+      if (_pipPath == null) {
+        _pipPath = await _findPipExecutable();
+        if (_pipPath == null && _pythonPath != null) {
+          // Tentar usar python -m pip se o pip não for encontrado diretamente
+          _pipPath = _pythonPath;
+        }
+      }
+
+      // Verificar se o pacote microdetect está instalado
+      await checkCurrentVersion();
+      if (currentVersion.value.isEmpty) {
+        _addLog('Pacote microdetect não instalado, tentando instalar...');
+        return await installOrUpdate();
+      }
+
+      return true;
+    } catch (e) {
+      _addLog('Erro ao verificar ambiente Python: $e');
+      return false;
+    }
+  }
+
+  /// Verifica a versão atual do pacote instalado
+  Future<void> checkCurrentVersion() async {
+    try {
+      if (_pipPath == null) {
+        await _initializePythonEnvironment();
+        if (_pipPath == null) {
+          _addLog('Pip não encontrado, não é possível verificar a versão do microdetect');
+          currentVersion.value = '';
+          return;
+        }
+      }
+
+      final result = await _runPipCommand(['show', 'microdetect']);
+
+      if (result.exitCode == 0) {
+        // Extrair versão da saída do pip show (formato: "Version: X.Y.Z")
+        final output = result.stdout.toString();
+        final versionMatch = RegExp(r'Version:\s+(\d+\.\d+\.\d+)').firstMatch(output);
+
+        if (versionMatch != null) {
+          currentVersion.value = versionMatch.group(1)!;
+          _addLog('Versão atual do microdetect: ${currentVersion.value}');
+        } else {
+          _addLog('Não foi possível determinar a versão atual do microdetect');
+          currentVersion.value = '';
+        }
+      } else {
+        _addLog('Pacote microdetect não está instalado');
+        currentVersion.value = '';
+      }
+    } catch (e) {
+      _addLog('Erro ao verificar versão atual: $e');
+      currentVersion.value = '';
+    }
+  }
+
+  /// Verifica se há atualizações disponíveis no CodeArtifact
+  Future<bool> checkForUpdates() async {
+    try {
+      _addLog('Verificando atualizações disponíveis...');
+
+      if (_pipPath == null) {
+        await _initializePythonEnvironment();
+        if (_pipPath == null) {
+          _addLog('Pip não encontrado, não é possível verificar atualizações');
+          return false;
+        }
+      }
+
+      // Primeiro obter o token de autenticação da AWS
+      final token = await _getAwsAuthToken();
+      if (token == null) {
+        _addLog('Não foi possível obter token de autenticação AWS');
+        return false;
+      }
+
+      // Index URL para o CodeArtifact
+      final indexUrl = 'https://$_codeArtifactDomain-$_codeArtifactOwner.d.codeartifact.$_awsRegion.amazonaws.com/pypi/$_codeArtifactRepository/simple/';
+
+      // Verifica a versão mais recente disponível
+      final result = await _runPipCommand(
+          ['install', 'microdetect==', '--no-deps', '--dry-run', '--index-url', indexUrl, '--extra-index-url', 'https://pypi.org/simple'],
+          environment: {'AWS_CODEARTIFACT_TOKEN': token}
+      );
+
+      // Analisar a saída para encontrar a versão mais recente disponível
+      final output = result.stderr.toString();
+      final versionMatch = RegExp(r'microdetect (\d+\.\d+\.\d+)').firstMatch(output);
+
+      if (versionMatch != null) {
+        latestVersion.value = versionMatch.group(1)!;
+        _addLog('Versão mais recente disponível: ${latestVersion.value}');
+
+        // Verificar se a versão mais recente é diferente da atual
+        final hasUpdate = currentVersion.value != latestVersion.value;
+        _addLog(hasUpdate
+            ? 'Atualização disponível: ${currentVersion.value} -> ${latestVersion.value}'
+            : 'Versão já atualizada: ${currentVersion.value}');
+
+        return hasUpdate;
+      } else {
+        _addLog('Não foi possível determinar a versão mais recente');
+        return false;
+      }
+    } catch (e) {
+      _addLog('Erro ao verificar atualizações: $e');
+      return false;
+    }
+  }
+
+  /// Obtém um token de autenticação para AWS CodeArtifact
+  Future<String?> _getAwsAuthToken() async {
+    try {
+      // Verificar se o comando AWS está disponível
+      final awsPath = await _findAwsExecutable();
+      if (awsPath == null) {
+        _addLog('AWS CLI não encontrado no sistema');
+        return null;
+      }
+
+      final result = await Process.run(
+          awsPath,
+          ['codeartifact', 'get-authorization-token',
+            '--domain', _codeArtifactDomain,
+            '--domain-owner', _codeArtifactOwner,
+            '--query', 'authorizationToken',
+            '--output', 'text'],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8
+      );
+
+      if (result.exitCode != 0) {
+        _addLog('Erro ao obter token AWS: ${result.stderr}');
+        return null;
+      }
+
+      return result.stdout.toString().trim();
+    } catch (e) {
+      _addLog('Erro ao obter token AWS: $e');
+      return null;
+    }
+  }
+
+  /// Encontra o executável AWS CLI
+  Future<String?> _findAwsExecutable() async {
+    List<String> possibleCommands = [];
+
+    if (Platform.isWindows) {
+      possibleCommands = [
+        'aws',
+        r'C:\Program Files\Amazon\AWSCLIV2\aws.exe',
+        r'C:\Program Files (x86)\Amazon\AWSCLIV2\aws.exe',
+      ];
+    } else {
+      // macOS e Linux
+      possibleCommands = [
+        '/usr/bin/aws',
+        '/usr/local/bin/aws',
+        '/opt/homebrew/bin/aws',
+        'aws',
+      ];
+    }
+
+    // Verificar se o executável existe diretamente
+    for (final command in possibleCommands) {
+      if (command.startsWith('/') || command.contains(':')) {
+        if (await File(command).exists()) {
+          return command;
+        }
+      }
+    }
+
+    // Verificar comandos usando where/which
+    final whereCommand = Platform.isWindows ? 'where' : 'which';
+
+    for (final command in possibleCommands) {
+      if (!command.startsWith('/') && !command.contains(':')) {
+        try {
+          final result = await Process.run(
+              whereCommand,
+              [command],
+              stdoutEncoding: utf8,
+              stderrEncoding: utf8
+          );
+
+          if (result.exitCode == 0) {
+            final foundPath = result.stdout.toString().trim().split('\n').first;
+            if (await File(foundPath).exists()) {
+              return foundPath;
+            }
+          }
+        } catch (_) {
+          // Continuar para a próxima tentativa
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Configura as credenciais da AWS
+  Future<bool> _configureAwsCredentials(String accessKeyId, String secretAccessKey) async {
+    try {
+      final awsPath = await _findAwsExecutable();
+      if (awsPath == null) {
+        _addLog('AWS CLI não encontrado no sistema');
+        return false;
+      }
+
+      // Configurar AWS CLI
+      await Process.run(
+          awsPath,
+          ['configure', 'set', 'aws_access_key_id', accessKeyId],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8
+      );
+
+      await Process.run(
+          awsPath,
+          ['configure', 'set', 'aws_secret_access_key', secretAccessKey],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8
+      );
+
+      await Process.run(
+          awsPath,
+          ['configure', 'set', 'region', _awsRegion],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8
+      );
+
+      return true;
+    } catch (e) {
+      _addLog('Erro ao configurar credenciais AWS: $e');
+      return false;
+    }
+  }
+
+  /// Instala ou atualiza o pacote microdetect via pip
+  Future<bool> installOrUpdate({bool force = false}) async {
+    try {
+      _addLog('Instalando/atualizando pacote microdetect...');
+
+      if (_pipPath == null) {
+        await _initializePythonEnvironment();
+        if (_pipPath == null) {
+          _addLog('Pip não encontrado, não é possível instalar o microdetect');
+          return false;
+        }
+      }
+
+      // Verificar versão atual
+      if (!force) {
+        await checkCurrentVersion();
+      }
+
+      // Obter token de autenticação
+      final token = await _getAwsAuthToken();
+      if (token == null) {
+        _addLog('Não foi possível obter token de autenticação AWS');
+        return false;
+      }
+
+      // URL do índice do CodeArtifact
+      final indexUrl = 'https://$_codeArtifactDomain-$_codeArtifactOwner.d.codeartifact.$_awsRegion.amazonaws.com/pypi/$_codeArtifactRepository/simple/';
+
+      // Instalar o pacote com pip
+      final result = await _runPipCommand(
+          ['install', 'microdetect', '--upgrade', '--index-url', indexUrl, '--extra-index-url', 'https://pypi.org/simple'],
+          environment: {'AWS_CODEARTIFACT_TOKEN': token}
+      );
+
+      if (result.exitCode != 0) {
+        _addLog('Erro ao instalar pacote: ${result.stderr}');
+        return false;
+      }
+
+      _addLog('Pacote microdetect instalado/atualizado com sucesso');
+
+      // Atualizar versão atual e procurar o executável microdetect
+      await checkCurrentVersion();
+      _microdetectPath = await _findMicrodetectExecutable();
+
+      return true;
+    } catch (e) {
+      _addLog('Erro ao instalar/atualizar pacote: $e');
+      return false;
+    }
+  }
+
+  /// Inicia o servidor microdetect
+  Future<bool> startServer({int port = 8000}) async {
+    if (_isRunning.value) {
+      _addLog('Servidor já está rodando');
+      return true;
+    }
+
+    try {
+      _port.value = port;
+      pythonState.value = BackendInitStep.serverStartup;
+
+      // Verificar se temos o executável microdetect
+      if (_microdetectPath == null) {
+        await _initializePythonEnvironment();
+        if (_microdetectPath == null) {
+          _addLog('Executável microdetect não encontrado');
+
+          // Verificar se o pacote está instalado
+          await checkCurrentVersion();
+          if (currentVersion.value.isEmpty) {
+            // Tentar instalar o pacote
+            final installed = await installOrUpdate();
+            if (!installed) {
+              _addLog('Não foi possível instalar o pacote microdetect');
+              return false;
+            }
+
+            // Procurar o executável novamente
+            _microdetectPath = await _findMicrodetectExecutable();
+            if (_microdetectPath == null) {
+              _addLog('Executável microdetect não encontrado mesmo após instalação');
+              return false;
+            }
+          }
+        }
+      }
+
+      // Obter diretório de dados
+      final dataDir = await appDataDir;
+
+      _addLog('Iniciando servidor microdetect na porta $port...');
+      _addLog('Diretório de dados: $dataDir');
+      _addLog('Usando executável: $_microdetectPath');
+
+      // Iniciar processo microdetect
+      _pythonProcess = await _startMicrodetectCommand(
+          ['start-server', '--port', port.toString(), '--data-dir', dataDir],
+          environment: {
+            'PYTHONUNBUFFERED': '1',
+          }
+      );
+
+      // Capturar saída padrão
+      _pythonProcess!.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((data) {
+        _addLog(data);
+
+        // Detectar quando o servidor está rodando
+        if (data.contains('Application startup complete') ||
+            data.contains('Uvicorn running on') ||
+            data.contains('Iniciando servidor na porta')) {
+          _isRunning.value = true;
+          _status.value = true;
+          pythonState.value = BackendInitStep.completed;
+        }
+      });
+
+      // Capturar saída de erro
+      _pythonProcess!.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((data) {
+        _addLog('ERROR: $data');
+
+        // Detectar erros comuns
+        if (data.contains('Address already in use')) {
+          _addLog('ERRO: Porta $port já está em uso');
+          pythonState.value = BackendInitStep.failed;
+        }
+      });
+
+      // Monitorar encerramento do processo
+      _pythonProcess!.exitCode.then((exitCode) {
+        _addLog('Servidor encerrado com código $exitCode');
+        _isRunning.value = false;
+        _status.value = false;
+        _pythonProcess = null;
+      });
+
+      // Aguardar um tempo para o servidor iniciar
+      await Future.delayed(const Duration(seconds: 5));
+
+      // Verificar saúde do servidor
+      final isHealthy = await checkServerHealth();
+
+      if (isHealthy) {
+        _addLog('Servidor iniciado com sucesso e está respondendo');
+        _isRunning.value = true;
+        _status.value = true;
+        pythonState.value = BackendInitStep.completed;
+        return true;
+      } else if (_isRunning.value) {
+        // Se o processo está rodando, mas não responde à verificação de saúde,
+        // ainda consideramos como em execução mas logamos um aviso
+        _addLog('Servidor iniciado, mas não está respondendo ao health check');
+        return true;
+      } else {
+        _addLog('Erro ao iniciar servidor, processo não está em execução');
+        pythonState.value = BackendInitStep.failed;
+        return false;
+      }
+    } catch (e) {
+      _addLog('Erro ao iniciar servidor: $e');
+      pythonState.value = BackendInitStep.failed;
+      return false;
+    }
+  }
+
+  /// Verifica a saúde do servidor
+  Future<bool> checkServerHealth() async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+
+      final url = 'http://${_host.value}:${_port.value}/health';
+
+      final request = await client.getUrl(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+
+      final response = await request.close()
+          .timeout(const Duration(seconds: 5));
+
+      final responseBody = await response.transform(utf8.decoder).join();
+      client.close();
+
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(responseBody);
+          return data['status'] == 'healthy';
+        } catch (e) {
+          // Se não conseguir decodificar o JSON, pelo menos respondeu com 200
+          return true;
+        }
+      }
+
+      return false;
+    } on TimeoutException {
+      _addLog('Timeout ao verificar saúde do servidor');
+      return false;
+    } on SocketException {
+      _addLog('Erro de conexão ao verificar saúde do servidor');
+      return false;
+    } catch (e) {
+      _addLog('Erro ao verificar saúde do servidor: $e');
+      return false;
+    }
+  }
+
+  /// Para o servidor microdetect
   Future<bool> stopServer({bool force = false}) async {
     if (!_isRunning.value && !force) {
       return true;
     }
 
     try {
-      _addLog('Encerrando servidor...');
+      _addLog('Parando servidor...');
 
-      // Se o processo ainda existe, tente matá-lo
       if (_pythonProcess != null) {
-        try {
-          // Primeiro tente finalizar normalmente
-          final killed = _pythonProcess!.kill(ProcessSignal.sigterm);
+        // Tentar parar o processo de forma limpa
+        _pythonProcess!.kill();
 
-          // Aguarde um tempo para que o processo termine normalmente
-          if (killed) {
-            await Future.delayed(const Duration(seconds: 2));
-          }
+        // Aguardar o processo encerrar
+        await Future.delayed(const Duration(seconds: 2));
 
-          // Verifique se o processo ainda está em execução
-          if (!killed || _pythonProcess!.kill(ProcessSignal.sigterm)) {
-            _addLog('Servidor não respondeu ao SIGTERM, forçando encerramento...');
-            _pythonProcess!.kill(ProcessSignal.sigkill);
-            await Future.delayed(const Duration(seconds: 1));
-          }
-        } catch (e) {
-          _addLog('Erro ao encerrar processo: $e');
-          // Se force=true, continue mesmo com erro
-          if (!force) {
-            return false;
-          }
+        // Se force=true e o processo ainda estiver rodando, usar SIGKILL
+        if (force && _pythonProcess != null) {
+          _pythonProcess!.kill(ProcessSignal.sigkill);
         }
       }
 
-      // Tentar finalizar processos Python usando comandos do sistema operacional
-      if (Platform.isMacOS || Platform.isLinux) {
-        await _killPythonProcesses();
+      // Em sistemas Unix, verificar e matar processos relacionados
+      if (Platform.isLinux || Platform.isMacOS) {
+        await _killRelatedProcesses();
       } else if (Platform.isWindows) {
-        await _killPythonProcessesWindows();
+        await _killWindowsProcesses();
       }
 
-      // Definir estado como parado
       _isRunning.value = false;
       _status.value = false;
-      _addLog('Servidor encerrado');
-
-      // Limpar a referência ao processo
       _pythonProcess = null;
 
       return true;
     } catch (e) {
-      _addLog('Erro ao encerrar servidor: $e');
+      _addLog('Erro ao parar servidor: $e');
 
-      // Se force=true, considere o servidor como parado mesmo com erro
       if (force) {
         _isRunning.value = false;
         _status.value = false;
@@ -562,391 +935,71 @@ class PythonService extends GetxService {
     }
   }
 
-  // Método para encerrar todos os processos Python relacionados no macOS/Linux
-  Future<void> _killPythonProcesses() async {
+  /// Mata processos relacionados em sistemas Unix
+  Future<void> _killRelatedProcesses() async {
     try {
-      final scriptPath = await startScriptPath;
-      final backendPath = await pythonBackendPath;
-
-      _addLog('Verificando processos Python relacionados...');
-
-      // Primeiro tentar matar processos usando pgrep (mais preciso)
-      try {
-        final pgrepResult = await Process.run(
-          'pgrep',
-          ['-f', 'python.*start_backend|python.*microdetect'],
-          stdoutEncoding: utf8,
-        );
-
-        if (pgrepResult.exitCode == 0 && (pgrepResult.stdout as String).isNotEmpty) {
-          final pids = (pgrepResult.stdout as String).trim().split('\n');
-          _addLog('Encontrados ${pids.length} processo(s) Python com pgrep');
-
-          for (final pid in pids) {
-            if (pid.isNotEmpty) {
-              _addLog('Encerrando processo Python PID: $pid via SIGTERM');
-              await Process.run('kill', [pid]);
-              await Future.delayed(const Duration(milliseconds: 300));
-
-              // Verificar se ainda está em execução e usar SIGKILL se necessário
-              final checkResult = await Process.run('ps', ['-p', pid]);
-              if (checkResult.exitCode == 0 && (checkResult.stdout as String).contains(pid)) {
-                _addLog('Forçando encerramento do processo PID: $pid via SIGKILL');
-                await Process.run('kill', ['-9', pid]);
-              }
-            }
-          }
-
-          return; // Se encontrou com pgrep, não precisa continuar
-        }
-      } catch (e) {
-        _addLog('Erro ao usar pgrep: $e - tentando método alternativo');
-      }
-
-      // Método alternativo usando ps e filtro manual
+      // Procurar por processos microdetect ou python que contenham microdetect
       final result = await Process.run(
-        'ps',
-        ['-ef'],
-        stdoutEncoding: utf8,
+          'ps',
+          ['-ef'],
+          stdoutEncoding: utf8
       );
 
-      if (result.exitCode != 0) {
-        _addLog('Erro ao buscar processos: ${result.stderr}');
-        return;
-      }
+      if (result.exitCode == 0) {
+        final output = result.stdout as String;
+        final lines = output.split('\n');
 
-      // Filtrar linhas que contém o caminho do script ou palavras-chave relacionadas
-      final lines = (result.stdout as String).split('\n');
-      final pythonProcesses = lines.where((line) =>
-      line.contains('python') &&
-          (line.contains('start_backend.py') ||
-              line.contains('microdetect') ||
-              line.contains(scriptPath) ||
-              line.contains(backendPath))
-      ).toList();
+        for (final line in lines) {
+          if ((line.contains('python') && line.contains('microdetect')) ||
+              line.contains('microdetect start-server')) {
 
-      if (pythonProcesses.isEmpty) {
-        _addLog('Nenhum processo Python relacionado foi encontrado');
-        return;
-      }
+            // Extrair o PID (geralmente o segundo campo)
+            final parts = line.trim().split(RegExp(r'\s+'));
+            if (parts.length > 1) {
+              final pid = parts[1];
+              _addLog('Matando processo relacionado PID: $pid');
 
-      _addLog('Encontrados ${pythonProcesses.length} processos Python relacionados via ps');
-
-      // Encerrar cada processo encontrado
-      for (final processLine in pythonProcesses) {
-        final parts = processLine.trim().split(RegExp(r'\s+'));
-        if (parts.length > 1) {
-          final pid = parts[1];
-          _addLog('Encerrando processo Python PID: $pid via SIGTERM');
-
-          // Tentar encerrar de forma normal primeiro
-          await Process.run('kill', [pid]);
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          // Depois verificar se ainda existe e força encerramento se necessário
-          final checkResult = await Process.run('ps', ['-p', pid]);
-          if (checkResult.exitCode == 0 && (checkResult.stdout as String).contains(pid)) {
-            _addLog('Forçando encerramento do processo PID: $pid via SIGKILL');
-            await Process.run('kill', ['-9', pid]);
+              await Process.run('kill', ['-9', pid]);
+            }
           }
         }
       }
     } catch (e) {
-      _addLog('Erro ao encerrar processos Python: $e');
+      _addLog('Erro ao matar processos relacionados: $e');
     }
   }
 
-  // Método para encerrar processos Python no Windows
-  Future<void> _killPythonProcessesWindows() async {
+  /// Mata processos relacionados no Windows
+  Future<void> _killWindowsProcesses() async {
     try {
-      _addLog('Encerrando processos Python no Windows...');
-
-      // No Windows, tente encerrar todos os processos python.exe relacionados
+      // Encerrar processos microdetect
       await Process.run(
-        'taskkill',
-        ['/F', '/IM', 'python.exe'],
-        runInShell: true,
+          'taskkill',
+          ['/F', '/IM', 'microdetect.exe'],
+          runInShell: true
       );
-    } catch (e) {
-      _addLog('Erro ao encerrar processos Python no Windows: $e');
-    }
-  }
 
-  Future<bool> checkServerHealth({int? port}) async {
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 10);
+      // Procurar processos Python que possam estar executando microdetect
+      final result = await Process.run(
+          'tasklist',
+          ['/FI', 'IMAGENAME eq python.exe', '/FO', 'CSV'],
+          stdoutEncoding: utf8,
+          runInShell: true
+      );
 
-      final targetPort = port ?? _port.value;
-      final url = 'http://${_host.value}:$targetPort/health';
-
-      _addLog('Verificando saúde do servidor em $url');
-
-      final request = await client.getUrl(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
-
-      final response = await request.close()
-          .timeout(const Duration(seconds: 10));
-
-      final responseBody = await response.transform(utf8.decoder).join();
-      client.close();
-
-      if (response.statusCode == 200) {
-        try {
-          final data = jsonDecode(responseBody);
-          if (data['status'] == 'healthy') {
-            _addLog('Servidor respondeu: saudável');
-            pythonState.value = BackendInitStep.completed;
-            return true;
-          }
-          _addLog('Servidor respondeu, mas status não é saudável: ${data['status']}');
-        } catch (e) {
-          // Se não conseguir decodificar o JSON, pelo menos a resposta foi 200
-          _addLog('Servidor respondeu com status 200, mas JSON inválido: $responseBody');
-          pythonState.value = BackendInitStep.completed;
-          return true;
-        }
-      } else {
-        _addLog('Servidor respondeu com status ${response.statusCode}: $responseBody');
-      }
-
-      return false;
-    } on TimeoutException {
-      _addLog('Timeout ao verificar saúde do servidor (servidor pode estar iniciando)');
-      return false;
-    } on SocketException catch (e) {
-      _addLog('Erro de conexão: $e - Servidor provavelmente ainda não está rodando');
-      return false;
-    } catch (e) {
-      _addLog('Erro ao verificar saúde do servidor: $e');
-      return false;
-    }
-  }
-
-// Funções de debugging para verificar o ambiente virtual no PythonService
-
-  Future<bool> createVirtualEnvIfNeeded() async {
-    try {
-      final backendPath = await pythonBackendPath;
-      LoggerUtil.debug(
-          '[DEBUG venv] Verificando ambiente virtual em: $backendPath');
-
-      final venvPath = Platform.isWindows
-          ? path.join(backendPath, 'venv', 'Scripts', 'python.exe')
-          : path.join(backendPath, 'venv', 'bin', 'python');
-
-      LoggerUtil.debug(
-          '[DEBUG venv] Procurando Python do ambiente virtual em: $venvPath');
-
-      // Verificar se já existe
-      if (await File(venvPath).exists()) {
-        LoggerUtil.debug(
-            '[DEBUG venv] Ambiente virtual Python já existe e está disponível');
-        return true;
-      } else {
-        LoggerUtil.debug(
-            '[DEBUG venv] Executável Python do ambiente virtual não encontrado');
-      }
-
-      // Verificar se o diretório venv existe, mesmo que o executável não exista
-      final venvDir = Directory(path.join(backendPath, 'venv'));
-      if (await venvDir.exists()) {
-        LoggerUtil.debug(
-            '[DEBUG venv] Diretório venv existe, mas executável Python não encontrado');
-
-        // Verificar conteúdo para entender o que existe
-        try {
-          final venvContents = await venvDir.list(recursive: false).toList();
-          LoggerUtil.debug(
-              '[DEBUG venv] Conteúdo do diretório venv (${venvContents
-                  .length} itens):');
-          for (var entity in venvContents) {
-            LoggerUtil.debug('[DEBUG venv] - ${path.basename(entity.path)}');
-          }
-
-          // Verificar subdiretórios específicos
-          if (Platform.isWindows) {
-            final scriptsDir = Directory(path.join(venvDir.path, 'Scripts'));
-            if (await scriptsDir.exists()) {
-              final scriptContents = await scriptsDir.list().toList();
-              LoggerUtil.debug(
-                  '[DEBUG venv] Conteúdo do diretório Scripts (${scriptContents
-                      .length} itens):');
-              for (var entity in scriptContents) {
-                LoggerUtil.debug(
-                    '[DEBUG venv] - ${path.basename(entity.path)}');
-              }
-            } else {
-              LoggerUtil.debug(
-                  '[DEBUG venv] Diretório Scripts não encontrado dentro do venv');
-            }
-          } else {
-            final binDir = Directory(path.join(venvDir.path, 'bin'));
-            if (await binDir.exists()) {
-              final binContents = await binDir.list().toList();
-              LoggerUtil.debug(
-                  '[DEBUG venv] Conteúdo do diretório bin (${binContents
-                      .length} itens):');
-              for (var entity in binContents) {
-                LoggerUtil.debug(
-                    '[DEBUG venv] - ${path.basename(entity.path)}');
-              }
-            } else {
-              LoggerUtil.debug(
-                  '[DEBUG venv] Diretório bin não encontrado dentro do venv');
-            }
-          }
-        } catch (e) {
-          LoggerUtil.debug('[DEBUG venv] Erro ao listar conteúdo do venv: $e');
-        }
-
-        LoggerUtil.debug(
-            '[DEBUG venv] Tentando usar assim mesmo, mas pode estar incompleto');
-        return true;
-      }
-
-      LoggerUtil.debug(
-          '[DEBUG venv] Ambiente virtual não existe, tentando criar...');
-
-      // Encontrar um Python disponível no sistema
-      String? systemPython = await _findSystemPython();
-      if (systemPython == null) {
-        LoggerUtil.debug(
-            '[DEBUG venv] Não foi possível encontrar Python no sistema');
-        return false;
-      }
-
-      LoggerUtil.debug(
-          '[DEBUG venv] Python encontrado para criar ambiente: $systemPython');
-
-      // Tenta criar o diretório venv se ele não existir
-      if (!await venvDir.exists()) {
-        try {
-          await venvDir.create(recursive: true);
-          LoggerUtil.debug('[DEBUG venv] Diretório venv criado');
-        } catch (e) {
-          LoggerUtil.debug('[DEBUG venv] Erro ao criar diretório venv: $e');
-        }
-      }
-
-      // Executar comando para criar ambiente virtual
-      try {
-        final command = systemPython;
-        final args = ['-m', 'venv', path.join(backendPath, 'venv')];
-
-        LoggerUtil.debug(
-            '[DEBUG venv] Executando comando: $command ${args.join(' ')}');
-
-        final result = await Process.run(
-          command,
-          args,
-          runInShell: true,
+      if (result.exitCode == 0 && (result.stdout as String).contains('python.exe')) {
+        await Process.run(
+            'taskkill',
+            ['/F', '/IM', 'python.exe'],
+            runInShell: true
         );
-
-        if (result.exitCode != 0) {
-          LoggerUtil.debug('[DEBUG venv] Erro ao criar ambiente virtual:');
-          LoggerUtil.debug('[DEBUG venv] - STDOUT: ${result.stdout}');
-          LoggerUtil.debug('[DEBUG venv] - STDERR: ${result.stderr}');
-
-          // Verificar módulo venv
-          try {
-            final checkVenv = await Process.run(
-              systemPython,
-              ['-c', 'import venv; print("venv module available")'],
-            );
-
-            if (checkVenv.exitCode == 0) {
-              LoggerUtil.debug('[DEBUG venv] Módulo venv está disponível');
-            } else {
-              LoggerUtil.debug(
-                  '[DEBUG venv] Módulo venv NÃO disponível, tentando instalar...');
-              // Em alguns sistemas pode ser necessário instalar o pacote venv separadamente
-              if (Platform.isLinux) {
-                try {
-                  LoggerUtil.debug(
-                      '[DEBUG venv] Tentando instalar python3-venv via apt-get');
-                  final aptResult = await Process.run(
-                      'sudo', ['apt-get', 'install', '-y', 'python3-venv']);
-                  LoggerUtil.debug(
-                      '[DEBUG venv] Resultado instalação apt: ${aptResult
-                          .exitCode}');
-
-                  if (aptResult.exitCode == 0) {
-                    // Tentar criar o ambiente novamente
-                    final retryResult = await Process.run(
-                      systemPython,
-                      ['-m', 'venv', path.join(backendPath, 'venv')],
-                    );
-
-                    if (retryResult.exitCode == 0) {
-                      LoggerUtil.debug(
-                          '[DEBUG venv] Ambiente virtual criado com sucesso após instalar venv');
-                      return true;
-                    }
-                  }
-                } catch (aptError) {
-                  LoggerUtil.debug(
-                      '[DEBUG venv] Erro ao instalar python3-venv: $aptError');
-                }
-              }
-            }
-          } catch (e) {
-            LoggerUtil.debug('[DEBUG venv] Erro ao verificar módulo venv: $e');
-          }
-
-          LoggerUtil.debug(
-              '[DEBUG venv] Usando Python do sistema como alternativa');
-          return true;
-        }
-
-        LoggerUtil.debug(
-            '[DEBUG venv] Ambiente virtual Python criado com sucesso');
-
-        // Verificar se foi realmente criado
-        if (Platform.isWindows) {
-          final pythonExe = File(
-              path.join(backendPath, 'venv', 'Scripts', 'python.exe'));
-          LoggerUtil.debug(
-              '[DEBUG venv] Python.exe exists: ${await pythonExe.exists()}');
-        } else {
-          final pythonBin = File(
-              path.join(backendPath, 'venv', 'bin', 'python'));
-          LoggerUtil.debug(
-              '[DEBUG venv] Python bin exists: ${await pythonBin.exists()}');
-        }
-
-        return true;
-      } catch (e) {
-        LoggerUtil.debug('[DEBUG venv] Exceção ao criar ambiente virtual: $e');
-        return true;
       }
     } catch (e) {
-      LoggerUtil.debug('[DEBUG venv] Erro ao criar ambiente virtual: $e');
-      return false;
+      _addLog('Erro ao matar processos Windows: $e');
     }
   }
 
-  Future<String?> _findSystemPython() async {
-    // Verificar caminhos conhecidos
-    final pythonPaths = Platform.isWindows
-        ? ['python', 'python3', 'C:\\Python39\\python.exe', 'C:\\Python310\\python.exe']
-        : ['/usr/bin/python3', '/usr/local/bin/python3', '/opt/homebrew/bin/python3', 'python3', 'python'];
-
-    for (final pythonPath in pythonPaths) {
-      try {
-        final result = await Process.run(pythonPath, ['--version'], runInShell: true);
-        if (result.exitCode == 0) {
-          return pythonPath;
-        }
-      } catch (e) {
-        // Continuar tentando outros caminhos
-      }
-    }
-
-    return null;
-  }
-
-  // Adicionar log à lista observável
+  /// Adiciona log à lista observável
   void _addLog(String message) {
     // Remover quebras de linha extras e espaços em branco
     final cleanedMessage = message.trim();

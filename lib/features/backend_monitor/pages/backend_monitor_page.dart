@@ -338,9 +338,9 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
                 ),
                 const SizedBox(width: 8),
                 Obx(() => Text(
-                    controller.assetVersion.value.isEmpty
+                    controller.latestVersion.value.isEmpty
                         ? 'Carregando...'
-                        : controller.assetVersion.value,
+                        : controller.latestVersion.value,
                     style: AppTypography.bodyMedium(context))),
               ],
             ),
@@ -350,7 +350,7 @@ class BackendMonitorPage extends GetView<BackendMonitorController> {
             Obx(() => controller.updateAvailable
                 ? Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.new_releases,
                   color: AppColors.primary,
                   size: 16,

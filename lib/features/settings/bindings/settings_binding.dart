@@ -1,7 +1,6 @@
 import 'package:get/get.dart';
-import 'package:microdetect/core/services/backend_installer_service.dart';
 import 'package:microdetect/core/services/backend_service.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
+import 'package:microdetect/core/services/python_service.dart';
 import '../controllers/settings_controller.dart';
 import '../services/settings_service.dart';
 
@@ -16,7 +15,7 @@ class SettingsBinding implements Bindings {
     Get.lazyPut<SettingsController>(() => SettingsController(
           settingsService: Get.find<SettingsService>(),
           backendService: Get.find<BackendService>(),
-          installerService: Get.find<BackendInstallerService>(),
+          pythonService: Get.find<PythonService>(),
         ));
   }
 }
