@@ -27,9 +27,9 @@ class PythonService extends GetxService {
 
   // AWS CodeArtifact configuration
   final String _awsRegion = 'us-east-1';
-  final String _codeArtifactDomain = 'your-domain';
-  final String _codeArtifactRepository = 'your-repository';
-  final String _codeArtifactOwner = '123456789012'; // AWS Account ID
+  final String _codeArtifactDomain = 'rbtech';
+  final String _codeArtifactRepository = 'microdetect';
+  final String _codeArtifactOwner = '718446585908'; // AWS Account ID
 
   // Getters
   bool get isRunning => _isRunning.value;
@@ -371,32 +371,99 @@ class PythonService extends GetxService {
         throw Exception('Python não encontrado no sistema');
       }
 
+      // Definir ambiente base para evitar interação
+      final Map<String, String> baseEnvironment = {
+        'PIP_NO_INPUT': '1',
+        'PYTHONIOENCODING': 'utf-8',
+        'PYTHONUNBUFFERED': '1',
+      };
+
+      // Mesclar com o ambiente fornecido
+      final completeEnvironment = {...baseEnvironment};
+      if (environment != null) {
+        completeEnvironment.addAll(environment);
+      }
+
+      // Verificar se a execução é em modo não interativo
+      final isInteractive = stdout.hasTerminal && stdin.hasTerminal;
+      if (!isInteractive) {
+        _addLog('Executando pip em modo não interativo');
+        completeEnvironment['PIP_NO_INPUT'] = '1';
+        // Evitar requisitos específicos de entrada em terminais não interativos
+        if (!args.contains('--no-input') && !args.contains('--quiet')) {
+          args = [...args, '--no-input', '--quiet'];
+        }
+      }
+
       return Process.run(
           _pythonPath!,
           ['-m', 'pip', ...args],
           stdoutEncoding: utf8,
           stderrEncoding: utf8,
-          environment: environment
+          environment: completeEnvironment,
+          runInShell: true // Usar runInShell para melhor tratamento das saídas
       );
     } else if (_pipPath == _pythonPath) {
       // Se estamos usando python -m pip
+      final Map<String, String> baseEnvironment = {
+        'PIP_NO_INPUT': '1',
+        'PYTHONIOENCODING': 'utf-8',
+        'PYTHONUNBUFFERED': '1',
+      };
+
+      final completeEnvironment = {...baseEnvironment};
+      if (environment != null) {
+        completeEnvironment.addAll(environment);
+      }
+
+      final isInteractive = stdout.hasTerminal && stdin.hasTerminal;
+      if (!isInteractive) {
+        if (!args.contains('--no-input') && !args.contains('--quiet')) {
+          args = [...args, '--no-input', '--quiet'];
+        }
+      }
+
       return Process.run(
           _pythonPath!,
           ['-m', 'pip', ...args],
           stdoutEncoding: utf8,
           stderrEncoding: utf8,
-          environment: environment
+          environment: completeEnvironment,
+          runInShell: true
       );
     } else {
       // Usar o pip diretamente
+      final Map<String, String> baseEnvironment = {
+        'PIP_NO_INPUT': '1',
+        'PYTHONIOENCODING': 'utf-8',
+        'PYTHONUNBUFFERED': '1',
+      };
+
+      final completeEnvironment = {...baseEnvironment};
+      if (environment != null) {
+        completeEnvironment.addAll(environment);
+      }
+
+      final isInteractive = stdout.hasTerminal && stdin.hasTerminal;
+      if (!isInteractive) {
+        if (!args.contains('--no-input') && !args.contains('--quiet')) {
+          args = [...args, '--no-input', '--quiet'];
+        }
+      }
+
       return Process.run(
           _pipPath!,
           args,
           stdoutEncoding: utf8,
           stderrEncoding: utf8,
-          environment: environment
+          environment: completeEnvironment,
+          runInShell: true
       );
     }
+  }
+
+  Future<ProcessResult> runPipCommandDirectly(List<String> args, Map<String, String>? environment) async {
+    return _runPipCommand(args, environment: environment);
   }
 
   /// Executa um comando microdetect com o caminho completo do executável
@@ -693,34 +760,54 @@ class PythonService extends GetxService {
         await checkCurrentVersion();
       }
 
-      // Obter token de autenticação
-      final token = await _getAwsAuthToken();
-      if (token == null) {
-        _addLog('Não foi possível obter token de autenticação AWS');
-        return false;
-      }
+      // Criar mapa de ambiente que evita a solicitação de entrada interativa
+      final environment = {
+        'PIP_NO_INPUT': '1',           // Evita que o pip solicite qualquer entrada
+        'PIP_DISABLE_PIP_VERSION_CHECK': '1', // Evita verificação de versão do pip
+        'PYTHONIOENCODING': 'utf-8',   // Garante codificação correta
+        'PYTHONUNBUFFERED': '1',       // Evita buffering da saída
+      };
 
-      // URL do índice do CodeArtifact
-      final indexUrl = 'https://$_codeArtifactDomain-$_codeArtifactOwner.d.codeartifact.$_awsRegion.amazonaws.com/pypi/$_codeArtifactRepository/simple/';
+      // Usar o PyPI padrão em vez do AWS CodeArtifact para evitar problemas de autenticação
+      _addLog('Instalando pacote microdetect do PyPI...');
 
-      // Instalar o pacote com pip
+      // Instalar com opções seguras para evitar entrada interativa
       final result = await _runPipCommand(
-          ['install', 'microdetect', '--upgrade', '--index-url', indexUrl, '--extra-index-url', 'https://pypi.org/simple'],
-          environment: {'AWS_CODEARTIFACT_TOKEN': token}
+          ['install', 'microdetect', '--upgrade', '--no-input', '--quiet',
+            '--user', '--no-cache-dir', '--default-timeout', '60',
+            '--retries', '3', '--index-url', 'https://pypi.org/simple'],
+          environment: environment
       );
 
-      if (result.exitCode != 0) {
+      if (result.exitCode == 0) {
+        _addLog('Pacote microdetect instalado/atualizado com sucesso');
+
+        // Atualizar versão atual e procurar o executável microdetect
+        await checkCurrentVersion();
+        _microdetectPath = await _findMicrodetectExecutable();
+
+        return true;
+      } else {
+        // Tentar novamente com configuração mais simples em caso de falha
+        _addLog('Primeira tentativa falhou, tentando com opções mais simples...');
+
+        final secondAttempt = await _runPipCommand(
+            ['install', 'microdetect', '--user', '--no-input'],
+            environment: environment
+        );
+
+        if (secondAttempt.exitCode == 0) {
+          _addLog('Pacote microdetect instalado com sucesso na segunda tentativa');
+
+          await checkCurrentVersion();
+          _microdetectPath = await _findMicrodetectExecutable();
+
+          return true;
+        }
+
         _addLog('Erro ao instalar pacote: ${result.stderr}');
         return false;
       }
-
-      _addLog('Pacote microdetect instalado/atualizado com sucesso');
-
-      // Atualizar versão atual e procurar o executável microdetect
-      await checkCurrentVersion();
-      _microdetectPath = await _findMicrodetectExecutable();
-
-      return true;
     } catch (e) {
       _addLog('Erro ao instalar/atualizar pacote: $e');
       return false;

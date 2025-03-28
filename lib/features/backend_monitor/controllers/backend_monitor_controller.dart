@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:microdetect/features/backend_monitor/widgets/pip_error_dialog.dart';
 import 'package:microdetect/routes/app_pages.dart';
 import '../../../core/enums/backend_status_enum.dart';
 import '../../../core/services/backend_service.dart';
@@ -93,6 +94,38 @@ class BackendMonitorController extends GetxController {
     }
 
     return statusMessage.value;
+  }
+
+  void handlePipInstallationError() {
+    // Verificar se o erro está relacionado ao pip/instalação
+    if (statusMessage.value.contains('Falha ao instalar o pacote') ||
+        statusMessage.value.contains('Erro ao instalar pacote') ||
+        statusMessage.value.contains('EOF when reading a line')) {
+
+      LoggerUtil.info('Detectado erro de instalação do pip. Mostrando opções avançadas.');
+
+      // Obter detalhe do erro a partir dos logs
+      String errorDetail = '';
+      for (final log in logs.reversed) {
+        if (log.contains('Error:') ||
+            log.contains('Erro:') ||
+            log.contains('ERROR') ||
+            log.contains('EOFError') ||
+            log.contains('pip')) {
+          errorDetail = '$log\n$errorDetail';
+          // Limitar para não ficar muito longo
+          if (errorDetail.length > 1500) break;
+        }
+      }
+
+      // Se não encontramos detalhes, usar a mensagem de status
+      if (errorDetail.isEmpty) {
+        errorDetail = statusMessage.value;
+      }
+
+      // Mostrar diálogo de erro com opções avançadas
+      PipErrorDialog.show(errorDetail);
+    }
   }
 
   /// Executar diagnóstico do sistema
@@ -224,7 +257,21 @@ class BackendMonitorController extends GetxController {
     // Implementation remains the same
     LoggerUtil.debug('Backend status changed to: $newStatus');
 
-    if (newStatus == BackendStatus.running) {
+    if (newStatus == BackendStatus.error) {
+      // Verificar se o erro está relacionado à instalação do pip
+      if (statusMessage.value.contains('Falha ao instalar o pacote') ||
+          statusMessage.value.contains('Erro ao instalar pacote') ||
+          statusMessage.value.contains('EOF when reading a line')) {
+
+        // Verificar se estamos na tela de monitor
+        if (Get.currentRoute.contains('/backend_monitor')) {
+          // Esperar um pouco para garantir que o usuário veja a mudança de status
+          Future.delayed(const Duration(milliseconds: 500), () {
+            handlePipInstallationError();
+          });
+        }
+      }
+    } else if (newStatus == BackendStatus.running) {
       try {
         // If an update was detected during initialization, don't navigate
         if (updateAvailable && !isUpdating.value && !updatePromptShown.value) {

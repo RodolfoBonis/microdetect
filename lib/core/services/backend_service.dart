@@ -1,6 +1,8 @@
 // Modificações no BackendService para usar o novo PythonService
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:get/get.dart';
 import '../utils/logger_util.dart';
 import '../enums/backend_status_enum.dart';
@@ -283,6 +285,178 @@ class BackendService extends GetxService {
       _setStatus(BackendStatus.error, 'Erro ao atualizar backend: $e');
       lastError.value = 'Erro: $e';
       return false;
+    }
+  }
+
+  // Adicionar ao lib/core/services/backend_service.dart
+
+  /// Tenta uma instalação personalizada do microdetect com opções específicas
+  Future<bool> retryInstallationWithCustomOptions({
+    required List<String> pipArgs,
+    required Map<String, String> environment,
+    required bool useSystemPython,
+  }) async {
+    try {
+      _setStatus(BackendStatus.initializing, 'Tentando instalação personalizada...');
+      _addLog('Tentando instalação personalizada com argumentos: ${pipArgs.join(' ')}');
+
+      // Se estamos usando o Python do sistema, precisamos encontrá-lo primeiro
+      String? pythonPath;
+      if (useSystemPython) {
+        _addLog('Procurando por instalação de Python no sistema...');
+        pythonPath = await _findSystemPython();
+
+        if (pythonPath == null) {
+          _addLog('Python não encontrado no sistema');
+          _setStatus(BackendStatus.error, 'Python não encontrado no sistema');
+          return false;
+        }
+
+        _addLog('Python encontrado: $pythonPath');
+      }
+
+      // Executar comando pip personalizado
+      final result = await _runCustomPipCommand(
+        pipArgs: pipArgs,
+        environment: environment,
+        pythonPath: pythonPath,
+      );
+
+      if (result.exitCode == 0) {
+        _addLog('Instalação personalizada concluída com sucesso');
+        _setStatus(BackendStatus.initializing, 'Pacote instalado. Verificando...');
+
+        // Verificar se o pacote foi instalado corretamente
+        final version = _pythonService.currentVersion();
+        if (version.isNotEmpty) {
+          _addLog('Microdetect instalado com sucesso: $version');
+          return true;
+        } else {
+          _addLog('Erro: Pacote instalado, mas não foi possível verificar a versão');
+          return false;
+        }
+      } else {
+        _addLog('Erro na instalação personalizada: ${result.stderr}');
+        _setStatus(BackendStatus.error, 'Falha na instalação personalizada');
+        return false;
+      }
+    } catch (e) {
+      _addLog('Erro ao tentar instalação personalizada: $e');
+      _setStatus(BackendStatus.error, 'Erro na instalação personalizada: $e');
+      return false;
+    }
+  }
+
+  /// Encontra uma instalação do Python no sistema
+  Future<String?> _findSystemPython() async {
+    try {
+      List<String> possibleCommands = [];
+
+      if (Platform.isWindows) {
+        possibleCommands = [
+          'python',
+          'python3',
+          r'C:\Python39\python.exe',
+          r'C:\Python310\python.exe',
+          r'C:\Python311\python.exe',
+          r'C:\Program Files\Python39\python.exe',
+          r'C:\Program Files\Python310\python.exe',
+          r'C:\Program Files\Python311\python.exe',
+        ];
+      } else {
+        // macOS e Linux
+        possibleCommands = [
+          '/usr/bin/python3',
+          '/usr/local/bin/python3',
+          '/opt/homebrew/bin/python3',
+          '/usr/bin/python',
+          'python3',
+          'python',
+        ];
+      }
+
+      // Tentar comandos diretos
+      for (final command in possibleCommands) {
+        try {
+          final result = await Process.run(
+            command,
+            ['--version'],
+            stdoutEncoding: utf8,
+          );
+
+          if (result.exitCode == 0) {
+            _addLog('Encontrado Python: $command');
+            return command;
+          }
+        } catch (_) {
+          // Continuar para o próximo comando
+        }
+      }
+
+      // Tentar usando where/which
+      final whereCommand = Platform.isWindows ? 'where' : 'which';
+      try {
+        final result = await Process.run(
+          whereCommand,
+          ['python3'],
+          stdoutEncoding: utf8,
+        );
+
+        if (result.exitCode == 0) {
+          final path = result.stdout.toString().trim().split('\n').first;
+          _addLog('Encontrado Python via $whereCommand: $path');
+          return path;
+        }
+      } catch (_) {
+        // Tentar 'python' se 'python3' falhar
+        try {
+          final result = await Process.run(
+            whereCommand,
+            ['python'],
+            stdoutEncoding: utf8,
+          );
+
+          if (result.exitCode == 0) {
+            final path = result.stdout.toString().trim().split('\n').first;
+            _addLog('Encontrado Python via $whereCommand: $path');
+            return path;
+          }
+        } catch (_) {
+          // Ignorar e retornar null
+        }
+      }
+
+      return null;
+    } catch (e) {
+      _addLog('Erro ao procurar Python no sistema: $e');
+      return null;
+    }
+  }
+
+  /// Executa um comando pip personalizado
+  Future<ProcessResult> _runCustomPipCommand({
+    required List<String> pipArgs,
+    required Map<String, String> environment,
+    String? pythonPath,
+  }) async {
+    try {
+      // Se temos um caminho Python específico, usá-lo
+      if (pythonPath != null) {
+        return await Process.run(
+          pythonPath,
+          ['-m', 'pip', ...pipArgs],
+          stdoutEncoding: utf8,
+          stderrEncoding: utf8,
+          environment: environment,
+          runInShell: true,
+        );
+      } else {
+        // Caso contrário, delegar para o serviço Python
+        return await _pythonService.runPipCommandDirectly(pipArgs, environment);
+      }
+    } catch (e) {
+      _addLog('Erro ao executar comando pip personalizado: $e');
+      throw e;
     }
   }
 
