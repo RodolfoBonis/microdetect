@@ -14,7 +14,7 @@ class AnnotationSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AnnotationController controller = Get.find<AnnotationController>();
-    
+
     return Container(
       width: 280,
       padding: const EdgeInsets.all(AppSpacing.medium),
@@ -36,31 +36,31 @@ class AnnotationSidebar extends StatelessWidget {
             style: AppTypography.headlineSmall(context),
           ),
           const SizedBox(height: AppSpacing.medium),
-          
+
           // Ações principais
           Obx(() => _buildMainActions(controller, context)),
-          
+
           const SizedBox(height: AppSpacing.medium),
-          
+
           // Lista de classes disponíveis
           Text(
             'Classes',
             style: AppTypography.titleMedium(context),
           ),
           const SizedBox(height: AppSpacing.xSmall),
-          
+
           // Lista de classes
           Obx(() => _buildClassList(controller, context)),
-          
+
           const Divider(height: AppSpacing.large),
-          
+
           // Lista de anotações da imagem atual
           Text(
             'Anotações na Imagem',
             style: AppTypography.titleMedium(context),
           ),
           const SizedBox(height: AppSpacing.xSmall),
-          
+
           // Lista de anotações
           Expanded(
             child: Obx(() => _buildAnnotationList(controller, context)),
@@ -74,11 +74,11 @@ class AnnotationSidebar extends StatelessWidget {
   Widget _buildMainActions(AnnotationController controller, BuildContext context) {
     final bool hasSelectedAnnotation = controller.selectedAnnotation.value != null;
     final AnnotationEditorState editorState = controller.editorState.value;
-    
+
     // Botões específicos para quando uma anotação está selecionada
-    if (hasSelectedAnnotation && 
-        (editorState == AnnotationEditorState.selected || 
-         editorState == AnnotationEditorState.moving || 
+    if (hasSelectedAnnotation &&
+        (editorState == AnnotationEditorState.selected ||
+         editorState == AnnotationEditorState.moving ||
          editorState == AnnotationEditorState.resizing)) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -113,9 +113,9 @@ class AnnotationSidebar extends StatelessWidget {
               ],
             ),
           ),
-          
+
           const SizedBox(height: AppSpacing.small),
-          
+
           // Botões de ação para a anotação selecionada
           Row(
             children: [
@@ -144,9 +144,9 @@ class AnnotationSidebar extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: AppSpacing.small),
-          
+
           // Botão para cancelar seleção
           AppButton(
             onPressed: controller.cancelSelection,
@@ -158,7 +158,7 @@ class AnnotationSidebar extends StatelessWidget {
         ],
       );
     }
-    
+
     // Estado padrão - sem anotação selecionada
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,8 +168,8 @@ class AnnotationSidebar extends StatelessWidget {
           children: [
             Expanded(
               child: AppButton(
-                onPressed: controller.selectedDataset.value != null 
-                    ? controller.exportToYolo 
+                onPressed: controller.selectedDataset.value != null
+                    ? controller.exportToYolo
                     : null,
                 label: 'Exportar YOLO',
                 suffixIcon: Icons.file_download_outlined,
@@ -178,8 +178,8 @@ class AnnotationSidebar extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.small),
             AppIconButton(
-              onPressed: controller.hasUnsavedChanges.value 
-                  ? controller.saveAllAnnotations 
+              onPressed: controller.hasUnsavedChanges.value
+                  ? controller.saveAllAnnotations
                   : null,
               icon: Icons.save,
               tooltip: 'Salvar Anotações',
@@ -187,9 +187,9 @@ class AnnotationSidebar extends StatelessWidget {
             ),
           ],
         ),
-        
+
         const SizedBox(height: AppSpacing.small),
-        
+
         // Avisos e notificações
         if (controller.hasUnsavedChanges.value)
           Container(
@@ -216,7 +216,7 @@ class AnnotationSidebar extends StatelessWidget {
               ],
             ),
           ),
-        
+
         if (controller.hasUnsavedChanges.value)
           const SizedBox(height: AppSpacing.small),
       ],
@@ -226,13 +226,13 @@ class AnnotationSidebar extends StatelessWidget {
   /// Formata as dimensões da anotação de forma legível
   String _formatDimensions(Annotation? annotation) {
     if (annotation == null) return 'N/A';
-    
+
     // Converter coordenadas normalizadas para porcentagens
     final int xPercent = (annotation.x * 100).round();
     final int yPercent = (annotation.y * 100).round();
     final int widthPercent = (annotation.width * 100).round();
     final int heightPercent = (annotation.height * 100).round();
-    
+
     return '$widthPercent% × $heightPercent% em ($xPercent%, $yPercent%)';
   }
 
@@ -252,7 +252,7 @@ class AnnotationSidebar extends StatelessWidget {
         ),
       );
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -270,7 +270,7 @@ class AnnotationSidebar extends StatelessWidget {
           final className = controller.classes[index];
           final isSelected = controller.selectedClass.value == className;
           final color = controller.classColors[className] ?? AppColors.primary;
-          
+
           return Material(
             color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
             borderRadius: BorderRadius.circular(AppSpacing.xxSmall),
@@ -327,7 +327,7 @@ class AnnotationSidebar extends StatelessWidget {
         ),
       );
     }
-    
+
     if (controller.annotations.isEmpty) {
       return Center(
         child: Text(
@@ -337,7 +337,7 @@ class AnnotationSidebar extends StatelessWidget {
         ),
       );
     }
-    
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -352,7 +352,7 @@ class AnnotationSidebar extends StatelessWidget {
           final annotation = controller.annotations[index];
           final isSelected = controller.selectedAnnotation.value?.id == annotation.id;
           final isPending = controller.pendingAnnotations.any((a) => a.id == annotation.id);
-          
+
           Color? color;
           if (annotation.colorValue != null) {
             color = Color(annotation.colorValue!);
@@ -361,11 +361,21 @@ class AnnotationSidebar extends StatelessWidget {
           } else {
             color = AppColors.primary;
           }
-          
+
           return Material(
             color: isSelected ? color!.withOpacity(0.1) : Colors.transparent,
             child: InkWell(
-              onTap: () => controller.selectedAnnotation.value = annotation,
+              onTap: () {
+                // Usar um Future.delayed para garantir que o tap seja processado após a UI atualizar
+                Future.microtask(() {
+                  controller.selectedAnnotation.value = null; // Limpar primeiro para garantir atualização
+                  Future.delayed(const Duration(milliseconds: 50), () {
+                    controller.selectedAnnotation.value = annotation;
+                    controller.editorState.value = AnnotationEditorState.selected;
+
+                  });
+                });
+              },
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.small),
                 child: Row(
