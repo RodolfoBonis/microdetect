@@ -7,14 +7,11 @@ import 'package:microdetect/features/datasets/models/class_distribution.dart';
 import 'package:microdetect/features/datasets/models/dataset.dart';
 import 'package:microdetect/features/datasets/models/dataset_statistics.dart';
 import 'package:microdetect/features/datasets/services/dataset_service.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
 
 class DatasetDetailController extends GetxController {
   // Injeções de dependência
-  final DatasetService _datasetService = Get.find<DatasetService>();
+  final DatasetService _datasetService = Get.find<DatasetService>(tag: 'datasetService');
   final CameraService _cameraService = Get.find<CameraService>();
-  final EventManager _eventManager = EventManager.instance;
 
   // Estado observável
   final Rx<Dataset?> _dataset = Rx<Dataset?>(null);
@@ -30,9 +27,6 @@ class DatasetDetailController extends GetxController {
 
   // Parâmetros
   final int datasetId;
-
-  // Lista de tipos de eventos registrados para limpeza
-  final List<String> _registeredEvents = [];
 
   // Construtor
   DatasetDetailController({required this.datasetId});
@@ -59,44 +53,9 @@ class DatasetDetailController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _setupEventListeners();
     loadDataset();
   }
 
-  @override
-  void onClose() {
-    _unregisterEventListeners();
-    super.onClose();
-  }
-
-  // Configurar escuta de eventos
-  void _setupEventListeners() {
-    _registerEventListener(ScreenEvents.refreshDatasets, _handleRefreshEvent);
-    _registerEventListener(ScreenEvents.refreshGallery, _handleRefreshGallery);
-  }
-
-  // Registrar um listener e armazenar o tipo para limpeza futura
-  void _registerEventListener(String eventType, Function(ScreenEvent) handler) {
-    Get.events.addListener(eventType, handler);
-    _registeredEvents.add(eventType);
-  }
-
-  // Cancelar todos os listeners registrados
-  void _unregisterEventListeners() {
-    for (final eventType in _registeredEvents) {
-      Get.events.removeAllListenersForType(eventType);
-    }
-    _registeredEvents.clear();
-  }
-
-  // Handler para o evento de atualização
-  void _handleRefreshEvent(ScreenEvent event) {
-    loadDataset();
-  }
-
-  void _handleRefreshGallery(ScreenEvent event) {
-    refreshImages();
-  }
 
   // Carregar dados do dataset
   Future<void> loadDataset() async {
@@ -223,9 +182,6 @@ class DatasetDetailController extends GetxController {
           description: 'Classe "$className" adicionada com sucesso!',
         );
 
-        // Disparar evento de atualização para outras telas
-        Get.events.fire(ScreenEvents.refreshDatasets, data: null);
-
         return true;
       } else {
         AppToast.error(
@@ -263,9 +219,6 @@ class DatasetDetailController extends GetxController {
           'Sucesso',
           description: 'Classe "$className" removida com sucesso!',
         );
-
-        // Disparar evento de atualização para outras telas
-        Get.events.fire(ScreenEvents.refreshDatasets, data: null);
 
         return true;
       } else {
@@ -319,9 +272,6 @@ class DatasetDetailController extends GetxController {
           'Sucesso',
           description: 'Dataset atualizado com sucesso!',
         );
-
-        // Disparar evento de atualização para outras telas
-        Get.events.fire(ScreenEvents.refreshDatasets, data: null);
 
         return updatedDataset;
       } else {
@@ -415,9 +365,5 @@ class DatasetDetailController extends GetxController {
     refreshImages();
     loadStatistics();
     loadClassDistribution();
-
-    // Disparar evento de atualização para outros controllers
-    _eventManager
-        .fire(ScreenEvents.refreshDatasets, data: {'dataset_id': datasetId});
   }
 }

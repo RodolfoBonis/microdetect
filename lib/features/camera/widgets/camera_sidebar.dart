@@ -1,15 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:camera_access/camera_access.dart';
+import 'package:get/get.dart';
 import 'package:microdetect/design_system/app_colors.dart';
-import 'package:microdetect/design_system/app_spacing.dart';
-import 'package:microdetect/design_system/app_typography.dart';
-import 'package:microdetect/features/camera/models/gallery_image.dart';
 import 'package:microdetect/features/camera/widgets/adjustment_panel.dart';
 import 'package:microdetect/features/camera/widgets/gallery_panel.dart';
 import 'package:microdetect/features/camera/widgets/settings_panel.dart';
-import 'package:get/get.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../controllers/camera_controller.dart';
 import '../enums/sidebar_content_enum.dart';
@@ -22,83 +16,10 @@ class CameraSidebar extends StatefulWidget {
   /// Largura da barra lateral
   final double width;
 
-  /// Tipo de conteúdo atual
-  final SidebarContent activeContent;
-
-  /// Callback para quando o conteúdo muda
-  final Function(SidebarContent)? onContentChanged;
-
-  /// Callback quando a barra lateral é fechada
-  final VoidCallback? onClose;
-
-  /// Câmeras e configurações de câmera
-  final List<CameraDevice> cameras;
-  final String selectedCameraId;
-  final VoidCallback onRefreshCameras;
-  final ValueChanged<String> onCameraSelected;
-  final List<String> resolutions;
-  final String? selectedResolution;
-  final List<String> whiteBalances;
-  final String? selectedWhiteBalance;
-
-  /// Callback quando uma configuração é alterada
-  final ValueChanged<String>? onResolutionChanged;
-  final ValueChanged<String>? onWhiteBalanceChanged;
-  final ValueChanged<String>? onFilterChanged;
-
-  /// Valores atuais dos ajustes
-  final double brightness;
-  final double contrast;
-  final double saturation;
-  final double sharpness;
-  final String selectedFilter;
-
-  /// Callbacks para mudanças nos ajustes
-  final ValueChanged<double> onBrightnessChanged;
-  final ValueChanged<double> onContrastChanged;
-  final ValueChanged<double> onSaturationChanged;
-  final ValueChanged<double> onSharpnessChanged;
-
-  /// Lista de imagens para a galeria
-  final List<GalleryImage> images;
-  final ValueChanged<GalleryImage>? onImageSelected;
-
-  /// ID do dataset atual (quando aberto de um dataset)
-  final int? datasetId;
-
-  /// Callback quando um dataset é selecionado
-  final ValueChanged<int>? onDatasetSelected;
 
   const CameraSidebar({
     Key? key,
     this.width = 320,
-    required this.activeContent,
-    this.onContentChanged,
-    this.onClose,
-    required this.cameras,
-    required this.selectedCameraId,
-    required this.onRefreshCameras,
-    required this.onCameraSelected,
-    required this.brightness,
-    required this.contrast,
-    required this.saturation,
-    required this.sharpness,
-    required this.onBrightnessChanged,
-    required this.onContrastChanged,
-    required this.onSaturationChanged,
-    required this.onSharpnessChanged,
-    this.selectedFilter = 'normal',
-    this.onFilterChanged,
-    this.resolutions = const ['sd', 'hd', 'fullhd'],
-    this.selectedResolution,
-    this.whiteBalances = const ['auto', 'sunny', 'cloudy', 'tungsten', 'fluorescent'],
-    this.selectedWhiteBalance,
-    this.onResolutionChanged,
-    this.onWhiteBalanceChanged,
-    this.images = const [],
-    this.onImageSelected,
-    this.datasetId,
-    this.onDatasetSelected,
   }) : super(key: key);
 
   @override
@@ -108,6 +29,7 @@ class CameraSidebar extends StatefulWidget {
 class _CameraSidebarState extends State<CameraSidebar> with SingleTickerProviderStateMixin {
   // Controlador para animação do conteúdo
   late TabController _tabController;
+  final CameraController _controller = Get.find<CameraController>();
 
   @override
   void initState() {
@@ -117,14 +39,14 @@ class _CameraSidebarState extends State<CameraSidebar> with SingleTickerProvider
     _tabController = TabController(
       length: 3,
       vsync: this,
-      initialIndex: _getTabIndexFromContent(widget.activeContent),
+      initialIndex: _getTabIndexFromContent(_controller.activeSidebarContent),
     );
 
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         final newContent = _getContentFromTabIndex(_tabController.index);
-        if (newContent != widget.activeContent) {
-          widget.onContentChanged?.call(newContent);
+        if (newContent != _controller.activeSidebarContent) {
+          _controller.setActiveSidebarContent(newContent);
         }
       }
     });
@@ -153,15 +75,6 @@ class _CameraSidebarState extends State<CameraSidebar> with SingleTickerProvider
         return SidebarContent.gallery;
       default:
         return SidebarContent.settings;
-    }
-  }
-
-  @override
-  void didUpdateWidget(CameraSidebar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.activeContent != widget.activeContent) {
-      _tabController.animateTo(_getTabIndexFromContent(widget.activeContent));
     }
   }
 
@@ -228,12 +141,6 @@ class _CameraSidebarState extends State<CameraSidebar> with SingleTickerProvider
                   ],
                 ),
               ),
-              if (widget.onClose != null)
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: widget.onClose,
-                  color: unselectedTabColor,
-                ),
             ],
           ),
         ),
@@ -242,41 +149,11 @@ class _CameraSidebarState extends State<CameraSidebar> with SingleTickerProvider
             controller: _tabController,
             children: [
               // Configurações da câmera
-              SettingsPanel(
-                cameras: widget.cameras,
-                selectedCameraId: widget.selectedCameraId,
-                resolution: widget.selectedResolution ?? 'hd',
-                whiteBalance: widget.selectedWhiteBalance ?? 'auto',
-                filter: widget.selectedFilter,
-                onCameraSelected: widget.onCameraSelected,
-                onRefreshCameras: widget.onRefreshCameras,
-                onResolutionChanged: widget.onResolutionChanged,
-                onWhiteBalanceChanged: widget.onWhiteBalanceChanged,
-                onFilterChanged: widget.onFilterChanged,
-                datasetId: widget.datasetId,
-                onDatasetSelected: widget.onDatasetSelected,
-              ),
-
+              SettingsPanel(),
               // Ajustes de imagem
-              AdjustmentPanel(
-                brightness: widget.brightness,
-                contrast: widget.contrast,
-                saturation: widget.saturation,
-                sharpness: widget.sharpness,
-                selectedFilter: widget.selectedFilter,
-                onBrightnessChanged: widget.onBrightnessChanged,
-                onContrastChanged: widget.onContrastChanged,
-                onSaturationChanged: widget.onSaturationChanged,
-                onSharpnessChanged: widget.onSharpnessChanged,
-                onFilterChanged: widget.onFilterChanged,
-              ),
-
+              AdjustmentPanel(),
               // Galeria de imagens
-              GalleryPanel(
-                images: widget.images,
-                onImageSelected: widget.onImageSelected,
-                datasetId: widget.datasetId,
-              ),
+              const GalleryPanel(),
             ],
           ),
         ),

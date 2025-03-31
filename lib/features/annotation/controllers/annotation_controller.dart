@@ -4,13 +4,12 @@ import 'package:microdetect/core/utils/logger_util.dart';
 import 'package:microdetect/design_system/app_colors.dart';
 import 'package:microdetect/features/annotation/models/annotation.dart';
 import 'package:microdetect/features/annotation/services/annotation_service.dart';
-import 'package:microdetect/features/camera/models/gallery_image.dart';
-import 'package:microdetect/features/camera/services/camera_service.dart';
 import 'package:microdetect/features/datasets/models/dataset.dart';
 import 'package:microdetect/features/datasets/services/dataset_service.dart';
 import 'dart:ui' as ui;
 
 import 'package:vector_math/vector_math_64.dart' as vector_math;
+import 'dart:math' as math;
 
 
 /// Estados possíveis do editor de anotações
@@ -25,13 +24,11 @@ enum AnnotationEditorState {
 /// Controlador das telas de anotação - usando uma abordagem de máquina de estados
 class AnnotationController extends GetxController {
   final AnnotationService _annotationService = Get.find<AnnotationService>();
-  final DatasetService _datasetService = Get.find<DatasetService>();
 
   // Estado atual do editor
   final Rx<AnnotationEditorState> editorState = AnnotationEditorState.idle.obs;
 
   // Dados principais
-  final RxList<Dataset> datasets = <Dataset>[].obs;
   final Rx<Dataset?> selectedDataset = Rx<Dataset?>(null);
   final RxList<AnnotatedImage> images = <AnnotatedImage>[].obs;
   final Rx<AnnotatedImage?> selectedImage = Rx<AnnotatedImage?>(null);
@@ -70,6 +67,9 @@ class AnnotationController extends GetxController {
   // Índice do canto que está sendo redimensionado
   // 0: top-left, 1: top-right, 2: bottom-right, 3: bottom-left
   final RxInt resizeCornerIndex = (-1).obs;
+  
+  // Flag para indicar que uma operação de resize está em andamento e não deve ser interrompida
+  final RxBool isResizeOperationActive = false.obs;
 
   // Tamanho do widget de visualização
   final Rx<Size> viewportSize = Size(0, 0).obs;
@@ -77,7 +77,6 @@ class AnnotationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadDatasets();
 
     // Observar mudanças no dataset
     ever(selectedDataset, (_) {
@@ -157,29 +156,6 @@ class AnnotationController extends GetxController {
   // Métodos para gerenciamento de dados
   //
 
-  /// Carrega a lista de datasets
-  Future<void> loadDatasets() async {
-    isLoading.value = true;
-    try {
-      final List<Dataset> result = await _datasetService.getDatasets();
-      datasets.value = result;
-
-      // Auto-selecionar dataset se houver ID nos argumentos
-      if (Get.arguments != null && Get.arguments['dataset_id'] != null) {
-        final int datasetId = Get.arguments['dataset_id'];
-        final Dataset? dataset = datasets.firstWhereOrNull((d) => d.id == datasetId);
-        if (dataset != null) {
-          selectedDataset.value = dataset;
-        }
-      }
-    } catch (e) {
-      LoggerUtil.error('Erro ao carregar datasets: $e');
-      errorMessage.value = 'Erro ao carregar datasets: $e';
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
   /// Carrega imagens de um dataset
   Future<void> loadDatasetImages(int datasetId) async {
     isLoading.value = true;
@@ -240,7 +216,12 @@ class AnnotationController extends GetxController {
   }
 
   /// Seleciona um dataset
-  void selectDataset(Dataset dataset) {
+  void selectDataset(Dataset? dataset) {
+    if (dataset == null) {
+      selectedDataset.value = null;
+      return;
+    }
+
     selectedDataset.value = dataset;
   }
 
@@ -263,56 +244,9 @@ class AnnotationController extends GetxController {
     viewportSize.value = size;
   }
 
-  /// Atualiza os dados de transformação da imagem
-  void updateTransformation(Matrix4 transform) {
-    transformMatrix.value = transform.clone();
-
-    // Extrair escala e translação da matriz de transformação
-    scale.value = transform.getMaxScaleOnAxis();
-    final vector_math.Vector3 translation = transform.getTranslation();
-    translateX.value = translation.x;
-    translateY.value = translation.y;
-  }
-
   /// Define a imagem carregada
   void setLoadedImage(ui.Image image) {
     loadedImage.value = image;
-  }
-
-  /// Converte um ponto de coordenadas de tela para coordenadas normalizadas (0-1)
-  Offset toNormalizedCoordinates(Offset screenPoint) {
-    if (loadedImage.value == null) return const Offset(0, 0);
-
-    final double imageWidth = loadedImage.value!.width.toDouble();
-    final double imageHeight = loadedImage.value!.height.toDouble();
-
-    // Aplicar a transformação inversa
-    final Matrix4 inverseMatrix = Matrix4.inverted(transformMatrix.value);
-    final vector_math.Vector4 position = vector_math.Vector4(screenPoint.dx, screenPoint.dy, 0, 1);
-    final vector_math.Vector4 transformed = inverseMatrix.transform(position);
-
-    final double normalX = transformed.x / imageWidth;
-    final double normalY = transformed.y / imageHeight;
-
-    return Offset(normalX, normalY);
-  }
-
-  /// Converte coordenadas normalizadas para coordenadas de tela
-  Offset toScreenCoordinates(Offset normalizedPoint) {
-    if (loadedImage.value == null) return const Offset(0, 0);
-
-    final double imageWidth = loadedImage.value!.width.toDouble();
-    final double imageHeight = loadedImage.value!.height.toDouble();
-
-    // Converter para coordenadas da imagem
-    final double x = normalizedPoint.dx * imageWidth;
-    final double y = normalizedPoint.dy * imageHeight;
-
-    // Aplicar a transformação
-    final vector_math.Vector4 position = vector_math.Vector4(x, y, 0, 1);
-    final vector_math.Vector4 transformed = transformMatrix.value.transform(position);
-
-    return Offset(transformed.x, transformed.y);
   }
 
   /// Verifica se um ponto (em coordenadas normalizadas) está dentro de uma anotação
@@ -324,8 +258,7 @@ class AnnotationController extends GetxController {
   }
 
   /// Encontra uma anotação no ponto indicado
-  Annotation? findAnnotationAt(Offset screenPoint) {
-    final normalizedPoint = toNormalizedCoordinates(screenPoint);
+  Annotation? findAnnotationAt(Offset normalizedPoint) {
     LoggerUtil.debug("Ponto normalizado: $normalizedPoint");
 
     // Procurar a anotação de trás para frente (para que a última desenhada seja selecionada primeiro)
@@ -342,35 +275,44 @@ class AnnotationController extends GetxController {
 
   /// Verifica se um ponto está próximo a um dos cantos da anotação
   /// Retorna o índice do canto ou -1 se não estiver próximo
-  int getResizeCornerIndex(Offset screenPoint, Annotation annotation) {
-    final double hitDistance = 20.0 / scale.value; // Área de toque ajustada pela escala
+  int getResizeCornerIndex(Offset normalizedPoint, Annotation annotation) {
+    // Distância de detecção em coordenadas normalizadas
+    final double hitDistanceNorm = 0.02;
 
-    // Calcular coordenadas da imagem
-    final double imageWidth = loadedImage.value!.width.toDouble();
-    final double imageHeight = loadedImage.value!.height.toDouble();
-
-    // Calcular os 4 cantos da anotação em coordenadas da imagem
-    final List<Offset> imageCorners = [
-      Offset(annotation.x * imageWidth, annotation.y * imageHeight), // Canto superior esquerdo
-      Offset((annotation.x + annotation.width) * imageWidth, annotation.y * imageHeight), // Canto superior direito
-      Offset((annotation.x + annotation.width) * imageWidth, (annotation.y + annotation.height) * imageHeight), // Canto inferior direito
-      Offset(annotation.x * imageWidth, (annotation.y + annotation.height) * imageHeight), // Canto inferior esquerdo
+    // Coordenadas dos quatro cantos da anotação em coordenadas normalizadas
+    final List<Offset> corners = [
+      Offset(annotation.x, annotation.y), // Canto superior esquerdo
+      Offset(annotation.x + annotation.width, annotation.y), // Canto superior direito
+      Offset(annotation.x + annotation.width, annotation.y + annotation.height), // Canto inferior direito
+      Offset(annotation.x, annotation.y + annotation.height), // Canto inferior esquerdo
     ];
 
-    // Transformar ponto da tela para coordenadas da imagem
-    final Matrix4 inverseMatrix = Matrix4.inverted(transformMatrix.value);
-    final vector_math.Vector4 screenPos = vector_math.Vector4(screenPoint.dx, screenPoint.dy, 0, 1);
-    final vector_math.Vector4 imagePos = inverseMatrix.transform(screenPos);
-    final Offset imagePoint = Offset(imagePos.x, imagePos.y);
-
-    // Verificar cada canto
-    for (int i = 0; i < imageCorners.length; i++) {
-      if ((imageCorners[i] - imagePoint).distance < hitDistance) {
-        return i;
+    // Se já estamos em modo de redimensionamento, verificar primeiro esse canto
+    if (editorState.value == AnnotationEditorState.resizing && resizeCornerIndex.value >= 0) {
+      final int currentCorner = resizeCornerIndex.value;
+      if ((corners[currentCorner] - normalizedPoint).distance < hitDistanceNorm * 2.0) {
+        LoggerUtil.debug("Mantendo canto atual de redimensionamento: $currentCorner");
+        return currentCorner;
       }
     }
 
-    return -1; // Não está perto de nenhum canto
+    // Verificar cada canto
+    double minDistance = double.infinity;
+    int nearestCornerIndex = -1;
+
+    for (int i = 0; i < corners.length; i++) {
+      final double distance = (corners[i] - normalizedPoint).distance;
+      if (distance < hitDistanceNorm && distance < minDistance) {
+        minDistance = distance;
+        nearestCornerIndex = i;
+      }
+    }
+
+    if (nearestCornerIndex >= 0) {
+      LoggerUtil.debug("Canto detectado: $nearestCornerIndex");
+    }
+
+    return nearestCornerIndex;
   }
 
   //
@@ -378,15 +320,21 @@ class AnnotationController extends GetxController {
   //
 
   /// Trata o evento de toque no canvas
-  void onCanvasTapDown(Offset position) {
+  void onCanvasTapDown(Offset normalizedPosition) {
     if (selectedImage.value == null || loadedImage.value == null) return;
 
-    LoggerUtil.debug("Toque em: $position");
+    LoggerUtil.debug("Toque em coordenadas normalizadas: $normalizedPosition");
+    
+    // Se uma operação de resize está ativa, não mudar o estado
+    if (isResizeOperationActive.value) {
+      LoggerUtil.debug("Operação de resize ativa, ignorando toque");
+      return;
+    }
 
     switch (editorState.value) {
       case AnnotationEditorState.idle:
       // Verificar se clicou em uma anotação existente
-        final tappedAnnotation = findAnnotationAt(position);
+        final tappedAnnotation = findAnnotationAt(normalizedPosition);
         if (tappedAnnotation != null) {
           // Selecionar a anotação
           selectedAnnotation.value = tappedAnnotation;
@@ -399,8 +347,8 @@ class AnnotationController extends GetxController {
           }
         } else {
           // Iniciar desenho de nova anotação
-          startPoint.value = position;
-          currentPoint.value = position;
+          startPoint.value = normalizedPosition;
+          currentPoint.value = normalizedPosition;
           editorState.value = AnnotationEditorState.drawing;
         }
         break;
@@ -412,19 +360,20 @@ class AnnotationController extends GetxController {
         }
 
         // Verificar se clicou em um ponto de redimensionamento
-        final cornerIndex = getResizeCornerIndex(position, selectedAnnotation.value!);
+        final cornerIndex = getResizeCornerIndex(normalizedPosition, selectedAnnotation.value!);
         if (cornerIndex >= 0) {
           // Iniciar redimensionamento
           resizeCornerIndex.value = cornerIndex;
-          dragStartPoint.value = position;
+          dragStartPoint.value = normalizedPosition;
           dragStartAnnotation.value = selectedAnnotation.value;
           editorState.value = AnnotationEditorState.resizing;
+          isResizeOperationActive.value = true;
           LoggerUtil.debug("Iniciando redimensionamento no canto $cornerIndex");
         }
         // Verificar se clicou dentro da anotação selecionada
-        else if (isPointInAnnotation(toNormalizedCoordinates(position), selectedAnnotation.value!)) {
+        else if (isPointInAnnotation(normalizedPosition, selectedAnnotation.value!)) {
           // Iniciar arrasto
-          dragStartPoint.value = position;
+          dragStartPoint.value = normalizedPosition;
           dragStartAnnotation.value = selectedAnnotation.value;
           editorState.value = AnnotationEditorState.moving;
           LoggerUtil.debug("Iniciando movimento");
@@ -433,8 +382,8 @@ class AnnotationController extends GetxController {
         else {
           // Desselecionar e iniciar desenho de nova anotação
           selectedAnnotation.value = null;
-          startPoint.value = position;
-          currentPoint.value = position;
+          startPoint.value = normalizedPosition;
+          currentPoint.value = normalizedPosition;
           editorState.value = AnnotationEditorState.drawing;
         }
         break;
@@ -447,37 +396,39 @@ class AnnotationController extends GetxController {
   }
 
   /// Trata o evento de arrasto no canvas
-  void onCanvasDragUpdate(Offset position) {
+  void onCanvasDragUpdate(Offset normalizedPosition) {
     if (selectedImage.value == null || loadedImage.value == null) return;
 
     switch (editorState.value) {
       case AnnotationEditorState.drawing:
-      // Atualizar ponto final da anotação em desenho
-        currentPoint.value = position;
+        // Atualizar ponto final da anotação em desenho
+        currentPoint.value = normalizedPosition;
+        update(); // Forçar atualização visual imediata
         break;
 
       case AnnotationEditorState.moving:
-        if (selectedAnnotation.value == null || dragStartPoint.value == null ||
-            dragStartAnnotation.value == null) {
+        if (selectedAnnotation.value == null) {
           editorState.value = AnnotationEditorState.idle;
           break;
+        }
+
+        // Se não temos ponto de início para o arrasto, inicializá-lo
+        if (dragStartPoint.value == null) {
+          dragStartPoint.value = normalizedPosition;
+          dragStartAnnotation.value = selectedAnnotation.value;
         }
 
         // Garantir que o estado continue sendo "moving" durante toda a operação
         editorState.value = AnnotationEditorState.moving;
 
-        // Converter os pontos para coordenadas normalizadas
-        final Offset startNorm = toNormalizedCoordinates(dragStartPoint.value!);
-        final Offset currentNorm = toNormalizedCoordinates(position);
-
-        // Calcular o delta do movimento
-        final double deltaX = currentNorm.dx - startNorm.dx;
-        final double deltaY = currentNorm.dy - startNorm.dy;
+        // Calcular o delta do movimento em coordenadas normalizadas
+        final double deltaX = normalizedPosition.dx - dragStartPoint.value!.dx;
+        final double deltaY = normalizedPosition.dy - dragStartPoint.value!.dy;
 
         // Obter a anotação original
         final annotation = dragStartAnnotation.value!;
 
-        // Calcular novas coordenadas com limites
+        // Aplicar o delta às coordenadas da anotação, respeitando os limites (0-1)
         final double newX = (annotation.x + deltaX).clamp(0.0, 1.0 - annotation.width);
         final double newY = (annotation.y + deltaY).clamp(0.0, 1.0 - annotation.height);
 
@@ -491,93 +442,102 @@ class AnnotationController extends GetxController {
         updateAnnotationInLists(updatedAnnotation, maintainMovingState: true);
 
         // Atualizar o ponto de início para o próximo delta
-        dragStartPoint.value = position;
+        dragStartPoint.value = normalizedPosition;
         dragStartAnnotation.value = updatedAnnotation;
         break;
 
       case AnnotationEditorState.resizing:
-        if (selectedAnnotation.value == null ||
-            dragStartPoint.value == null ||
-            dragStartAnnotation.value == null) {
+        if (selectedAnnotation.value == null) {
           editorState.value = AnnotationEditorState.idle;
           break;
         }
 
-        // Se por algum motivo o índice do canto for inválido, mas estamos no estado resizing,
-        // força um valor válido para evitar problemas
-        if (resizeCornerIndex.value < 0) {
-          resizeCornerIndex.value = 0; // Usar canto superior esquerdo como padrão
+        // Se estamos em uma operação de resize, verificar se temos um índice de canto válido
+        if (isResizeOperationActive.value && resizeCornerIndex.value < 0) {
+          LoggerUtil.debug("Erro: Operação de resize ativa mas cornerIndex inválido");
+          isResizeOperationActive.value = false;
+          editorState.value = AnnotationEditorState.selected;
+          break;
+        }
+
+        // Se não temos ponto de início para o redimensionamento, inicializá-lo
+        if (dragStartPoint.value == null) {
+          dragStartPoint.value = normalizedPosition;
+          dragStartAnnotation.value = selectedAnnotation.value;
         }
 
         // Garantir que o estado continue sendo "resizing" durante toda a operação
         editorState.value = AnnotationEditorState.resizing;
 
         // Obter a anotação original
-        final annotation = dragStartAnnotation.value!;
-
-        // Obter o canto que está sendo arrastado
+        final annotation = dragStartAnnotation.value ?? selectedAnnotation.value!;
+        dragStartAnnotation.value = annotation;
+        
+        // Importante: Usar o cornerIndex armazenado no início da operação e não alterá-lo
         final cornerIndex = resizeCornerIndex.value;
-
-        // Converter para coordenadas normalizadas
-        final Offset currentNorm = toNormalizedCoordinates(position);
-
-        // Valores atuais da anotação
-        double x = annotation.x;
-        double y = annotation.y;
-        double width = annotation.width;
-        double height = annotation.height;
-
+        
+        // Coordenadas dos cantos em coordenadas normalizadas
+        final double x = annotation.x;
+        final double y = annotation.y;
+        final double width = annotation.width;
+        final double height = annotation.height;
+        
+        // Novas coordenadas após o redimensionamento
+        double newX = x;
+        double newY = y;
+        double newWidth = width;
+        double newHeight = height;
+        
+        // Ajustar dimensões com base no canto que está sendo manipulado
         switch (cornerIndex) {
-          case 0: // Canto superior esquerdo
-          // Novo X não pode ser maior que X + largura - tamanho mínimo
-            x = currentNorm.dx.clamp(0.0, annotation.x + annotation.width - 0.01);
-            // Novo Y não pode ser maior que Y + altura - tamanho mínimo
-            y = currentNorm.dy.clamp(0.0, annotation.y + annotation.height - 0.01);
-            // Ajustar largura e altura
-            width = annotation.x + annotation.width - x;
-            height = annotation.y + annotation.height - y;
+          case 0: // Superior Esquerdo
+            newX = normalizedPosition.dx.clamp(0.0, x + width - 0.01);
+            newY = normalizedPosition.dy.clamp(0.0, y + height - 0.01);
+            newWidth = x + width - newX;
+            newHeight = y + height - newY;
             break;
-
-          case 1: // Canto superior direito
-          // Novo Y não pode ser maior que Y + altura - tamanho mínimo
-            y = currentNorm.dy.clamp(0.0, annotation.y + annotation.height - 0.01);
-            // Nova largura não pode fazer X + largura sair da imagem
-            width = (currentNorm.dx - annotation.x).clamp(0.01, 1.0 - annotation.x);
-            // Ajustar altura
-            height = annotation.y + annotation.height - y;
+          case 1: // Superior Direito
+            newWidth = (normalizedPosition.dx - x).clamp(0.01, 1.0 - x);
+            newY = normalizedPosition.dy.clamp(0.0, y + height - 0.01);
+            newHeight = y + height - newY;
             break;
-
-          case 2: // Canto inferior direito
-          // Nova largura não pode fazer X + largura sair da imagem
-            width = (currentNorm.dx - annotation.x).clamp(0.01, 1.0 - annotation.x);
-            // Nova altura não pode fazer Y + altura sair da imagem
-            height = (currentNorm.dy - annotation.y).clamp(0.01, 1.0 - annotation.y);
+          case 2: // Inferior Direito
+            newWidth = (normalizedPosition.dx - x).clamp(0.01, 1.0 - x);
+            newHeight = (normalizedPosition.dy - y).clamp(0.01, 1.0 - y);
             break;
-
-          case 3: // Canto inferior esquerdo
-          // Novo X não pode ser maior que X + largura - tamanho mínimo
-            x = currentNorm.dx.clamp(0.0, annotation.x + annotation.width - 0.01);
-            // Ajustar largura
-            width = annotation.x + annotation.width - x;
-            // Nova altura não pode fazer Y + altura sair da imagem
-            height = (currentNorm.dy - annotation.y).clamp(0.01, 1.0 - annotation.y);
+          case 3: // Inferior Esquerdo
+            newX = normalizedPosition.dx.clamp(0.0, x + width - 0.01);
+            newWidth = x + width - newX;
+            newHeight = (normalizedPosition.dy - y).clamp(0.01, 1.0 - y);
             break;
         }
-
+        
         // Garantir tamanho mínimo
-        if (width < 0.01) width = 0.01;
-        if (height < 0.01) height = 0.01;
-
+        if (newWidth < 0.01) newWidth = 0.01;
+        if (newHeight < 0.01) newHeight = 0.01;
+        
         // Criar a anotação atualizada
         final updatedAnnotation = annotation.copyWith(
-          x: x,
-          y: y,
-          width: width,
-          height: height,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
         );
+        
+        // Log para debug
+        LoggerUtil.debug("Anotação atualizada: $newX, $newY, $newWidth, $newHeight");
 
-        // Importante: manter o estado como "resizing" durante toda a operação
+        // Importante: manter o estado como "resizing" e o cornerIndex consistente durante toda a operação
+        final int savedCornerIndex = resizeCornerIndex.value;
         updateAnnotationInLists(updatedAnnotation, maintainResizingState: true);
+        // Restaurar cornerIndex se necessário
+        if (resizeCornerIndex.value != savedCornerIndex) {
+          LoggerUtil.debug("Restaurando cornerIndex para $savedCornerIndex");
+          resizeCornerIndex.value = savedCornerIndex;
+        }
+        
+        // Atualizar a anotação de início para o próximo delta
+        dragStartAnnotation.value = updatedAnnotation;
         break;
 
       default:
@@ -589,21 +549,40 @@ class AnnotationController extends GetxController {
   void onCanvasDragEnd() {
     if (selectedImage.value == null) return;
 
+    // Resetar flag de operação de resize
+    isResizeOperationActive.value = false;
+
     switch (editorState.value) {
       case AnnotationEditorState.drawing:
         if (startPoint.value != null && currentPoint.value != null) {
           // Finalizar o desenho criando uma nova anotação
           createNewAnnotation();
+        } else {
+          // Caso não tenha pontos definidos, limpar o estado
+          editorState.value = AnnotationEditorState.idle;
+          // Forçar atualização da UI
+          update();
         }
-        editorState.value = AnnotationEditorState.idle;
         break;
 
       case AnnotationEditorState.moving:
       case AnnotationEditorState.resizing:
-        // Após mover ou redimensionar, voltar para o estado de seleção
-        // Garantir que a anotação ainda esteja selecionada
+        // Verificar se há uma anotação selecionada antes de transicionar para o estado selecionado
         if (selectedAnnotation.value != null) {
+          // Transicionar para o estado de seleção
           editorState.value = AnnotationEditorState.selected;
+          
+          // Apenas para o estado de redimensionamento, resetar o índice do canto
+          if (editorState.value == AnnotationEditorState.resizing) {
+            // Resetar o índice do canto apenas no final da operação
+            resizeCornerIndex.value = -1;
+            
+            // Garantir que o estado seja updated para 'selected'
+            editorState.value = AnnotationEditorState.selected;
+            
+            // Log para debug
+            LoggerUtil.debug("Redimensionamento concluído, estado transicionado para: ${editorState.value}");
+          }
         } else {
           editorState.value = AnnotationEditorState.idle;
         }
@@ -611,30 +590,37 @@ class AnnotationController extends GetxController {
         // Limpar os pontos de referência do arrasto
         dragStartPoint.value = null;
         dragStartAnnotation.value = null;
-        resizeCornerIndex.value = -1;
+        
+        // Forçar atualização da UI
+        annotations.refresh();
+        update();
         break;
 
       default:
         editorState.value = AnnotationEditorState.idle;
+        update();
         break;
     }
   }
+
+  // Função auxiliar para calcular o valor absoluto
+  double abs(double value) => value < 0 ? -value : value;
 
   /// Cria uma nova anotação a partir dos pontos inicial e final
   void createNewAnnotation() {
     if (startPoint.value == null || currentPoint.value == null ||
         selectedImage.value == null || loadedImage.value == null) return;
 
-    // Converter os pontos para coordenadas normalizadas
-    final Offset startNorm = toNormalizedCoordinates(startPoint.value!);
-    final Offset endNorm = toNormalizedCoordinates(currentPoint.value!);
-
-    // Calcular as coordenadas do retângulo em coordenadas normalizadas
-    final double x = min(startNorm.dx, endNorm.dx).clamp(0.0, 1.0);
-    final double y = min(startNorm.dy, endNorm.dy).clamp(0.0, 1.0);
-    final double width = (max(startNorm.dx, endNorm.dx) - x).clamp(0.01, 1.0 - x);
-    final double height = (max(startNorm.dy, endNorm.dy) - y).clamp(0.01, 1.0 - y);
-
+    // Calcular o retângulo em coordenadas normalizadas
+    final double left = math.min(startPoint.value!.dx, currentPoint.value!.dx);
+    final double top = math.min(startPoint.value!.dy, currentPoint.value!.dy);
+    final double right = math.max(startPoint.value!.dx, currentPoint.value!.dx);
+    final double bottom = math.max(startPoint.value!.dy, currentPoint.value!.dy);
+    
+    // Calcular dimensões
+    final double width = right - left;
+    final double height = bottom - top;
+    
     // Verificar tamanho mínimo
     if (width < 0.01 || height < 0.01) return;
 
@@ -642,33 +628,43 @@ class AnnotationController extends GetxController {
     Annotation newAnnotation = Annotation(
       imageId: selectedImage.value!.id,
       datasetId: selectedDataset.value!.id,
-      classId: selectedClass.value.isNotEmpty ? classes.indexOf(selectedClass.value) + 1 : 1,
       className: selectedClass.value,
-      x: x,
-      y: y,
+      x: left,
+      y: top,
       width: width,
       height: height,
       colorValue: classColors[selectedClass.value]?.value,
     );
 
     // Atribuir ID temporário negativo
-    final int tempId = -(annotations.length + pendingAnnotations.length + 1);
+    final int tempId = -(DateTime.now().millisecondsSinceEpoch);
     newAnnotation = newAnnotation.copyWith(id: tempId);
-
+    
+    // Limpar pontos para evitar conflitos na visualização
+    startPoint.value = null;
+    currentPoint.value = null;
+    
     // Adicionar às listas
     annotations.add(newAnnotation);
     pendingAnnotations.add(newAnnotation);
-
-    // Selecionar a nova anotação
-    selectedAnnotation.value = newAnnotation;
+    
+    // Selecionar a nova anotação e mudar o estado
     editorState.value = AnnotationEditorState.selected;
+    selectedAnnotation.value = newAnnotation;
+    
+    // Forçar atualização da UI
+    annotations.refresh();
+    update();
 
-    LoggerUtil.debug("Nova anotação criada: ${newAnnotation.id} em ($x, $y) ${width}x${height}");
+    LoggerUtil.debug("Nova anotação criada: ${newAnnotation.id} em ($left, $top) ${width}x${height}");
   }
 
   /// Atualiza uma anotação nas listas de anotações
   void updateAnnotationInLists(Annotation updatedAnnotation, {bool maintainMovingState = false, bool maintainResizingState = false}) {
     if (updatedAnnotation.id == null) return;
+
+    // Armazenar o cornerIndex atual se estamos em modo de redimensionamento
+    final int currentCornerIndex = resizeCornerIndex.value;
 
     // Atualizar na lista principal
     final int index = annotations.indexWhere((a) => a.id == updatedAnnotation.id);
@@ -690,9 +686,21 @@ class AnnotationController extends GetxController {
     }
 
     // Importante: manter o estado como "moving" ou "resizing" durante toda a operação
-    if (maintainResizingState) {
+    if (maintainResizingState || isResizeOperationActive.value) {
+      // Se estamos em uma operação de resize ativa, forçar a permanência neste estado
+      isResizeOperationActive.value = true;
+      
       // Forçar o estado para resizing independentemente do valor de resizeCornerIndex
       editorState.value = AnnotationEditorState.resizing;
+      
+      // IMPORTANTE: Manter o cornerIndex original se já está definido
+      if (currentCornerIndex >= 0) {
+        resizeCornerIndex.value = currentCornerIndex;
+      }
+      // Apenas definir um valor padrão se não temos nenhum cornerIndex definido
+      else if (resizeCornerIndex.value < 0) {
+        resizeCornerIndex.value = 0;
+      }
     } else if (maintainMovingState) {
       editorState.value = AnnotationEditorState.moving;
     }
@@ -721,6 +729,10 @@ class AnnotationController extends GetxController {
       pendingAnnotations.removeWhere((a) => a.id == annotationId);
       selectedAnnotation.value = null;
       editorState.value = AnnotationEditorState.idle;
+      
+      // Forçar atualização da UI
+      annotations.refresh();
+      update();
     } else {
       // Confirmar exclusão de anotação existente
       Get.dialog(
@@ -759,6 +771,10 @@ class AnnotationController extends GetxController {
           selectedAnnotation.value = null;
           editorState.value = AnnotationEditorState.idle;
         }
+
+        // Forçar atualização da UI
+        annotations.refresh();
+        update();
 
         Get.snackbar(
           'Sucesso',
@@ -799,13 +815,13 @@ class AnnotationController extends GetxController {
       final List<Annotation> updateAnnotations = pendingAnnotations
           .where((a) => a.id != null && a.id! > 0)
           .toList();
-
+      
       // Processar novas anotações em lote
       if (newAnnotations.isNotEmpty) {
         final List<Annotation> preparedAnnotations = newAnnotations
             .map((a) => a.copyWith(id: null))
             .toList();
-
+        
         final result = await _annotationService.createAnnotationsBatch(
             selectedImage.value!.id,
             selectedDataset.value!.id,
@@ -858,26 +874,26 @@ class AnnotationController extends GetxController {
         );
       }
 
-      Get.snackbar(
+       Get.snackbar(
         'Sucesso',
         'Anotações salvas com sucesso',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+         colorText: Colors.white,
+       );
 
       return true;
     } catch (e) {
       LoggerUtil.error('Erro ao salvar anotações: $e');
       errorMessage.value = 'Erro ao salvar anotações: $e';
 
-      Get.snackbar(
+       Get.snackbar(
         'Erro',
         'Falha ao salvar anotações: $e',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
         colorText: Colors.white,
-      );
+       );
 
       return false;
     } finally {
@@ -969,6 +985,12 @@ class AnnotationController extends GetxController {
             },
             child: const Text('Salvar'),
           ),
+          TextButton(
+            onPressed: () {
+              Get.back(); // Apenas fecha o diálogo sem fazer nada
+            },
+            child: const Text('Cancelar'),
+          ),
         ],
       ),
     );
@@ -999,14 +1021,11 @@ class AnnotationController extends GetxController {
     if (!hasNextImage()) return;
 
     if (hasUnsavedChanges.value) {
-      _confirmSaveChanges();
+      _confirmSaveChangesWithNavigation(true);
       return;
     }
 
-    final int currentIndex = images.indexWhere((img) => img.id == selectedImage.value!.id);
-    if (currentIndex < images.length - 1) {
-      selectImage(images[currentIndex + 1]);
-    }
+    _navigateToNextImage();
   }
 
   /// Navega para a imagem anterior
@@ -1014,10 +1033,70 @@ class AnnotationController extends GetxController {
     if (!hasPreviousImage()) return;
 
     if (hasUnsavedChanges.value) {
-      _confirmSaveChanges();
+      _confirmSaveChangesWithNavigation(false);
       return;
     }
 
+    _navigateToPreviousImage();
+  }
+
+  /// Confirma com o usuário se deseja salvar as mudanças antes de navegar
+  void _confirmSaveChangesWithNavigation(bool isNext) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Anotações não salvas'),
+        content: const Text('Você tem anotações não salvas. Deseja salvá-las antes de continuar?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+              pendingAnnotations.clear();
+              hasUnsavedChanges.value = false;
+              
+              // Navegar após descarte
+              if (isNext) {
+                _navigateToNextImage();
+              } else {
+                _navigateToPreviousImage();
+              }
+            },
+            child: const Text('Descartar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back();
+              await saveAllAnnotations();
+              
+              // Navegar após salvar
+              if (isNext) {
+                _navigateToNextImage();
+              } else {
+                _navigateToPreviousImage();
+              }
+            },
+            child: const Text('Salvar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back(); // Apenas fecha o diálogo sem navegar
+            },
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Navegação interna para próxima imagem
+  void _navigateToNextImage() {
+    final int currentIndex = images.indexWhere((img) => img.id == selectedImage.value!.id);
+    if (currentIndex < images.length - 1) {
+      selectImage(images[currentIndex + 1]);
+    }
+  }
+
+  /// Navegação interna para imagem anterior
+  void _navigateToPreviousImage() {
     final int currentIndex = images.indexWhere((img) => img.id == selectedImage.value!.id);
     if (currentIndex > 0) {
       selectImage(images[currentIndex - 1]);
@@ -1027,4 +1106,11 @@ class AnnotationController extends GetxController {
   // Helpers
   double min(double a, double b) => a < b ? a : b;
   double max(double a, double b) => a > b ? a : b;
+
+  /// Atualiza a matriz de transformação (não usado na nova abordagem, mas mantido para compatibilidade)
+  void updateTransformation(Matrix4 matrix) {
+    // Na nova abordagem, não precisamos mais dessa matriz de transformação
+    // mas mantemos o método para evitar erros de compilação
+    transformMatrix.value = matrix;
+  }
 }

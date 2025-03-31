@@ -4,7 +4,6 @@ import 'package:microdetect/design_system/app_colors.dart';
 import 'package:microdetect/design_system/app_typography.dart';
 import 'package:microdetect/features/app_root/controllers/app_root_controller.dart';
 import 'package:microdetect/features/app_root/widgets/collapsible_sidebar.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
 import 'package:microdetect/routes/app_pages.dart';
 
 /// Widget principal do aplicativo, que gerencia o layout e a navegação.
@@ -22,12 +21,10 @@ class _AppRootPageState extends State<AppRootPage> with WidgetsBindingObserver {
   final AppRootController controller = Get.find();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final GlobalKey<NavigatorState>? _navigatorKey = Get.nestedKey(1);
-
   @override
   Widget build(BuildContext context) {
     final surfaceColor =
-        Get.isDarkMode ? AppColors.surfaceDark : AppColors.surfaceLight;
+        Get.isDarkMode ? AppColors.surfaceDark : AppColors.white;
 
     return Scaffold(
       key: _scaffoldKey,

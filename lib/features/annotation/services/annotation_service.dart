@@ -127,7 +127,7 @@ class AnnotationService extends ApiService {
             .toList(),
       };
 
-      final response = await post<Map<String, dynamic>>(
+      final response = await post(
         '/api/v1/annotations/batch',
         data: data,
       );

@@ -338,9 +338,15 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Classes e Distribuição',
-                  style: AppTypography.titleLarge(context),
+                Row(
+                  children: [
+                    const Icon(Icons.stacked_bar_chart),
+                    const SizedBox(width: AppSpacing.small),
+                    Text(
+                      'Distribuição de Classes',
+                      style: AppTypography.titleLarge(context),
+                    ),
+                  ],
                 ),
                 Row(
                   children: [
@@ -430,7 +436,7 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
                           style: AppTypography.bodyLarge(context),
                         ),
                         subtitle: Text(
-                          '${classItem.count} imagens (${(classItem.percentage * 100).toStringAsFixed(1)}%)',
+                          '${classItem.count} imagens (${(classItem.percentage).toStringAsFixed(2)}%)',
                           style: AppTypography.bodySmall(context),
                         ),
                         trailing: IconButton(

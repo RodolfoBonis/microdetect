@@ -5,9 +5,9 @@ import 'package:microdetect/core/services/health_service.dart';
 import 'package:microdetect/core/services/port_checker_service.dart';
 import 'package:microdetect/core/services/python_service.dart';
 import 'package:microdetect/core/services/system_status_service.dart';
+import 'package:microdetect/features/app_root/controllers/app_root_controller.dart';
 import 'package:microdetect/features/settings/services/settings_service.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
-import 'package:microdetect/features/shared/events/screen_event_service.dart';
+import 'package:microdetect/features/shared/events/event_bus.dart';
 
 /// Binding principal da aplicação que registra todos os serviços e controllers necessários
 class AppBinding implements Bindings {
@@ -18,11 +18,7 @@ class AppBinding implements Bindings {
       Get.put<SettingsService>(SettingsService(), permanent: true);
     }
 
-    Get.put<EventManager>(EventManager(), permanent: true);
-
-    // Serviço de eventos de tela
-    Get.put<ScreenEventService>(ScreenEventService(), permanent: true);
-
+    Get.put<EventBus>(EventBus(), permanent: true);
     // Registrar serviços principais como singletons permanentes
     Get.put<HealthService>(HealthService(), permanent: true);
     Get.put<PortCheckerService>(PortCheckerService(), permanent: true);
@@ -32,5 +28,11 @@ class AppBinding implements Bindings {
     // Registrar serviço de backend que depende dos anteriores
     Get.put<BackendService>(BackendService(), permanent: true);
     Get.put<SystemStatusService>(SystemStatusService(), permanent: true);
+    
+    // Registrar o controller raiz
+    Get.put<AppRootController>(
+      AppRootController(backendService: Get.find()),
+      permanent: true
+    );
   }
 }

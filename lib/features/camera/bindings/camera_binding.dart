@@ -8,21 +8,40 @@ import 'package:microdetect/features/datasets/services/dataset_service.dart';
 class CameraBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<DatasetService>(() => DatasetService());
-    
-    // Verify if DatasetListController is already registered
-    if (!Get.isRegistered<DatasetController>()) {
-      Get.lazyPut<DatasetController>(() => DatasetController());
+    // Registra o CameraService como permanente
+    Get.put<CameraService>(
+      CameraService(),
+      permanent: true
+    );
+
+    // Registra o DatasetService como permanente
+    if (!Get.isRegistered<DatasetService>(tag: 'datasetService')) {
+      Get.put<DatasetService>(
+        DatasetService(),
+        tag: 'datasetService',
+        permanent: true
+      );
     }
 
-    Get.lazyPut<CameraService>(() => CameraService());
+    // Registra o DatasetController como permanente
+    if (!Get.isRegistered<DatasetController>(tag: 'datasetController')) {
+      Get.put<DatasetController>(
+        DatasetController(),
+        tag: 'datasetController',
+        permanent: true
+      );
+    }
+
     // Obtain dataset ID if provided
     final arguments = Get.arguments;
     final int? datasetId = arguments != null ? arguments['datasetId'] : null;
 
     // Register CameraController with the dataset ID
-    Get.lazyPut<CameraController>(() => CameraController(
-          datasetId: datasetId,
-        ));
+    Get.put<CameraController>(
+      CameraController(
+        datasetId: datasetId,
+      ),
+      permanent: true
+    );
   }
 } 

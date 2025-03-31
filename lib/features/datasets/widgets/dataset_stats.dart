@@ -19,6 +19,8 @@ class DatasetStats extends StatelessWidget {
     // Calcular estatísticas
     int totalImages = 0;
     int totalAnnotations = 0;
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     for (final dataset in datasets) {
       totalImages += dataset.imagesCount;
@@ -31,7 +33,7 @@ class DatasetStats extends StatelessWidget {
         vertical: AppSpacing.xSmall,
       ),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: isDarkMode ? AppColors.surfaceDark : AppColors.white,
         borderRadius: BorderRadius.circular(AppBorders.radiusSmall),
         border: Border.all(
           color: Theme.of(context).dividerColor.withOpacity(0.2),

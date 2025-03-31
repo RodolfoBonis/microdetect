@@ -6,17 +6,28 @@ import '../services/dataset_service.dart';
 class DatasetDetailBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<CameraService>(() => CameraService());
-
-    // Registrar o serviço de datasets se ainda não estiver registrado
-    if (!Get.isRegistered<DatasetService>()) {
-      Get.lazyPut<DatasetService>(() => DatasetService());
+    // Registrar o serviço de câmera se ainda não estiver registrado
+    if (!Get.isRegistered<CameraService>()) {
+      Get.put<CameraService>(
+        CameraService(),
+        permanent: true
+      );
     }
 
-    
+    // Registrar o serviço de datasets se ainda não estiver registrado
+    if (!Get.isRegistered<DatasetService>(tag: 'datasetService')) {
+      Get.put<DatasetService>(
+        DatasetService(),
+        tag: 'datasetService',
+        permanent: true
+      );
+    }
+
     // Registrar o controller de detalhes do dataset
-    Get.lazyPut<DatasetDetailController>(() => DatasetDetailController(
-      datasetId: int.parse(Get.parameters['id']!),
-    ));
+    Get.put<DatasetDetailController>(
+      DatasetDetailController(
+        datasetId: int.parse(Get.parameters['id']!),
+      )
+    );
   }
 } 

@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:developer' as developer;
 import 'package:microdetect/core/services/backend_service.dart';
 import 'package:microdetect/features/settings/services/settings_service.dart';
-import 'package:microdetect/routes/app_pages.dart';
 import 'package:microdetect/design_system/app_toast.dart';
-import 'package:microdetect/features/shared/events/screen_event_service.dart';
+import 'package:microdetect/features/shared/events/app_event.dart';
+import 'package:microdetect/features/shared/events/event_bus.dart';
+import 'package:microdetect/routes/app_pages.dart';
 
 class AppRootController extends GetxController {
   final BackendService backendService;
@@ -24,6 +26,7 @@ class AppRootController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    developer.log('AppRootController - onInit()', name: 'AppRootController');
     _initBackendService();
   }
 
@@ -40,6 +43,8 @@ class AppRootController extends GetxController {
 
   @override
   void onClose() {
+    developer.log('AppRootController - onClose()', name: 'AppRootController');
+    
     // Desligar o servidor Python antes de encerrar a aplicação
     try {
       debugPrint('Encerrando servidor Python antes de fechar a aplicação...');
@@ -83,13 +88,18 @@ class AppRootController extends GetxController {
     isSearchOpen.value = !isSearchOpen.value;
   }
 
-  /// Dispara evento de refresh para a tela atual
+  /// Atualiza a tela atual
   void refreshCurrentScreen() {
-    ScreenEventService.to.fireRefresh();
+    EventBus.to.emit(AppEvent.refresh);
   }
   
-  /// Dispara evento para mostrar ajuda
+  /// Mostra ajuda
   void showHelp() {
-    ScreenEventService.to.fireShowHelp();
+    AppToast.info('Ajuda', description: 'Esta função foi desativada');
+  }
+  
+  /// Atualiza datasets
+  void refreshDatasets() {
+    AppToast.info('Refresh Datasets', description: 'Esta função foi desativada');
   }
 }

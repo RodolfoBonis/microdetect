@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:microdetect/core/utils/logger_util.dart';
 import 'package:microdetect/design_system/app_colors.dart';
+import 'package:microdetect/design_system/app_typography.dart';
 import 'package:microdetect/features/annotation/controllers/annotation_controller.dart';
 import 'package:microdetect/features/annotation/models/annotation.dart';
 
 import 'package:vector_math/vector_math_64.dart' as vector_math;
-
 
 /// Widget para visualizar e desenhar anotações sobre uma imagem
 class AnnotationCanvas extends StatefulWidget {
@@ -33,12 +36,10 @@ class AnnotationCanvas extends StatefulWidget {
   State<AnnotationCanvas> createState() => _AnnotationCanvasState();
 }
 
-class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProviderStateMixin {
+class _AnnotationCanvasState extends State<AnnotationCanvas>
+    with TickerProviderStateMixin {
   /// Controlador de anotação
   late AnnotationController controller;
-
-  /// Controlador de transformação
-  final TransformationController _transformController = TransformationController();
 
   /// Imagem carregada
   ui.Image? _image;
@@ -67,15 +68,17 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 
   /// Armazenar o estado inicial da operação para usar em onPointerMove
   AnnotationEditorState? _initialDragState;
-  
+
   /// Armazenar o índice do canto que está sendo redimensionado
   int _resizingCornerIndex = -1;
+
+  /// Indica se uma operação de redimensionamento está em andamento
+  bool _isResizingActive = false;
 
   @override
   void initState() {
     super.initState();
     controller = Get.find<AnnotationController>();
-    _loadImage();
 
     // Inicializar o controlador de animação
     _pulseController = AnimationController(
@@ -83,8 +86,8 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
       duration: const Duration(milliseconds: 400),
     )..repeat(reverse: true);
 
-    // Listener para transformação
-    _transformController.addListener(_handleTransformChange);
+    // Carregar imagem
+    _loadImage();
 
     // Focar o nó para capturar eventos de teclado
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,16 +98,9 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 
   @override
   void dispose() {
-    _transformController.removeListener(_handleTransformChange);
     _pulseController.dispose();
     _canvasFocusNode.dispose();
     super.dispose();
-  }
-
-  /// Atualiza os valores de transformação no controller
-  void _handleTransformChange() {
-    if (_image == null) return;
-    controller.updateTransformation(_transformController.value);
   }
 
   @override
@@ -116,6 +112,7 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
     }
 
     if (widget.imageUrl != oldWidget.imageUrl) {
+      // Nova imagem carregada
       _loadImage();
     }
   }
@@ -133,7 +130,7 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 
       final Completer<ui.Image> completer = Completer<ui.Image>();
       final ImageStreamListener listener = ImageStreamListener(
-            (ImageInfo info, bool _) {
+        (ImageInfo info, bool _) {
           completer.complete(info.image);
         },
         onError: (dynamic exception, StackTrace? stackTrace) {
@@ -153,9 +150,6 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 
         // Atualizar o controlador com a imagem carregada
         controller.setLoadedImage(image);
-
-        // Ajustar a transformação inicial para caber na tela
-        _resetTransformation();
       }
     } catch (e) {
       if (mounted) {
@@ -165,33 +159,6 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
         });
       }
     }
-  }
-
-  /// Reset da transformação para que a imagem se ajuste à tela
-  void _resetTransformation() {
-    if (_image == null) return;
-
-    // Calcular escala para ajustar a imagem ao container
-    final double scaleX = widget.size.width / _image!.width;
-    final double scaleY = widget.size.height / _image!.height;
-
-    // Usar a menor escala para garantir que a imagem caiba completamente
-    final double scale = math.min(scaleX, scaleY) * 0.95; // 95% para dar uma margem
-
-    // Centralizar a imagem
-    final double dx = (widget.size.width - (_image!.width * scale)) / 2;
-    final double dy = (widget.size.height - (_image!.height * scale)) / 2;
-
-    // Definir a matriz de transformação
-    final Matrix4 matrix = Matrix4.identity()
-      ..translate(dx, dy)
-      ..scale(scale);
-
-    // Aplicar a transformação
-    _transformController.value = matrix;
-
-    // Atualizar informações de transformação no controlador
-    controller.updateTransformation(matrix);
   }
 
   /// Processa eventos de teclado
@@ -301,10 +268,13 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Get.isDarkMode;
+
     if (_isLoading) {
-      return SizedBox(
+      return Container(
         width: widget.size.width,
         height: widget.size.height,
+        color: isDarkMode ? Colors.black : Colors.grey[200],
         child: const Center(
           child: CircularProgressIndicator(),
         ),
@@ -312,9 +282,10 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
     }
 
     if (_error != null) {
-      return SizedBox(
+      return Container(
         width: widget.size.width,
         height: widget.size.height,
+        color: isDarkMode ? Colors.black : Colors.grey[200],
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -338,160 +309,331 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
     }
 
     if (_image == null) {
-      return const SizedBox();
+      return Container(
+        width: widget.size.width,
+        height: widget.size.height,
+        color: isDarkMode ? Colors.black : Colors.grey[200],
+      );
     }
 
-    return KeyboardListener(
-      focusNode: _canvasFocusNode,
-      onKeyEvent: _handleKeyEvent,
-      child: Stack(
-        children: [
-          // Canvas interativo com gestos
-          _buildCanvas(),
+    // Nova abordagem: widget de layout com tamanho fixo para manter as proporções da imagem
+    return Column(
+      children: [
+        Container(
+          width: widget.size.width,
+          height: widget.size.height,
+          color: isDarkMode ? Colors.black : Colors.grey[200],
+          child: Center(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Calcular o tamanho da imagem mantendo proporção
+                final double imageWidth = _image!.width.toDouble();
+                final double imageHeight = _image!.height.toDouble();
 
-          // Overlay de status e navegação
-          Obx(() => _buildStatusOverlay()),
+                // Escolher o fator de escala para caber no container
+                final double scaleX = constraints.maxWidth / imageWidth;
+                final double scaleY = constraints.maxHeight / imageHeight;
+                final double scale = math.min(scaleX, scaleY);
 
-          // Barra de ferramentas
-          Obx(() => _buildToolbar()),
+                // Obter dimensões finais da imagem e do canvas
+                final double displayWidth = imageWidth * scale;
+                final double displayHeight = imageHeight * scale;
 
-          // Botões de navegação
-          Obx(() => _buildNavigationControls()),
-        ],
-      ),
+                // Atualizar o controller com as dimensões da visualização
+                controller.setViewportSize(Size(displayWidth, displayHeight));
+
+                return SizedBox(
+                  width: displayWidth,
+                  height: displayHeight,
+                  child: Stack(
+                    children: [
+                      // Camada 1: Imagem base
+                      Image.network(
+                        widget.imageUrl,
+                        fit: BoxFit.contain,
+                        width: displayWidth,
+                        height: displayHeight,
+                      ),
+
+                      // Camada 2: Canvas interativo para anotações
+                      KeyboardListener(
+                        focusNode: _canvasFocusNode,
+                        onKeyEvent: _handleKeyEvent,
+                        child: GestureDetector(
+                          onTapDown: (details) => _handleTapDown(
+                            details.localPosition,
+                            displayWidth,
+                            displayHeight,
+                          ),
+                          onPanStart: (details) => _handlePanStart(
+                            details.localPosition,
+                            displayWidth,
+                            displayHeight,
+                          ),
+                          onPanUpdate: (details) => _handlePanUpdate(
+                            details.localPosition,
+                            displayWidth,
+                            displayHeight,
+                          ),
+                          onPanEnd: (_) => _handlePanEnd(),
+                          child: Obx(() => CustomPaint(
+                                size: Size(displayWidth, displayHeight),
+                                painter: AnnotationsPainter(
+                                  annotations: controller.annotations.toList(),
+                                  selectedAnnotation:
+                                      controller.selectedAnnotation.value,
+                                  classColors: controller.classColors,
+                                  pulseAnimation: _pulseController,
+                                  resizeCornerIndex: _isResizingActive
+                                      ? _resizingCornerIndex
+                                      : controller.resizeCornerIndex.value,
+                                  imageWidth: imageWidth,
+                                  imageHeight: imageHeight,
+                                  canvasWidth: displayWidth,
+                                  canvasHeight: displayHeight,
+                                ),
+                                foregroundPainter: controller
+                                                .editorState.value ==
+                                            AnnotationEditorState.drawing &&
+                                        controller.startPoint.value != null &&
+                                        controller.currentPoint.value != null
+                                    ? DrawingAnnotationPainter(
+                                        startPoint:
+                                            controller.startPoint.value!,
+                                        currentPoint:
+                                            controller.currentPoint.value!,
+                                        pulseAnimation: _pulseController,
+                                        color: controller.classColors[controller
+                                                .selectedClass.value] ??
+                                            AppColors.primary,
+                                        imageWidth: imageWidth,
+                                        imageHeight: imageHeight,
+                                        canvasWidth: displayWidth,
+                                        canvasHeight: displayHeight,
+                                        controller: controller,
+                                      )
+                                    : null,
+                              )),
+                        ),
+                      ),
+
+                      // Camada 3: Controles de UI
+                      Obx(() => _buildToolbar()),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        Obx(() => _buildStatusOverlay()),
+      ],
     );
   }
 
-  /// Constrói o canvas de anotação
-  Widget _buildCanvas() {
-    return Obx(() {
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          // InteractiveViewer para zoom e pan
-          InteractiveViewer(
-            transformationController: _transformController,
-            constrained: true,
-            panEnabled: _isPanningMode || controller.editorState.value == AnnotationEditorState.idle,
-            scaleEnabled: true,
-            boundaryMargin: const EdgeInsets.all(20.0),
-            minScale: 0.1,
-            maxScale: 10.0,
-            onInteractionEnd: (_) {
-              _handleTransformChange();
-            },
-            child: Stack(
-              children: [
-                // Imagem de fundo
-                SizedBox(
-                  width: _image!.width.toDouble(),
-                  height: _image!.height.toDouble(),
-                  child: Image.network(
-                    widget.imageUrl,
-                    fit: BoxFit.cover,
-                  ),
-                ),
+  /// Determina o cursor apropriado com base no estado
+  MouseCursor _getCursorForState() {
+    if (_isResizingActive) {
+      // Mostra cursor apropriado com base no canto
+      switch (_resizingCornerIndex) {
+        case 0:
+          return SystemMouseCursors.resizeUpLeft;
+        case 1:
+          return SystemMouseCursors.resizeUpRight;
+        case 2:
+          return SystemMouseCursors.resizeDownRight;
+        case 3:
+          return SystemMouseCursors.resizeDownLeft;
+        default:
+          return SystemMouseCursors.basic;
+      }
+    } else if (controller.editorState.value == AnnotationEditorState.moving) {
+      return SystemMouseCursors.move;
+    } else if (controller.editorState.value == AnnotationEditorState.drawing) {
+      return SystemMouseCursors.precise;
+    } else if (_isPanningMode) {
+      return SystemMouseCursors.grab;
+    }
+    return SystemMouseCursors.basic;
+  }
 
-                // Anotações existentes
-                CustomPaint(
-                  size: Size(_image!.width.toDouble(), _image!.height.toDouble()),
-                  painter: AnnotationsPainter(
-                    annotations: controller.annotations.toList(),
-                    selectedAnnotation: controller.selectedAnnotation.value,
-                    transformMatrix: _transformController.value,
-                    classColors: controller.classColors,
-                    pulseAnimation: _pulseController,
-                    resizeCornerIndex: controller.resizeCornerIndex.value,
-                    imageWidth: _image!.width.toDouble(),
-                    imageHeight: _image!.height.toDouble(),
-                  ),
-                ),
+  /// Trata eventos de clique/toque no canvas de anotação
+  void _handleTapDown(Offset pos, double canvasWidth, double canvasHeight) {
+    if (!widget.editable) return;
 
-                // Anotação sendo desenhada
-                if (controller.editorState.value == AnnotationEditorState.drawing &&
-                    controller.startPoint.value != null &&
-                    controller.currentPoint.value != null)
-                  CustomPaint(
-                    size: Size(_image!.width.toDouble(), _image!.height.toDouble()),
-                    painter: DrawingAnnotationPainter(
-                      startPoint: controller.startPoint.value!,
-                      currentPoint: controller.currentPoint.value!,
-                      transformMatrix: _transformController.value,
-                      pulseAnimation: _pulseController,
-                      color: controller.classColors[controller.selectedClass.value] ?? AppColors.primary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+    // Verificar duplo-clique para edição
+    if (_isDoubleClick(pos) && controller.selectedAnnotation.value != null) {
+      _showAnnotationEditDialog(controller.selectedAnnotation.value!);
+      return;
+    }
 
-          // Área de gestos transparente para capturar interações em modo de anotação
-          if (!_isPanningMode)
-            Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (event) {
-                if (!widget.editable) return;
-                
-                final Offset pos = event.localPosition;
-                
-                // Verificar duplo-clique para edição
-                if (_isDoubleClick(pos) && controller.selectedAnnotation.value != null) {
-                  _showAnnotationEditDialog(controller.selectedAnnotation.value!);
-                  return;
-                }
-                
-                // Iniciar operação
-                controller.onCanvasTapDown(pos);
-                
-                // Armazenar estado e verificar se estamos iniciando um redimensionamento
-                _initialDragState = controller.editorState.value;
-                _isDragging = _initialDragState == AnnotationEditorState.drawing ||
-                              _initialDragState == AnnotationEditorState.moving ||
-                              _initialDragState == AnnotationEditorState.resizing;
-                
-                // Capturar o índice do canto que está sendo redimensionado
-                if (_initialDragState == AnnotationEditorState.resizing) {
-                  _resizingCornerIndex = controller.resizeCornerIndex.value;
-                }
-              },
-              onPointerMove: (event) {
-                if (!widget.editable) return;
-                
-                // Verificar se estamos em uma operação ativa de arrasto
-                if (_isDragging) {
-                  // Forçar o estado correto antes de processar o evento
-                  if (_initialDragState == AnnotationEditorState.resizing) {
-                    // Forçar o estado para resizing e restaurar o índice do canto
-                    controller.editorState.value = AnnotationEditorState.resizing;
-                    if (_resizingCornerIndex >= 0) {
-                      controller.resizeCornerIndex.value = _resizingCornerIndex;
-                    }
-                  } else if (_initialDragState == AnnotationEditorState.moving) {
-                    controller.editorState.value = AnnotationEditorState.moving;
-                  }
-                  
-                  // Processar o evento de arrasto
-                  controller.onCanvasDragUpdate(event.localPosition);
-                }
-              },
-              onPointerUp: (event) {
-                if (!widget.editable) return;
-                
-                // Verificar se estamos em operação de arrasto
-                if (_isDragging) {
-                  controller.onCanvasDragEnd();
-                  _isDragging = false;
-                  _initialDragState = null;
-                  _resizingCornerIndex = -1;
-                }
-              },
-              child: Container(
-                color: Colors.transparent,
-              ),
-            ),
-        ],
-      );
-    });
+    // Detectar se está em space
+    if (HardwareKeyboard.instance
+        .isLogicalKeyPressed(LogicalKeyboardKey.space)) {
+      setState(() {
+        _isPanningMode = true;
+      });
+      return;
+    }
+
+    // Salvar o estado inicial
+    _initialDragState = controller.editorState.value;
+
+    // Verificar se estamos em modo de redimensionamento
+    _isResizingActive = _initialDragState == AnnotationEditorState.resizing ||
+        controller.isResizeOperationActive.value;
+
+    if (_isResizingActive) {
+      // Se já estamos redimensionando, manter estado
+      _resizingCornerIndex = controller.resizeCornerIndex.value;
+      controller.isResizeOperationActive.value = true;
+      controller.editorState.value = AnnotationEditorState.resizing;
+      _isDragging = true;
+
+      // Converter para coordenadas normalizadas para o controller
+      final Offset normalizedPos =
+          _canvasToNormalizedCoordinates(pos, canvasWidth, canvasHeight);
+      controller.onCanvasDragUpdate(normalizedPos);
+      return;
+    }
+
+    // Verificar se há anotação selecionada e estamos em um canto
+    if (controller.selectedAnnotation.value != null) {
+      // Converter para coordenadas normalizadas para o controller
+      final Offset normalizedPos =
+          _canvasToNormalizedCoordinates(pos, canvasWidth, canvasHeight);
+
+      // Verificar se estamos em um canto para redimensionar
+      final int cornerIndex = controller.getResizeCornerIndex(
+          normalizedPos, controller.selectedAnnotation.value!);
+      if (cornerIndex >= 0) {
+        // Iniciar redimensionamento
+        _isResizingActive = true;
+        _resizingCornerIndex = cornerIndex;
+        controller.resizeCornerIndex.value = cornerIndex;
+        controller.isResizeOperationActive.value = true;
+        controller.editorState.value = AnnotationEditorState.resizing;
+        controller.dragStartPoint.value = normalizedPos;
+        controller.dragStartAnnotation.value =
+            controller.selectedAnnotation.value;
+        _isDragging = true;
+        return;
+      }
+    }
+
+    // Iniciar operação normal (tap)
+    final Offset normalizedPos =
+        _canvasToNormalizedCoordinates(pos, canvasWidth, canvasHeight);
+    controller.onCanvasTapDown(normalizedPos);
+
+    // Atualizar flags
+    _initialDragState = controller.editorState.value;
+    _isResizingActive = _initialDragState == AnnotationEditorState.resizing;
+    if (_isResizingActive) {
+      _resizingCornerIndex = controller.resizeCornerIndex.value;
+    }
+    _isDragging = _initialDragState == AnnotationEditorState.drawing ||
+        _initialDragState == AnnotationEditorState.moving ||
+        _isResizingActive;
+
+    // No caso de iniciar desenho, forçar refresh visual
+    if (_initialDragState == AnnotationEditorState.drawing) {
+      setState(() {});
+    }
+  }
+
+  /// Trata o início do pan (arrasto)
+  void _handlePanStart(Offset pos, double canvasWidth, double canvasHeight) {
+    if (!widget.editable) return;
+
+    // Salvar o estado inicial e converter para coordenadas normalizadas
+    _initialDragState = controller.editorState.value;
+    final Offset normalizedPos =
+        _canvasToNormalizedCoordinates(pos, canvasWidth, canvasHeight);
+
+    // Verificar se temos uma anotação selecionada
+    if (controller.selectedAnnotation.value != null) {
+      // Verificar se estamos em um canto para redimensionar
+      final int cornerIndex = controller.getResizeCornerIndex(
+          normalizedPos, controller.selectedAnnotation.value!);
+      if (cornerIndex >= 0) {
+        // Iniciar redimensionamento
+        _isResizingActive = true;
+        _resizingCornerIndex = cornerIndex;
+        controller.resizeCornerIndex.value = cornerIndex;
+        controller.isResizeOperationActive.value = true;
+        controller.editorState.value = AnnotationEditorState.resizing;
+        controller.dragStartPoint.value = normalizedPos;
+        controller.dragStartAnnotation.value =
+            controller.selectedAnnotation.value;
+        _isDragging = true;
+        return;
+      }
+
+      // Verificar se estamos dentro da anotação para mover
+      if (controller.isPointInAnnotation(
+          normalizedPos, controller.selectedAnnotation.value!)) {
+        controller.editorState.value = AnnotationEditorState.moving;
+        controller.dragStartPoint.value = normalizedPos;
+        controller.dragStartAnnotation.value =
+            controller.selectedAnnotation.value;
+        _isDragging = true;
+        return;
+      }
+    }
+
+    // Se estamos em modo idle e não em cima de nenhuma anotação, iniciar desenho
+    if (controller.editorState.value == AnnotationEditorState.idle) {
+      controller.editorState.value = AnnotationEditorState.drawing;
+      controller.startPoint.value = normalizedPos;
+      controller.currentPoint.value = normalizedPos;
+      _isDragging = true;
+      // Forçar rebuild do widget para visualizar a atualização inicial
+      setState(() {});
+    }
+  }
+
+  /// Trata movimento do ponteiro no canvas
+  void _handlePanUpdate(Offset pos, double canvasWidth, double canvasHeight) {
+    if (!widget.editable) return;
+
+    // Converter as coordenadas para o espaço normalizado
+    final Offset normalizedPos =
+        _canvasToNormalizedCoordinates(pos, canvasWidth, canvasHeight);
+
+    // Atualizar o controlador com a nova posição
+    controller.onCanvasDragUpdate(normalizedPos);
+
+    // Forçar rebuild do widget para visualizar a atualização
+    setState(() {});
+  }
+
+  /// Trata soltura do ponteiro
+  void _handlePanEnd() {
+    if (!widget.editable) return;
+
+    // Finalizar operações de drag/resize
+    if (_isDragging || _isResizingActive) {
+      controller.onCanvasDragEnd();
+      _isDragging = false;
+      _isResizingActive = false;
+      _initialDragState = null;
+      _resizingCornerIndex = -1;
+    }
+  }
+
+  /// Converte coordenadas do canvas para coordenadas normalizadas (0-1)
+  Offset _canvasToNormalizedCoordinates(
+      Offset canvasPoint, double canvasWidth, double canvasHeight) {
+    // Garantir que as coordenadas estejam dentro dos limites do canvas
+    final double x = canvasPoint.dx.clamp(0.0, canvasWidth);
+    final double y = canvasPoint.dy.clamp(0.0, canvasHeight);
+
+    // Converter para coordenadas normalizadas (0-1)
+    final double normalX = x / canvasWidth;
+    final double normalY = y / canvasHeight;
+
+    return Offset(normalX, normalY);
   }
 
   /// Constrói a barra de ferramentas
@@ -508,28 +650,15 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
             heroTag: 'togglePan',
             onPressed: _togglePanMode,
             tooltip: _isPanningMode ? 'Modo Anotação' : 'Modo Navegação',
-            backgroundColor: _isPanningMode
-                ? AppColors.info
-                : AppColors.primary,
+            backgroundColor:
+                _isPanningMode ? AppColors.info : AppColors.primary,
             child: Icon(
               _isPanningMode ? Icons.edit : Icons.pan_tool,
               size: 20,
+              color: AppColors.white,
             ),
           ),
           const SizedBox(height: 8),
-
-          // Botão para resetar zoom/transformação
-          FloatingActionButton(
-            mini: true,
-            heroTag: 'resetZoom',
-            onPressed: _resetTransformation,
-            tooltip: 'Ajustar à tela',
-            backgroundColor: Colors.grey.shade700,
-            child: const Icon(
-              Icons.fit_screen,
-              size: 20,
-            ),
-          ),
 
           // Botão para salvar mudanças
           if (controller.hasUnsavedChanges.value) ...[
@@ -542,14 +671,18 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
               backgroundColor: AppColors.success,
               child: controller.isSaving.value
                   ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : const Icon(Icons.save, size: 20),
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.save,
+                      size: 20,
+                      color: AppColors.white,
+                    ),
             ),
           ],
 
@@ -565,6 +698,7 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
               child: const Icon(
                 Icons.delete,
                 size: 20,
+                color: AppColors.white,
               ),
             ),
           ],
@@ -573,84 +707,42 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
     );
   }
 
-  /// Constrói os botões para navegar entre imagens
-  Widget _buildNavigationControls() {
-    return Positioned(
-      bottom: 80,
-      left: 0,
-      right: 0,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Botão para imagem anterior
-          ElevatedButton.icon(
-            onPressed: controller.hasPreviousImage()
-                ? controller.previousImage
-                : null,
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Anterior'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.grey,
-              foregroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 16),
-
-          // Botão para próxima imagem
-          ElevatedButton.icon(
-            onPressed: controller.hasNextImage()
-                ? controller.nextImage
-                : null,
-            icon: const Icon(Icons.arrow_forward),
-            label: const Text('Próxima'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.grey,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Constrói o overlay de status
   Widget _buildStatusOverlay() {
     String message = '';
-    Color backgroundColor = AppColors.primary.withOpacity(0.8);
 
     // Indicar modo atual
     if (_isPanningMode) {
       message = 'Modo Navegação ativo (zoom e pan)';
-      backgroundColor = AppColors.info.withOpacity(0.8);
     } else {
       // Mensagem baseada no estado do editor
       switch (controller.editorState.value) {
         case AnnotationEditorState.idle:
           if (controller.annotations.isEmpty) {
-            message = 'Clique para iniciar uma anotação | Classe: ${controller.selectedClass.value}';
+            message =
+                'Clique para iniciar uma anotação | Classe: ${controller.selectedClass.value}';
           } else {
-            message = 'Clique em uma anotação ou inicie uma nova | Classe: ${controller.selectedClass.value}';
+            message =
+                'Clique em uma anotação ou inicie uma nova | Classe: ${controller.selectedClass.value}';
           }
           break;
 
         case AnnotationEditorState.drawing:
-          message = 'Arraste para desenhar a anotação | Classe: ${controller.selectedClass.value}';
-          backgroundColor = AppColors.primary.withOpacity(0.8);
+          message =
+              'Arraste para desenhar a anotação | Classe: ${controller.selectedClass.value}';
           break;
 
         case AnnotationEditorState.selected:
-          message = 'Anotação selecionada: ${controller.selectedAnnotation.value?.className ?? ""}';
-          backgroundColor = AppColors.success.withOpacity(0.8);
+          message =
+              'Anotação selecionada: ${controller.selectedAnnotation.value?.className ?? ""}';
           break;
 
         case AnnotationEditorState.moving:
           message = 'Movendo anotação...';
-          backgroundColor = AppColors.warning.withOpacity(0.8);
           break;
 
         case AnnotationEditorState.resizing:
           message = 'Redimensionando anotação...';
-          backgroundColor = AppColors.warning.withOpacity(0.8);
           break;
       }
     }
@@ -660,22 +752,17 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
       message += ' | ⚠️ Alterações não salvas';
     }
 
-    return Positioned(
-      bottom: 20,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(20),
+    return Center(
+      child: Column(
+        children: [
+          Divider(
+            color: controller.classColors[controller.selectedClass.value],
           ),
-          child: Text(
+          Text(
             message,
-            style: const TextStyle(color: Colors.white),
+            style: AppTypography.headlineSmall(context),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -687,7 +774,8 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
     });
 
     // Cancelar qualquer anotação em andamento ao mudar para modo de panorâmica
-    if (_isPanningMode && controller.editorState.value != AnnotationEditorState.idle) {
+    if (_isPanningMode &&
+        controller.editorState.value != AnnotationEditorState.idle) {
       controller.cancelSelection();
     }
   }
@@ -697,22 +785,24 @@ class _AnnotationCanvasState extends State<AnnotationCanvas> with TickerProvider
 class AnnotationsPainter extends CustomPainter {
   final List<Annotation> annotations;
   final Annotation? selectedAnnotation;
-  final Matrix4 transformMatrix;
   final Map<String, Color> classColors;
   final AnimationController pulseAnimation;
   final int resizeCornerIndex;
   final double imageWidth;
   final double imageHeight;
+  final double canvasWidth;
+  final double canvasHeight;
 
   AnnotationsPainter({
     required this.annotations,
     this.selectedAnnotation,
-    required this.transformMatrix,
     required this.classColors,
     required this.pulseAnimation,
     this.resizeCornerIndex = -1,
     required this.imageWidth,
     required this.imageHeight,
+    required this.canvasWidth,
+    required this.canvasHeight,
   }) : super(repaint: pulseAnimation);
 
   @override
@@ -726,11 +816,11 @@ class AnnotationsPainter extends CustomPainter {
 
   /// Desenha uma anotação
   void _drawAnnotation(Canvas canvas, Annotation annotation, bool isSelected) {
-    // Converter coordenadas normalizadas para pixels da imagem
-    final double left = annotation.x * imageWidth;
-    final double top = annotation.y * imageHeight;
-    final double width = annotation.width * imageWidth;
-    final double height = annotation.height * imageHeight;
+    // Converter coordenadas normalizadas para coordenadas do canvas
+    final double left = annotation.x * canvasWidth;
+    final double top = annotation.y * canvasHeight;
+    final double width = annotation.width * canvasWidth;
+    final double height = annotation.height * canvasHeight;
 
     final Rect rect = Rect.fromLTWH(left, top, width, height);
 
@@ -762,6 +852,34 @@ class AnnotationsPainter extends CustomPainter {
       _drawResizeHandles(canvas, rect);
     }
 
+    // Desenhar texto com dimensões em pixels da imagem original
+    final int pixelWidth = (annotation.width * imageWidth).round();
+    final int pixelHeight = (annotation.height * imageHeight).round();
+    final String dimensions = '${pixelWidth}x${pixelHeight} px';
+
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(
+        text: dimensions,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Colors.black54,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+
+    textPainter.layout();
+
+    // Posicionar o texto no canto inferior direito da anotação
+    final Offset textPosition = Offset(
+      rect.right - textPainter.width - 4,
+      rect.bottom - textPainter.height - 4,
+    );
+
+    textPainter.paint(canvas, textPosition);
+
     // Desenhar rótulo da classe
     _drawClassLabel(canvas, rect, annotation, color);
   }
@@ -780,13 +898,15 @@ class AnnotationsPainter extends CustomPainter {
 
       // Desenhar círculo de fundo
       final handlePaint = Paint()
-        ..color = isActive ? Colors.red : Colors.white
+        ..color = isActive
+            ? const Color(0xFFFF0000) // Vermelho forte para o canto ativo
+            : Colors.white
         ..style = PaintingStyle.fill;
 
-      // Tamanho do círculo depende se está ativo ou não, e da animação se ativo
+      // Tamanho do círculo depende se está ativo ou não
       final double handleSize = isActive
-          ? 10.0 + (pulseAnimation.value * 2.0)
-          : 8.0;
+          ? 10.0 + (pulseAnimation.value * 3.0) // Maior quando ativo
+          : 6.0; // Tamanho padrão para os outros cantos
 
       canvas.drawCircle(corners[i], handleSize, handlePaint);
 
@@ -795,17 +915,18 @@ class AnnotationsPainter extends CustomPainter {
           corners[i],
           handleSize,
           Paint()
-            ..color = Colors.black
+            ..color = isActive ? Colors.white : Colors.black
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5
-      );
+            ..strokeWidth = isActive ? 2.0 : 1.0);
     }
   }
 
   /// Desenha o rótulo da classe
-  void _drawClassLabel(Canvas canvas, Rect rect, Annotation annotation, Color color) {
+  void _drawClassLabel(
+      Canvas canvas, Rect rect, Annotation annotation, Color color) {
     if (annotation.className == null || annotation.className!.isEmpty) return;
 
+    // Preparar o texto da classe
     final TextPainter textPainter = TextPainter(
       text: TextSpan(
         text: annotation.className,
@@ -820,35 +941,26 @@ class AnnotationsPainter extends CustomPainter {
 
     textPainter.layout();
 
-    // Fundo do rótulo
-    final Paint backgroundPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final double labelWidth = textPainter.width + 10;
-    final double labelHeight = textPainter.height + 6;
-
-    final Rect labelRect = Rect.fromLTWH(
-      rect.left,
-      rect.top - labelHeight,
-      labelWidth,
-      labelHeight,
-    );
-
-    // Desenhar retângulo com bordas arredondadas
-    canvas.drawRRect(
-      RRect.fromRectAndCorners(
-        labelRect,
-        topLeft: const Radius.circular(3),
-        topRight: const Radius.circular(3),
+    // Desenhar fundo para o texto
+    final RRect labelRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        rect.left,
+        rect.top - textPainter.height - 4,
+        textPainter.width + 8,
+        textPainter.height + 4,
       ),
-      backgroundPaint,
+      const Radius.circular(2),
     );
 
-    // Texto
+    canvas.drawRRect(
+      labelRect,
+      Paint()..color = color,
+    );
+
+    // Desenhar o texto
     textPainter.paint(
       canvas,
-      Offset(rect.left + 5, rect.top - labelHeight + 3),
+      Offset(rect.left + 4, rect.top - textPainter.height - 2),
     );
   }
 
@@ -856,8 +968,9 @@ class AnnotationsPainter extends CustomPainter {
   bool shouldRepaint(AnnotationsPainter oldDelegate) {
     return oldDelegate.annotations != annotations ||
         oldDelegate.selectedAnnotation != selectedAnnotation ||
-        oldDelegate.transformMatrix != transformMatrix ||
-        oldDelegate.resizeCornerIndex != resizeCornerIndex;
+        oldDelegate.resizeCornerIndex != resizeCornerIndex ||
+        oldDelegate.canvasWidth != canvasWidth ||
+        oldDelegate.canvasHeight != canvasHeight;
   }
 }
 
@@ -865,30 +978,39 @@ class AnnotationsPainter extends CustomPainter {
 class DrawingAnnotationPainter extends CustomPainter {
   final Offset startPoint;
   final Offset currentPoint;
-  final Matrix4 transformMatrix;
   final AnimationController pulseAnimation;
   final Color color;
+  final double imageWidth;
+  final double imageHeight;
+  final double canvasWidth;
+  final double canvasHeight;
+
+  final AnnotationController controller;
 
   DrawingAnnotationPainter({
     required this.startPoint,
     required this.currentPoint,
-    required this.transformMatrix,
     required this.pulseAnimation,
     required this.color,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.canvasWidth,
+    required this.canvasHeight,
+    required this.controller,
   }) : super(repaint: pulseAnimation);
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Aplicar transformação inversa para obter as coordenadas corretas
-    final Matrix4 inverted = Matrix4.inverted(transformMatrix);
+    // Converter pontos de coordenadas normalizadas para coordenadas do canvas
+    final double startX = startPoint.dx * canvasWidth;
+    final double startY = startPoint.dy * canvasHeight;
+    final double currentX = currentPoint.dx * canvasWidth;
+    final double currentY = currentPoint.dy * canvasHeight;
 
-    final vector_math.Vector4 start = inverted.transform(vector_math.Vector4(startPoint.dx, startPoint.dy, 0, 1));
-    final vector_math.Vector4 current = inverted.transform(vector_math.Vector4(currentPoint.dx, currentPoint.dy, 0, 1));
-
-    // Calcular o retângulo
+    // Calcular o retângulo a partir dos pontos convertidos
     final Rect rect = Rect.fromPoints(
-      Offset(start.x, start.y),
-      Offset(current.x, current.y),
+      Offset(startX, startY),
+      Offset(currentX, currentY),
     );
 
     // Estilo da borda
@@ -913,10 +1035,14 @@ class DrawingAnnotationPainter extends CustomPainter {
 
     canvas.drawRect(rect, fillPaint);
 
+    // Calcular dimensões em pixels da imagem original
+    final double normalWidth = controller.abs(currentPoint.dx - startPoint.dx);
+    final double normalHeight = controller.abs(currentPoint.dy - startPoint.dy);
+    final int pixelWidth = (normalWidth * imageWidth).round();
+    final int pixelHeight = (normalHeight * imageHeight).round();
+
     // Indicar dimensões
-    final int width = rect.width.abs().toInt();
-    final int height = rect.height.abs().toInt();
-    final String dimensions = '${width}x${height} px';
+    final String dimensions = '${pixelWidth}x${pixelHeight} px';
 
     final TextPainter textPainter = TextPainter(
       text: TextSpan(
@@ -945,7 +1071,159 @@ class DrawingAnnotationPainter extends CustomPainter {
   bool shouldRepaint(DrawingAnnotationPainter oldDelegate) {
     return oldDelegate.startPoint != startPoint ||
         oldDelegate.currentPoint != currentPoint ||
-        oldDelegate.transformMatrix != transformMatrix ||
-        oldDelegate.color != color;
+        oldDelegate.color != color ||
+        oldDelegate.imageWidth != imageWidth ||
+        oldDelegate.imageHeight != imageHeight ||
+        oldDelegate.canvasWidth != canvasWidth ||
+        oldDelegate.canvasHeight != canvasHeight;
+  }
+}
+
+// Pintor customizado para renderizar a imagem e anotações
+class _AnnotationPainter extends CustomPainter {
+  final ui.Image image;
+  final AnnotationController controller;
+  final AnimationController pulseAnimation;
+
+  _AnnotationPainter({
+    required this.image,
+    required this.controller,
+    required this.pulseAnimation,
+  }) : super(repaint: pulseAnimation);
+
+  // Função auxiliar para calcular o valor absoluto
+  double _abs(double value) => value < 0 ? -value : value;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Obter matriz de transformação
+    final Matrix4 transform = controller.transformMatrix.value;
+
+    // Desenhar a imagem
+    final Paint paint = Paint();
+    canvas.drawImage(image, Offset.zero, paint);
+
+    // Desenhar anotações existentes
+    for (final annotation in controller.annotations) {
+      final bool isSelected =
+          controller.selectedAnnotation.value?.id == annotation.id;
+      _drawAnnotation(canvas, annotation, isSelected);
+    }
+
+    // Desenhar anotação em progresso
+    if (controller.editorState.value == AnnotationEditorState.drawing &&
+        controller.startPoint.value != null &&
+        controller.currentPoint.value != null) {
+      _drawDraftAnnotation(
+          canvas,
+          controller.startPoint.value!,
+          controller.currentPoint.value!,
+          controller.classColors[controller.selectedClass.value] ??
+              AppColors.primary);
+    }
+  }
+
+  // Desenhar anotação existente
+  void _drawAnnotation(Canvas canvas, Annotation annotation, bool isSelected) {
+    // Calcular coordenadas em pixels
+    final double imageWidth = image.width.toDouble();
+    final double imageHeight = image.height.toDouble();
+
+    final double x = annotation.x * imageWidth;
+    final double y = annotation.y * imageHeight;
+    final double width = annotation.width * imageWidth;
+    final double height = annotation.height * imageHeight;
+
+    final Rect rect = Rect.fromLTWH(x, y, width, height);
+
+    // Determinar cor
+    final Color color = annotation.colorValue != null
+        ? Color(annotation.colorValue!)
+        : (controller.classColors[annotation.className] ?? AppColors.primary);
+
+    // Desenhar retângulo
+    canvas.drawRect(
+        rect,
+        Paint()
+          ..color = color.withOpacity(isSelected ? 0.4 : 0.2)
+          ..style = PaintingStyle.fill);
+
+    // Desenhar borda
+    canvas.drawRect(
+        rect,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = isSelected ? 3.0 : 2.0);
+
+    // Se selecionada, desenhar pontos de redimensionamento
+    if (isSelected) {
+      // Cantos para redimensionamento
+      final List<Offset> corners = [
+        rect.topLeft,
+        rect.topRight,
+        rect.bottomRight,
+        rect.bottomLeft,
+      ];
+
+      // Desenhar ponto em cada canto
+      for (int i = 0; i < corners.length; i++) {
+        final bool isActiveCorner = i == controller.resizeCornerIndex.value;
+
+        canvas.drawCircle(
+            corners[i],
+            isActiveCorner ? 8.0 : 6.0,
+            Paint()
+              ..color = isActiveCorner ? Colors.red : Colors.white
+              ..style = PaintingStyle.fill);
+
+        canvas.drawCircle(
+            corners[i],
+            isActiveCorner ? 8.0 : 6.0,
+            Paint()
+              ..color = Colors.black
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.0);
+      }
+    }
+  }
+
+  // Desenhar anotação em progresso
+  void _drawDraftAnnotation(
+      Canvas canvas, Offset start, Offset end, Color color) {
+    // Calcular retângulo
+    final Rect rect = Rect.fromPoints(start, end);
+
+    // Desenhar retângulo semitransparente
+    canvas.drawRect(
+        rect,
+        Paint()
+          ..color = color.withOpacity(0.2)
+          ..style = PaintingStyle.fill);
+
+    // Desenhar borda pulsante
+    canvas.drawRect(
+        rect,
+        Paint()
+          ..color = color.withOpacity(0.7 + pulseAnimation.value * 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0 + pulseAnimation.value * 1.0);
+
+    // Calcular dimensões em pixels da imagem original
+    final double normalWidth = _abs(end.dx - start.dx);
+    final double normalHeight = _abs(end.dy - start.dy);
+    final int pixelWidth = (normalWidth * image.width).round();
+    final int pixelHeight = (normalHeight * image.height).round();
+  }
+
+  @override
+  bool shouldRepaint(_AnnotationPainter oldDelegate) {
+    return oldDelegate.image != image ||
+        controller.annotations != controller.annotations ||
+        controller.selectedAnnotation.value !=
+            controller.selectedAnnotation.value ||
+        controller.editorState.value != controller.editorState.value ||
+        controller.startPoint.value != controller.startPoint.value ||
+        controller.currentPoint.value != controller.currentPoint.value;
   }
 }

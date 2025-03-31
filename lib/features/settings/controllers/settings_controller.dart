@@ -8,8 +8,6 @@ import 'package:microdetect/core/services/python_service.dart';
 import 'package:microdetect/design_system/app_colors.dart';
 import 'package:microdetect/design_system/app_toast.dart';
 import 'package:microdetect/design_system/app_typography.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
 import '../../../core/services/backend_service.dart';
 import '../../../core/utils/logger_util.dart';
 import '../../../features/backend_monitor/controllers/backend_monitor_controller.dart';
@@ -37,13 +35,6 @@ class SettingsController extends GetxController {
   final RxString backendVersion = ''.obs;
   final RxString errorMessage = ''.obs;
   
-  // Lista de tipos de eventos registrados para limpeza
-  final List<String> _registeredEvents = [];
-  
-  // Controles e dados adicionais
-  DateTime? _lastRefreshTime;
-  final _refreshDebounceTime = const Duration(seconds: 2);
-  
   // Controller para TabView - nullable para evitar erros se não estiver inicializado
   TabController? _tabController;
 
@@ -56,18 +47,8 @@ class SettingsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _setupEventListeners();
     _loadSettings();
     _checkBackendVersion();
-  }
-
-  @override
-  void onClose() {
-    _unregisterEventListeners();
-    if (_serverMonitorTimer != null) {
-      _serverMonitorTimer?.cancel();
-    }
-    super.onClose();
   }
   
   /// Configura um TabController
@@ -84,37 +65,18 @@ class SettingsController extends GetxController {
       }
     });
   }
-  
-  /// Configura os event listeners
-  void _setupEventListeners() {
-    // Registrar handler para o evento de refresh
-    _registerEventListener(ScreenEvents.refresh, _handleRefreshRequest);
-  }
-  
-  // Registrar um listener e armazenar o tipo para limpeza futura
-  void _registerEventListener(String eventType, Function(ScreenEvent) handler) {
-    Get.events.addListener(eventType, handler);
-    _registeredEvents.add(eventType);
-  }
-  
-  // Cancelar todos os listeners registrados
-  void _unregisterEventListeners() {
-    for (final eventType in _registeredEvents) {
-      Get.events.removeAllListenersForType(eventType);
-    }
-    _registeredEvents.clear();
-  }
+
   
   /// Trata solicitações de atualização
-  void _handleRefreshRequest(ScreenEvent event) {
-    final now = DateTime.now();
-    if (_lastRefreshTime == null || 
-        now.difference(_lastRefreshTime!) > _refreshDebounceTime) {
-      _lastRefreshTime = now;
-      _loadSettings();
-      _checkBackendVersion();
-    }
-  }
+  // void _handleRefreshRequest(ScreenEvent event) {
+  //   final now = DateTime.now();
+  //   if (_lastRefreshTime == null ||
+  //       now.difference(_lastRefreshTime!) > _refreshDebounceTime) {
+  //     _lastRefreshTime = now;
+  //     _loadSettings();
+  //     _checkBackendVersion();
+  //   }
+  // }
 
   /// Carrega as configurações atuais
   Future<void> _loadSettings() async {

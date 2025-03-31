@@ -65,6 +65,9 @@ class Dataset {
   /// Data da última atualização do dataset
   final DateTime updatedAt;
 
+  /// URL da imagem em miniatura do dataset
+  final String thumb;
+
   /// Número de imagens no dataset
   final int imagesCount;
 
@@ -84,6 +87,7 @@ class Dataset {
     required this.createdAt,
     required this.updatedAt,
     required this.imagesCount,
+    required this.thumb,
     this.classes = const [],
     this.annotationsCount,
     this.statistics,
@@ -117,6 +121,7 @@ class Dataset {
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       imagesCount: json['images_count'] ?? 0,
+      thumb: json['thumb'] ?? '',
       classes: json['classes'] != null
           ? List<String>.from(json['classes'])
           : [],
@@ -158,6 +163,7 @@ class Dataset {
       description: description ?? this.description,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      thumb: thumb,
       imagesCount: imagesCount ?? this.imagesCount,
       classes: classes ?? this.classes,
       annotationsCount: annotationsCount ?? this.annotationsCount,

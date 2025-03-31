@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'dart:developer' as developer;
 import 'package:microdetect/core/models/system_status_model.dart';
 import 'package:microdetect/core/services/system_status_service.dart';
 import 'package:microdetect/design_system/app_colors.dart';
 import 'package:microdetect/design_system/app_typography.dart';
 import 'package:microdetect/design_system/app_spacing.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
+import 'package:microdetect/features/shared/events/app_event.dart';
+import 'package:microdetect/features/shared/events/event_bus.dart';
 import '../../../design_system/app_toast.dart';
 
 class HomeController extends GetxController {
@@ -19,12 +20,7 @@ class HomeController extends GetxController {
   var isLoading = false.obs;
   var systemStatus = SystemStatusModel.defaultStatus().obs;
 
-  // Gerenciamento de eventos usando o novo EventManager
-  final List<String> _registeredEvents = [];
-  
-  // Controle de debounce para evitar múltiplos refreshes
-  DateTime? _lastRefreshTime;
-  final _refreshDebounceTime = const Duration(seconds: 2);
+  late StreamSubscription<EventData> event;
 
   HomeController({
     required this.systemStatusService,
@@ -33,54 +29,18 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    developer.log('HomeController - onInit()', name: 'HomeController');
+    listenRefreshDashboard();
+    // Carregar dados iniciais
     fetchSystemStatus();
-    _setupEventListeners();
   }
 
-  @override
-  void onClose() {
-    // Limpar os listeners ao fechar o controller
-    _unregisterEventListeners();
-    super.onClose();
-  }
-
-  // Configurar listeners para eventos
-  void _setupEventListeners() {
-    // Registrar handler para o evento de refresh
-    _registerEventListener(ScreenEvents.refresh, _handleRefreshEvent);
-    
-    // Registrar handler para o evento de ajuda
-    _registerEventListener(ScreenEvents.showHelp, _handleHelpEvent);
-  }
-  
-  // Registrar um listener e armazenar o tipo para limpeza futura
-  void _registerEventListener(String eventType, Function(ScreenEvent) handler) {
-    Get.events.addListener(eventType, handler);
-    _registeredEvents.add(eventType);
-  }
-  
-  // Cancelar todos os listeners registrados
-  void _unregisterEventListeners() {
-    for (final eventType in _registeredEvents) {
-      Get.events.removeAllListenersForType(eventType);
-    }
-    _registeredEvents.clear();
-  }
-  
-  // Handler para o evento de refresh
-  void _handleRefreshEvent(ScreenEvent event) {
-    // Aplicar debounce para evitar múltiplos refreshes
-    final now = DateTime.now();
-    if (_lastRefreshTime == null ||
-        now.difference(_lastRefreshTime!) > _refreshDebounceTime) {
-      _lastRefreshTime = now;
+  void listenRefreshDashboard() {
+    developer.log('HomeController - listenRefreshDashboard()', name: 'HomeController');
+    // Ouvir eventos de atualização do dashboard
+    event = EventBus.to.on(AppEvent.refresh, (data) {
       refreshDashboard();
-    }
-  }
-  
-  // Handler para o evento de ajuda
-  void _handleHelpEvent(ScreenEvent event) {
-    showHelpDialog();
+    });
   }
 
   /// Buscar status do sistema a partir da API
@@ -104,6 +64,7 @@ class HomeController extends GetxController {
 
   /// Atualizar os dados do dashboard
   void refreshDashboard() async {
+    developer.log('HomeController - refreshDashboard()', name: 'HomeController');
     isLoading.value = true;
 
     await fetchSystemStatus();
@@ -117,6 +78,7 @@ class HomeController extends GetxController {
 
   /// Exibir diálogo de ajuda para a tela inicial
   void showHelpDialog() {
+    developer.log('HomeController - showHelpDialog()', name: 'HomeController');
     final isDark = Get.isDarkMode;
     final textColor = isDark ? AppColors.white : AppColors.neutralDarkest;
 
@@ -184,5 +146,11 @@ class HomeController extends GetxController {
         ),
       ],
     );
+  }
+
+  @override
+  void onClose() {
+    event.cancel();
+    super.onClose();
   }
 }

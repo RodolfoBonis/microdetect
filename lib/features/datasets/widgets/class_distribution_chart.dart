@@ -102,7 +102,7 @@ class ClassDistributionChart extends StatelessWidget {
                       ),
                     ),
                     TextSpan(
-                      text: '${(classData.percentage * 100).toStringAsFixed(1)}%',
+                      text: '${(classData.percentage).toStringAsFixed(2)}%',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.normal,
@@ -192,11 +192,17 @@ class ClassDistributionChart extends StatelessWidget {
     ClassDistribution classData,
     BuildContext context,
   ) {
+    // Normalizar o percentual para estar entre 0 e 1
+    // Se percentage já estiver entre 0-1, mantém; caso contrário, divide por 100
+    final normalizedPercentage = classData.percentage <= 1.0 
+        ? classData.percentage 
+        : classData.percentage / 100;
+
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
-          toY: classData.percentage,
+          toY: normalizedPercentage,
           width: 20,
           color: _getBarColor(classData, x),
           gradient: useGradient
@@ -239,7 +245,7 @@ class ClassDistributionChart extends StatelessWidget {
     return LinearGradient(
       colors: [
         baseColor,
-        baseColor.withValues(alpha: 0.6),
+        baseColor.withOpacity(0.6),
       ],
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,

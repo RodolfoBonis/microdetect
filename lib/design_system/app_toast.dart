@@ -158,9 +158,6 @@ class AppToast {
         pauseOnHover: true,
         borderRadius: BorderRadius.circular(8),
       );
-    } else {
-      // Se não for possível exibir o toast, fazer fallback para o console
-      print('⚠️ Impossível mostrar toast: $title - $description');
     }
   }
   

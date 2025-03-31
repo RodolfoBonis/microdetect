@@ -219,14 +219,6 @@ class _MicrodetectAppState extends State<MicrodetectApp> {
   @override
   void initState() {
     super.initState();
-    _setupAppCloseHandler();
-  }
-
-  // Configurar handler para quando o aplicativo for fechado
-  void _setupAppCloseHandler() {
-    print('Configurando handler para fechar a aplicação...');
-    // Isso pode ser usado para registrar handlers adicionais se necessário
-    // para diferentes métodos de fechamento da aplicação
   }
 
   @override

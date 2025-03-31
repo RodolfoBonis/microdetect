@@ -1,72 +1,52 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
+import 'dart:developer' as developer;
 import 'package:microdetect/core/utils/logger_util.dart';
-import 'package:microdetect/features/datasets/models/class_distribution.dart';
 import 'package:microdetect/features/datasets/models/dataset.dart';
 import 'package:microdetect/features/datasets/services/dataset_service.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
 import 'package:microdetect/design_system/app_toast.dart';
+import 'package:microdetect/features/shared/events/app_event.dart';
+import 'package:microdetect/features/shared/events/event_bus.dart';
 
 class DatasetController extends GetxController {
   // Injeções de dependência
-  final DatasetService _datasetService = Get.find<DatasetService>();
+  final DatasetService _datasetService = Get.find<DatasetService>(tag: 'datasetService');
 
   // Estado observável
-  final RxList<Dataset> _datasets = <Dataset>[].obs;
+  final Rx<List<Dataset>> _datasets = Rx<List<Dataset>>([]);
   final RxBool _isLoading = false.obs;
   final RxString _errorMessage = ''.obs;
-  final RxBool _isGridView = true.obs;
   final RxString _searchQuery = ''.obs;
-
-  // Lista de tipos de eventos registrados para limpeza
-  final List<String> _registeredEvents = [];
+  late StreamSubscription<EventData> event;
 
   // Getters para estado observável
-  List<Dataset> get datasets => _datasets;
+  List<Dataset> get datasets => _datasets.value;
   bool get isLoading => _isLoading.value;
   String get errorMessage => _errorMessage.value;
-  bool get isGridView => _isGridView.value;
   String get searchQuery => _searchQuery.value;
 
   @override
   void onInit() {
+    developer.log('DatasetController - onInit()', name: 'DatasetController');
+    listenRefreshDashboard();
+    fetchDatasets();
     super.onInit();
-    _setupEventListeners();
-    fetchDatasets();
   }
 
-  @override
-  void onClose() {
-    _unregisterEventListeners();
-    super.onClose();
-  }
 
-  // Configurar escuta de eventos
-  void _setupEventListeners() {
-    _registerEventListener(ScreenEvents.refreshDatasets, _handleRefreshEvent);
-  }
 
-  // Registrar um listener e armazenar o tipo para limpeza futura
-  void _registerEventListener(String eventType, Function(ScreenEvent) handler) {
-    Get.events.addListener(eventType, handler);
-    _registeredEvents.add(eventType);
-  }
-
-  // Cancelar todos os listeners registrados
-  void _unregisterEventListeners() {
-    for (final eventType in _registeredEvents) {
-      Get.events.removeAllListenersForType(eventType);
-    }
-    _registeredEvents.clear();
-  }
-
-  // Handler para o evento de atualização
-  void _handleRefreshEvent(ScreenEvent event) {
-    fetchDatasets();
+  void listenRefreshDashboard() {
+    developer.log('HomeController - listenRefreshDashboard()', name: 'HomeController');
+    // Ouvir eventos de atualização do dashboard
+    event = EventBus.to.on(AppEvent.refresh, (data) {
+      fetchDatasets();
+    });
   }
 
   // Buscar todos os datasets
   Future<void> fetchDatasets() async {
+    developer.log('DatasetController - fetchDatasets()', name: 'DatasetController');
     _isLoading.value = true;
     _errorMessage.value = '';
 
@@ -76,7 +56,8 @@ class DatasetController extends GetxController {
       // Ordenar por data de atualização (mais recente primeiro)
       fetchedDatasets.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       
-      _datasets.assignAll(fetchedDatasets);
+      _datasets.value = fetchedDatasets;
+      developer.log('DatasetController - ${fetchedDatasets.length} datasets carregados', name: 'DatasetController');
     } catch (e) {
       _errorMessage.value = 'Erro ao carregar datasets: $e';
       LoggerUtil.error(_errorMessage.value, e);
@@ -238,101 +219,6 @@ class DatasetController extends GetxController {
     }
   }
 
-  // Adicionar classe a um dataset
-  Future<bool> addClass(int datasetId, String className) async {
-    _isLoading.value = true;
-    _errorMessage.value = '';
-
-    try {
-      final success = await _datasetService.addClass(datasetId, className);
-      
-      if (success) {
-        // Atualizar a lista de datasets
-        await fetchDatasets();
-        
-        // Notificar sucesso
-        AppToast.success(
-          'Sucesso',
-          description: 'Classe adicionada com sucesso!',
-        );
-        
-        return true;
-      } else {
-        _errorMessage.value = 'Erro ao adicionar classe';
-        LoggerUtil.error(_errorMessage.value);
-        
-        AppToast.error(
-          'Erro',
-          description: 'Não foi possível adicionar a classe',
-        );
-        
-        return false;
-      }
-    } catch (e) {
-      _errorMessage.value = 'Erro ao adicionar classe: $e';
-      LoggerUtil.error(_errorMessage.value, e);
-
-      AppToast.error(
-        'Erro',
-        description: 'Ocorreu um erro ao adicionar a classe',
-      );
-      
-      return false;
-    } finally {
-      _isLoading.value = false;
-    }
-  }
-
-  // Remover classe de um dataset
-  Future<bool> removeClass(int datasetId, String className) async {
-    _isLoading.value = true;
-    _errorMessage.value = '';
-
-    try {
-      final success = await _datasetService.removeClass(datasetId, className);
-      
-      if (success) {
-        // Atualizar a lista de datasets
-        await fetchDatasets();
-        
-        // Notificar sucesso
-        AppToast.success(
-          'Sucesso',
-          description: 'Classe removida com sucesso!',
-        );
-        
-        return true;
-      } else {
-        _errorMessage.value = 'Erro ao remover classe';
-        LoggerUtil.error(_errorMessage.value);
-        
-        AppToast.error(
-          'Erro',
-          description: 'Não foi possível remover a classe',
-        );
-        
-        return false;
-      }
-    } catch (e) {
-      _errorMessage.value = 'Erro ao remover classe: $e';
-      LoggerUtil.error(_errorMessage.value, e);
-
-      AppToast.error(
-        'Erro',
-        description: 'Ocorreu um erro ao remover a classe',
-      );
-      
-      return false;
-    } finally {
-      _isLoading.value = false;
-    }
-  }
-
-  // Alternar entre visualização em grade e lista
-  void toggleViewMode() {
-    _isGridView.value = !_isGridView.value;
-  }
-
   // Definir consulta de pesquisa
   void setSearchQuery(String query) {
     _searchQuery.value = query.toLowerCase();
@@ -340,14 +226,15 @@ class DatasetController extends GetxController {
 
   // Obter datasets filtrados pela consulta de pesquisa
   List<Dataset> getFilteredDatasets() {
-    if (_searchQuery.isEmpty) {
-      return _datasets;
+    final query = _searchQuery.value;
+    if (query.isEmpty) {
+      return datasets.toList();
     }
     
-    return _datasets.where((dataset) {
-      final nameMatch = dataset.name.toLowerCase().contains(_searchQuery.value);
-      final descMatch = dataset.description?.toLowerCase().contains(_searchQuery.value) ?? false;
-      final classMatch = dataset.classes.any((cls) => cls.toLowerCase().contains(_searchQuery.value));
+    return datasets.where((dataset) {
+      final nameMatch = dataset.name.toLowerCase().contains(query);
+      final descMatch = dataset.description?.toLowerCase().contains(query) ?? false;
+      final classMatch = dataset.classes.any((cls) => cls.toLowerCase().contains(query));
       
       return nameMatch || descMatch || classMatch;
     }).toList();
@@ -356,5 +243,11 @@ class DatasetController extends GetxController {
   // Limpar consulta de pesquisa
   void clearSearchQuery() {
     _searchQuery.value = '';
+  }
+
+  @override
+  void onClose() {
+    event.cancel();
+    super.onClose();
   }
 } 

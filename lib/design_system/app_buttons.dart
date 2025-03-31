@@ -227,7 +227,7 @@ class AppButton extends StatelessWidget {
 
     // Garantir que o estilo de texto mantenha o inherit consistente
     final TextStyle safeTextStyle = textStyle.copyWith(inherit: true);
-    children.add(Text(label, style: safeTextStyle));
+    children.add(Text(label, style: safeTextStyle.copyWith(color: textColor)));
 
     if (suffixIcon != null) {
       children.add(SizedBox(width: AppSpacing.xSmall));

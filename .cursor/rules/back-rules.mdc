@@ -25,34 +25,6 @@ Este documento define os padrões de desenvolvimento, arquitetura e design para 
 - **PyTorch/Ultralytics**: Biblioteca para modelos YOLO
 - **OpenCV**: Processamento de imagens
 - **SQLite/SQLAlchemy**: Armazenamento de metadados
-- **Pydantic**: Validação de dados e serialização
-
-## II. Estrutura do Projeto
-
-### Organização de Pastas
-
-```
-microdetect_backend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                    # Ponto de entrada da aplicação
-│   ├── config/                    # Configurações da aplicação
-│   ├── api/                       # Rotas da API
-│   ├── core/                      # Funcionalidades principais
-│   ├── database/                  # Modelos e conexão com banco
-│   ├── models/                    # Modelos ML
-│   ├── schemas/                   # Esquemas Pydantic
-│   ├── services/                  # Serviços
-│   └── utils/                     # Utilitários
-├── tests/                         # Testes
-├── alembic/                       # Migrações do banco de dados
-├── scripts/                       # Scripts utilitários
-└── data/                          # Diretório para dados
-    ├── datasets/                  # Diretórios de datasets
-    ├── models/                    # Modelos treinados
-    ├── gallery/                   # Imagens capturadas
-    └── temp/                      # Arquivos temporários
-```
 
 ### Convenções de Codificação
 

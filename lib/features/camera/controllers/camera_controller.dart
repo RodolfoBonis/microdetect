@@ -6,6 +6,7 @@ import 'package:camera_access/camera_access.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:microdetect/core/utils/logger_util.dart';
 import 'package:microdetect/design_system/app_toast.dart';
+import 'package:microdetect/features/datasets/models/dataset.dart';
 import 'package:microdetect/features/settings/services/settings_service.dart';
 import 'dart:io';
 
@@ -13,8 +14,6 @@ import '../enums/sidebar_content_enum.dart';
 import '../models/camera_image.dart';
 import '../models/gallery_image.dart';
 import '../services/camera_service.dart';
-import 'package:microdetect/features/shared/events/screen_events.dart';
-import 'package:microdetect/features/shared/events/event_manager.dart';
 
 class CameraController extends GetxController with WidgetsBindingObserver {
   // Dependências
@@ -66,10 +65,10 @@ class CameraController extends GetxController with WidgetsBindingObserver {
 
   // Variáveis auxiliares
   final RxDouble _sidebarWidth = 320.0.obs;
-  final Rx<String?> _selectedResolution = Rx<String?>(null);
+  final RxString _selectedResolution = 'hd'.obs;
   final RxList<String> _availableResolutions =
       <String>['sd', 'fullhd', 'hd'].obs;
-  final Rx<String?> _selectedWhiteBalance = Rx<String?>(null);
+  final Rx<String?> _selectedWhiteBalance = 'auto'.obs;
   final RxList<String> _availableWhiteBalances =
       <String>['auto', 'sunny', 'cloudy', 'tungsten', 'fluorescent'].obs;
 
@@ -89,9 +88,6 @@ class CameraController extends GetxController with WidgetsBindingObserver {
 
   // Dataset selecionado
   final Rx<int?> _selectedDatasetId = Rx<int?>(null);
-
-  // Lista de tipos de eventos registrados para limpeza
-  final List<String> _registeredEvents = [];
 
   // Estado de inicialização
   final RxString _cameraStatus = 'Câmera não inicializada'.obs;
@@ -143,7 +139,7 @@ class CameraController extends GetxController with WidgetsBindingObserver {
 
   double get sidebarWidth => _sidebarWidth.value;
 
-  String? get selectedResolution => _selectedResolution.value;
+  String get selectedResolution => _selectedResolution.value;
 
   List<String> get availableResolutions => _availableResolutions;
 
@@ -182,35 +178,8 @@ class CameraController extends GetxController with WidgetsBindingObserver {
     _initializeCamera();
 
     loadSavedImages();
-    _setupEventListeners();
   }
 
-  void _setupEventListeners() {
-    _registerEventListener(ScreenEvents.showHelp, _handleHelpEvent);
-  }
-
-  // Registrar um listener e armazenar o tipo para limpeza futura
-  void _registerEventListener(String eventType, Function(ScreenEvent) handler) {
-    Get.events.addListener(eventType, handler);
-    _registeredEvents.add(eventType);
-  }
-
-  // Cancelar todos os listeners registrados
-  void _unregisterEventListeners() {
-    for (final eventType in _registeredEvents) {
-      Get.events.removeAllListenersForType(eventType);
-    }
-    _registeredEvents.clear();
-  }
-
-  // Handler para o evento de ajuda
-  void _handleHelpEvent(ScreenEvent event) {
-    AppToast.info(
-      'Ajuda',
-      description:
-          'Esta é a tela da câmera. Aqui você pode capturar imagens e ajustar as configurações da câmera.',
-    );
-  }
 
   /// Atualiza o status da câmera
   void _updateCameraStatus(String status, {bool isLoading = false}) {
@@ -347,8 +316,10 @@ class CameraController extends GetxController with WidgetsBindingObserver {
       final settings = _settingsService.settings;
       _currentResolution.value =
           _sessionResolution ?? settings.defaultResolution;
+      _selectedResolution.value = _currentResolution.value;
       _whiteBalance.value =
           _sessionWhiteBalance ?? settings.defaultWhiteBalance;
+      _selectedWhiteBalance.value = _whiteBalance.value;
 
       // 7. Iniciar escuta do frameStream nativo do plugin
       _listenToFrameStream();
@@ -659,9 +630,6 @@ class CameraController extends GetxController with WidgetsBindingObserver {
 
   /// Callback para mudança de filtro
   void handleFilterChanged(String filter) {
-    // Log detalhado para debug
-    print(
-        'Filtro selecionado na tela: $filter (atual: ${_selectedFilter.value})');
 
     // Forçar uma atualização de estado mesmo se for o mesmo filtro (para garantir que "normal" sempre será aplicado)
     if (filter == 'normal' || filter != _selectedFilter.value) {
@@ -723,6 +691,7 @@ class CameraController extends GetxController with WidgetsBindingObserver {
 
     // Atualizar a resolução atual na UI
     _currentResolution.value = resolution;
+    _selectedResolution.value = resolution;
 
     // Aplicar a resolução - isso vai atualizar _sessionResolution se for bem sucedido
     await _applyResolution(resolution);
@@ -731,6 +700,7 @@ class CameraController extends GetxController with WidgetsBindingObserver {
     if (_sessionResolution != null &&
         _sessionResolution != _currentResolution.value) {
       _currentResolution.value = _sessionResolution!;
+      _selectedResolution.value = _sessionResolution!;
     }
   }
 
@@ -739,6 +709,7 @@ class CameraController extends GetxController with WidgetsBindingObserver {
     if (_whiteBalance.value == mode) return;
 
     _whiteBalance.value = mode;
+    _selectedWhiteBalance.value = mode;
 
     // Armazenar o balanço de branco escolhido durante a sessão
     _sessionWhiteBalance = mode;
@@ -811,15 +782,25 @@ class CameraController extends GetxController with WidgetsBindingObserver {
   }
 
   /// Callback quando um dataset é selecionado no painel de configurações
-  void handleDatasetSelected(int datasetId) {
-    _selectedDatasetId.value = datasetId;
+  void handleDatasetSelected(Dataset? dataset) {
 
+    _selectedDatasetId.value = dataset?.id;
+
+    if (dataset == null) {
+      AppToast.info(
+        'Dataset',
+        description:
+        'Nenhum dataset selecionado. As imagens capturadas não serão associadas a nenhum dataset.',
+      );
+    } else {
+      AppToast.info(
+        'Dataset',
+        description:
+        'Dataset selecionado: ${dataset.name}. As imagens capturadas serão associadas a ele.',
+      );
+    }
     // Mostrar mensagem de confirmação
-    AppToast.success(
-      'Sucesso',
-      description:
-          'Dataset selecionado! As imagens capturadas serão associadas a ele.',
-    );
+
 
     // Carregar imagens do dataset
     loadSavedImages();
@@ -926,7 +907,6 @@ class CameraController extends GetxController with WidgetsBindingObserver {
   @override
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
-    _unregisterEventListeners();
     _stopCamera();
     _frameTimer?.cancel();
     _frameStreamSubscription?.cancel();

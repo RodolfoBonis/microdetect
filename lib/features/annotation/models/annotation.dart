@@ -5,7 +5,7 @@ class Annotation {
   final int? id;
   final int? imageId;
   final int? datasetId;
-  final int classId;
+  final int? classId;
   final String? className;
   final double x; // Coordenada x do canto superior esquerdo (normalizada de 0 a 1)
   final double y; // Coordenada y do canto superior esquerdo (normalizada de 0 a 1)
@@ -20,7 +20,7 @@ class Annotation {
     this.id,
     this.imageId,
     this.datasetId,
-    required this.classId,
+    this.classId,
     this.className,
     required this.x,
     required this.y,
@@ -71,7 +71,6 @@ class Annotation {
       id: json['id'],
       imageId: json['image_id'],
       datasetId: json['dataset_id'],
-      classId: json['class_id'],
       className: json['class_name'],
       x: json['x']?.toDouble() ?? 0.0,
       y: json['y']?.toDouble() ?? 0.0,
@@ -94,7 +93,6 @@ class Annotation {
       if (id != null) 'id': id,
       if (imageId != null) 'image_id': imageId,
       if (datasetId != null) 'dataset_id': datasetId,
-      'class_id': classId,
       if (className != null) 'class_name': className,
       'x': x,
       'y': y,

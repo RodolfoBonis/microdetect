@@ -12,7 +12,7 @@ import 'package:microdetect/features/camera/models/gallery_image.dart';
 class ImageGalleryGrid extends StatelessWidget {
   /// Altura desejada dos itens da grade
   final double itemHeight;
-  
+
   /// Quantidade de colunas na grade
   final int crossAxisCount;
 
@@ -25,23 +25,24 @@ class ImageGalleryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AnnotationController controller = Get.find<AnnotationController>();
-    
+    final bool isDarkMode = Get.isDarkMode;
+
     return Obx(() {
       if (controller.isLoading.value) {
         return const Center(
           child: CircularProgressIndicator(),
         );
       }
-      
+
       if (controller.selectedDataset.value == null) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.photo_library_outlined,
                 size: 64,
-                color: AppColors.grey,
+                color: isDarkMode ? AppColors.lightGrey : AppColors.grey,
               ),
               const SizedBox(height: AppSpacing.medium),
               Text(
@@ -53,16 +54,16 @@ class ImageGalleryGrid extends StatelessWidget {
           ),
         );
       }
-      
+
       if (controller.images.isEmpty) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.image_not_supported_outlined,
                 size: 64,
-                color: AppColors.grey,
+                color: isDarkMode ? AppColors.lightGrey : AppColors.grey,
               ),
               const SizedBox(height: AppSpacing.medium),
               Text(
@@ -74,7 +75,7 @@ class ImageGalleryGrid extends StatelessWidget {
           ),
         );
       }
-      
+
       return GridView.builder(
         padding: const EdgeInsets.all(AppSpacing.small),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -87,7 +88,7 @@ class ImageGalleryGrid extends StatelessWidget {
         itemBuilder: (context, index) {
           final image = controller.images[index];
           final isSelected = controller.selectedImage.value?.id == image.id;
-          
+
           return ImageGalleryItem(
             image: image,
             isSelected: isSelected,
@@ -103,10 +104,10 @@ class ImageGalleryGrid extends StatelessWidget {
 class ImageGalleryItem extends StatelessWidget {
   /// Imagem a ser exibida
   final AnnotatedImage image;
-  
+
   /// Indica se esta imagem está selecionada
   final bool isSelected;
-  
+
   /// Callback quando o item é clicado
   final VoidCallback onTap;
 
@@ -119,112 +120,95 @@ class ImageGalleryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Get.isDarkMode;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color: isDarkMode
+              ? (isSelected ? AppColors.tertiaryDark : AppColors.surfaceDark)
+              : (isSelected ? AppColors.tertiaryLight : AppColors.white),
           borderRadius: BorderRadius.circular(AppSpacing.small),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.surfaceDark,
-            width: isSelected ? 3 : 1,
+            color: isDarkMode
+                ? (isSelected ? AppColors.primary : Colors.black)
+                : (isSelected ? AppColors.primary : AppColors.grey),
+            width: isSelected ? 2 : 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.5),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  )
-                ]
-              : null,
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Imagem (com overlay de contagem de anotações)
             Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Imagem
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(AppSpacing.small - 1),
-                      topRight: Radius.circular(AppSpacing.small - 1),
-                    ),
-                    child: CachedNetworkImage(
-                      imageUrl: image.url,
-                      fit: BoxFit.cover,
-                      progressIndicatorBuilder: (context, str, progress) {
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: progress.progress,
-                            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  
-                  // Badge com contagem de anotações
-                  if (image.annotations.isNotEmpty)
-                    Positioned(
-                      top: AppSpacing.xSmall,
-                      right: AppSpacing.xSmall,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.small,
-                          vertical: AppSpacing.xxSmall,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(AppSpacing.xSmall),
-                        ),
-                        child: Text(
-                          '${image.annotations.length}',
-                          style: AppTypography.labelMedium(context).copyWith(
-                            color: AppColors.white,
+              child: image.url.isEmpty
+                  ? Center(
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        size: 32,
+                        color:
+                            isDarkMode ? AppColors.lightGrey : AppColors.grey,
+                      ),
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: image.url,
+                          fit: BoxFit.cover,
+                          progressIndicatorBuilder:
+                              (context, url, downloadProgress) => Center(
+                            child: CircularProgressIndicator(
+                              value: downloadProgress.progress,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
+                        if (image.annotations.isNotEmpty)
+                          Positioned(
+                            top: AppSpacing.xSmall,
+                            right: AppSpacing.xSmall,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xSmall,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(
+                                  AppSpacing.xxSmall,
+                                ),
+                              ),
+                              child: Text(
+                                'Anotada',
+                                style:
+                                    AppTypography.labelSmall(context).copyWith(
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  
-                  // Seleção
-                  if (isSelected)
-                    Positioned(
-                      top: AppSpacing.xSmall,
-                      left: AppSpacing.xSmall,
-                      child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.xxSmall),
-                        decoration: const BoxDecoration(
-                          color: AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check,
-                          color: AppColors.white,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
             ),
-            
-            // Nome do arquivo
             Container(
-              padding: const EdgeInsets.all(AppSpacing.small),
-              decoration: const BoxDecoration(
-                color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(AppSpacing.small - 1),
-                  bottomRight: Radius.circular(AppSpacing.small - 1),
-                ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xSmall,
+                vertical: AppSpacing.xSmall,
               ),
+              color: isDarkMode
+                  ? (isSelected
+                      ? AppColors.tertiaryDark
+                      : AppColors.surfaceDark)
+                  : (isSelected
+                      ? AppColors.tertiaryLight
+                      : AppColors.surfaceLight),
               child: Text(
                 image.fileName,
-                style: AppTypography.bodySmall(context),
+                style: AppTypography.labelSmall(context).copyWith(
+                  color: isDarkMode ? AppColors.lightGrey : AppColors.darkGrey,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -234,4 +218,4 @@ class ImageGalleryItem extends StatelessWidget {
       ),
     );
   }
-} 
+}

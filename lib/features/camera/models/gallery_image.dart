@@ -52,6 +52,8 @@ class GalleryImage {
   /// Verifica se a imagem pertence a pelo menos um dataset
   bool get hasDatasets => datasets.isNotEmpty;
 
+  bool get hasAnnotations => annotations.isNotEmpty;
+
   /// Retorna os nomes dos datasets formatados em uma string
   String get datasetNames => datasets.isNotEmpty
       ? datasets.map((d) => d.name).join(', ')
