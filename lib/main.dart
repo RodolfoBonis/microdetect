@@ -256,7 +256,7 @@ class _MicrodetectAppState extends State<MicrodetectApp> {
           routeObserver,
         ],
         // Configuração das rotas
-        initialRoute: AppRoutes.backendMonitor,
+        initialRoute: AppRoutes.root,
         getPages: AppPages.pageRoutes,
         builder: (context, child) {
           return ScrollConfiguration(

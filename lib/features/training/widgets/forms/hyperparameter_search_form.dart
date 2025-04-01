@@ -40,6 +40,7 @@ class _HyperparameterSearchFormState extends State<HyperparameterSearchForm> {
   int _iterations = 5;
   String _selectedModelType = 'yolov8';
   List<String> _selectedModelSizes = ['n', 's'];
+  String _device = 'auto';
 
   // Valores para ranges
   RangeValues _batchSizeRange = const RangeValues(8, 32);
@@ -84,6 +85,10 @@ class _HyperparameterSearchFormState extends State<HyperparameterSearchForm> {
           } else if (searchSpace['model_size'] is String) {
             _selectedModelSizes = [searchSpace['model_size']];
           }
+        }
+
+        if (searchSpace.containsKey('device')) {
+          _device = searchSpace['device'] ?? 'auto';
         }
 
         if (searchSpace.containsKey('batch_size')) {
@@ -431,6 +436,39 @@ class _HyperparameterSearchFormState extends State<HyperparameterSearchForm> {
           ),
           const SizedBox(height: 32),
 
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Dispositivo*',
+              helperText: 'Hardware para execução (fixo para todas as iterações)',
+            ),
+            value: _device,
+            items: const [
+              DropdownMenuItem<String>(
+                value: 'auto',
+                child: Text('Auto (recomendado)'),
+              ),
+              DropdownMenuItem<String>(
+                value: 'cpu',
+                child: Text('CPU'),
+              ),
+              DropdownMenuItem<String>(
+                value: '0',
+                child: Text('GPU 0'),
+              ),
+              // Pode adicionar mais GPUs se necessário
+              DropdownMenuItem<String>(
+                value: '1',
+                child: Text('GPU 1'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _device = value!;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+
           // Botões de ação
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -625,6 +663,7 @@ class _HyperparameterSearchFormState extends State<HyperparameterSearchForm> {
             'min': _learningRateRange.start,
             'max': _learningRateRange.end,
           },
+          'device': _device,
         },
       };
 

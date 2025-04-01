@@ -37,11 +37,11 @@ class CameraBinding extends Bindings {
     final int? datasetId = arguments != null ? arguments['datasetId'] : null;
 
     // Register CameraController with the dataset ID
-    Get.put<CameraController>(
-      CameraController(
+    Get.lazyPut<CameraController>(
+      () => CameraController(
         datasetId: datasetId,
       ),
-      permanent: true
+      fenix: true
     );
   }
 } 

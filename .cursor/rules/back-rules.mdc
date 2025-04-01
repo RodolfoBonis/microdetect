@@ -25,6 +25,34 @@ Este documento define os padrões de desenvolvimento, arquitetura e design para 
 - **PyTorch/Ultralytics**: Biblioteca para modelos YOLO
 - **OpenCV**: Processamento de imagens
 - **SQLite/SQLAlchemy**: Armazenamento de metadados
+- **Schemas Personalizados**: Sistema próprio para validação de dados e serialização
+
+## II. Estrutura do Projeto
+
+### Organização de Pastas
+
+```
+microdetect_api/
+├── microdetect/
+│   ├── __init__.py               # Versão e inicializadores
+│   ├── server.py                 # Configuração do servidor FastAPI
+│   ├── cli.py                    # Interface de linha de comando
+│   ├── api/                      # Rotas da API
+│   │   ├── __init__.py           # Router principal
+│   │   └── endpoints/            # Endpoints específicos
+│   ├── core/                     # Configurações e utilitários core
+│   ├── database/                 # Modelos e conexão com banco
+│   │   └── migrations/           # Migrações Alembic
+│   ├── models/                   # Modelos de dados SQLAlchemy
+│   ├── schemas/                  # Schemas para serialização
+│   ├── services/                 # Serviços de negócio
+│   └── utils/                    # Utilitários
+├── tests/                        # Testes
+├── setup.py                      # Configuração do pacote
+├── requirements.txt              # Dependências
+├── alembic.ini                   # Configuração do Alembic
+└── README.md                     # Documentação
+```
 
 ### Convenções de Codificação
 
@@ -44,19 +72,18 @@ Este documento define os padrões de desenvolvimento, arquitetura e design para 
 
 ### Estrutura de Endpoints
 
-- **/api/v1/datasets**: Gerenciamento de datasets
-- **/api/v1/gallery**: Gerenciamento de imagens capturadas
-- **/api/v1/annotations**: Gerenciamento de anotações
+- **/api/v1/datasets**: Gerenciamento de datasets para treinamento
+- **/api/v1/images**: Gerenciamento de imagens individuais
+- **/api/v1/annotations**: Gerenciamento de anotações de objetos
 - **/api/v1/training**: Gerenciamento de treinamento de modelos
 - **/api/v1/models**: Gerenciamento de modelos treinados
-- **/api/v1/inference**: Endpoints para inferência
-- **/api/v1/analysis**: Análise de dados e estatísticas
+- **/api/v1/inference**: Endpoints para detecção em imagens
 - **/api/v1/system**: Informações e configurações do sistema
 
 ### WebSockets
 
 - **/ws/training/{id}**: Streaming de progresso de treinamento
-- **/ws/inference/{id}**: Streaming de resultados de inferência
+- **/ws/inference/{id}**: Streaming de resultados de inferência em tempo real
 
 ## IV. Banco de Dados
 
@@ -65,209 +92,160 @@ Este documento define os padrões de desenvolvimento, arquitetura e design para 
 1. **Dataset**: Coleção de imagens para treinamento/validação/teste
 2. **Image**: Imagens individuais com metadados
 3. **Annotation**: Anotações para imagens (bounding boxes, classes)
-4. **TrainingSession**: Sessões de treinamento de modelos
-5. **Model**: Modelos treinados com metadados
-6. **InferenceResult**: Resultados de inferência
+4. **DatasetImage**: Relação entre datasets e imagens
+5. **TrainingSession**: Sessões de treinamento de modelos
+6. **Model**: Modelos treinados com metadados
+7. **InferenceResult**: Resultados de inferência
 
 ### Relacionamentos
 
-- Um Dataset contém muitas Images
+- Um Dataset contém muitas Images através de DatasetImage
 - Uma Image pode ter muitas Annotations
 - Um Dataset está associado a muitas TrainingSessions
 - Uma TrainingSession resulta em um Model
 - Um Model gera muitos InferenceResults
 
-## V. Processamento de Imagens
+## V. Sistema de Schemas
+
+### Abordagem de Serialização
+
+O MicroDetect API implementa um sistema personalizado de schemas em vez de usar o Pydantic:
+
+1. **BaseSchema**: Classe base em `microdetect/schemas/base.py` que fornece:
+   - Inicialização via `__init__`
+   - Serialização para dicionário via método `dict()`
+   - Conversão de objetos ORM para schemas via método `from_orm()`
+
+2. **Schemas Especializados**:
+   - `dataset.py`: Schemas para datasets
+   - `image.py`: Schemas para imagens
+   - `annotation.py`: Schemas para anotações
+   - `model.py`: Schemas para modelos
+   - `training_session.py`: Schemas para sessões de treinamento
+   - `inference_result.py`: Schemas para resultados de inferência
+
+3. **Utilitários de Serialização**:
+   - Conversão de objetos Python para JSON
+   - Construção de respostas da API padronizadas
+
+## VI. Processamento de Imagens
 
 ### Pipeline de Processamento
 
-1. **Aquisição**: Captura de imagens (câmera USB, upload)
+1. **Aquisição**: Upload de imagens via API
 2. **Pré-processamento**: Normalização, ajustes básicos
-3. **Conversão**: Conversão entre formatos de imagem
-4. **Augmentação**: Técnicas de augmentação para treinamento
-5. **Processamento**: Filtros, realce, detecção de características
-6. **Anotação**: Ferramentas para anotação manual e automática
+3. **Armazenamento**: Imagens organizadas por datasets
+4. **Anotação**: Interface para anotação manual e automática
+5. **Augmentação**: Técnicas de augmentação para treinamento
+6. **Exportação**: Formatos compatíveis com YOLO
 
-### Otimizações
+### Serviço de Imagem
 
-- Processamento em lote para grandes conjuntos de imagens
-- Caching de resultados intermediários
-- Processamento paralelo quando apropriado
-- Uso eficiente de NumPy para operações vetorizadas
+O `image_service.py` implementa funcionalidades como:
+- Upload e armazenamento de imagens
+- Geração de thumbnails
+- Conversão entre formatos
+- Aplicação de transformações básicas
 
-## VI. Treinamento e Inferência
+## VII. Treinamento e Inferência
 
 ### Processo de Treinamento
 
-1. **Preparação de Dados**: Criação de dataset estruturado
-2. **Configuração**: Definição de hiperparâmetros
-3. **Inicialização**: Carregamento de pesos pré-treinados
-4. **Treinamento**: Execução do treinamento com callbacks
-5. **Validação**: Avaliação em conjunto de validação
+1. **Preparação de Dados**: Organização de imagens e anotações no formato YOLO
+2. **Configuração**: Definição de hiperparâmetros via API
+3. **Execução**: Treinamento assíncrono com callbacks de progresso
+4. **Monitoramento**: Métricas em tempo real via WebSockets
+5. **Avaliação**: Métricas de desempenho em conjunto de validação
 6. **Exportação**: Salvamento do modelo treinado
 
 ### Sistema de Inferência
 
-1. **Carregamento de Modelo**: Inicialização de modelo treinado
-2. **Pré-processamento**: Preparação de imagens para inferência
-3. **Detecção**: Execução da inferência
-4. **Pós-processamento**: Filtragem de resultados, NMS
-5. **Visualização**: Renderização dos resultados
+1. **Carregamento de Modelo**: Via `model_service.py`
+2. **Detecção**: Execução do modelo em imagens novas
+3. **Pós-processamento**: Filtragem por confiança, NMS
+4. **Visualização**: Geração de imagens com anotações visuais
+5. **Persistência**: Armazenamento de resultados no banco de dados
 
-### Agendamento e Monitoramento
+## VIII. Sistema de Arquivos
 
-- Agendamento de treinamentos longos
-- Monitoramento de recursos (CPU, GPU, memória)
-- Checkpoints automáticos
-- Early stopping e estratégias de ajuste de learning rate
+### Estrutura de Diretórios
 
-## VII. Sistema de Arquivos
+O sistema utiliza uma estrutura padrão em `~/.microdetect/`:
+```
+~/.microdetect/
+├── data/
+│   ├── datasets/          # Datasets organizados
+│   ├── models/            # Modelos treinados
+│   ├── images/            # Imagens originais
+│   ├── gallery/           # Imagens de galeria
+│   ├── temp/              # Arquivos temporários
+│   └── static/            # Arquivos estáticos
+```
 
-### Gerenciamento de Arquivos
+### Inicialização de Diretórios
 
-1. **Estrutura de Diretórios**: Organização clara e padronizada
-2. **Nomeação**: Convenções consistentes de nomeação
-3. **Metadados**: Armazenamento de metadados junto com arquivos
-4. **Limpeza**: Rotinas para limpeza de arquivos temporários
+O método `setup_user_directories()` no `server.py` garante que todos os diretórios necessários sejam criados durante a inicialização da aplicação.
 
-### Formatos Suportados
-
-- **Imagens**: PNG, JPG, TIFF
-- **Anotações**: YOLO, COCO, Pascal VOC
-- **Modelos**: PyTorch (.pt), ONNX
-- **Configurações**: YAML, JSON
-
-## VIII. Execução do Backend
+## IX. Execução do Backend
 
 ### Modos de Operação
 
-1. **Standalone**: Execução como serviço independente
-2. **Integrado**: Iniciado pelo aplicativo Flutter
-3. **CLI**: Interface de linha de comando para scripts
+1. **Servidor Web**: Via `start_server()` em `server.py`
+2. **CLI**: Interface de linha de comando em `cli.py`
+3. **Importação como Biblioteca**: Para uso em outros projetos Python
 
-### Ambiente de Execução
+### Configuração
 
-- **Virtual Environment**: Isolamento de dependências
-- **Multi-threading**: Para operações paralelas
-- **Configuração**: Variáveis de ambiente e arquivos de configuração
+O módulo `core/config.py` centraliza todas as configurações da aplicação:
+- Caminhos de diretórios
+- Configurações de banco de dados
+- Parâmetros do servidor
+- Opções de modelos ML
 
-## IX. Tratamento de Erros
+## X. Tratamento de Erros
 
 ### Estratégia de Tratamento de Erros
 
-1. **Hierarquia de Exceções**: Exceções customizadas para diferentes tipos de erro
-2. **Logging**: Sistema de logging abrangente com níveis apropriados
-3. **Recuperação**: Estratégias de fallback e recovery
-4. **Feedback**: Mensagens de erro claras e acionáveis
+1. **Validação de Entrada**: Validação rigorosa em schemas
+2. **Exceções Específicas**: Para diferentes tipos de erros
+3. **Respostas Padronizadas**: Formato consistente para erros da API
+4. **Logging**: Sistema de logging abrangente
 
-### Monitoramento e Diagnóstico
-
-- Logs estruturados para facilitar análise
-- Captura de telemetria para diagnóstico
-- Alertas para condições críticas
-
-## X. Testes
+## XI. Testes
 
 ### Estratégia de Testes
 
-1. **Testes Unitários**: Para funções e métodos individuais
-2. **Testes de Integração**: Para fluxos completos
-3. **Testes de API**: Para verificar endpoints
-4. **Testes de Performance**: Para operações críticas
+O arquivo `test_endpoints.py` implementa testes abrangentes para os endpoints da API, cobrindo:
+- Operações CRUD para todos os recursos
+- Casos de erro e validação
+- Fluxos completos de processamento
 
-### Ferramentas de Teste
+## XII. Desenvolvimento e Contribuição
 
-- **pytest**: Framework principal de testes
-- **pytest-cov**: Cobertura de código
-- **pytest-asyncio**: Testes para código assíncrono
-- **pytest-mock**: Mock de dependências
+### Processo de Desenvolvimento
 
-## XI. Padrões de Desenvolvimento
+1. **Versionamento**: Atualizar a versão em `microdetect/__init__.py`
+2. **Documentação**: Manter README.md atualizado
+3. **Testes**: Executar e atualizar testes via pytest
+4. **Dependências**: Gerenciar via requirements.txt
 
-### Padrões Arquiteturais
+### Packaging
 
-1. **Repository Pattern**: Para acesso a dados
-2. **Service Layer**: Para lógica de negócios
-3. **Dependency Injection**: Para desacoplamento
-4. **Command Pattern**: Para operações assíncronas
+O projeto utiliza `setup.py` para configuração do pacote, permitindo:
+- Instalação via pip
+- Distribuição como biblioteca
+- Execução de comandos via CLI
 
-### Práticas Recomendadas
+## XIII. Considerações de Deployment
 
-1. **Tipo Estático**: Uso de type hints
-2. **Documentação**: Docstrings para todas as funções públicas
-3. **Imutabilidade**: Preferência por estruturas imutáveis
-4. **Funções Puras**: Minimizar efeitos colaterais
+### Empacotamento com Flutter
 
-## XII. Considerações de Deployment
+- Após modificar o backend, atualizar a versão no `version.txt`
+- Empacotar o diretório `python_backend` e colocá-lo na pasta de assets do Flutter
+- O aplicativo Flutter gerencia o ciclo de vida do backend
 
-### Empacotamento
+## XIV. Referências e Recursos
 
-- Empacotamento com a aplicação Flutter
-- Distribuição de ambiente virtual completo
-- Scripts de instalação e atualização
-
-### Compatibilidade
-
-- Suporte para Windows, macOS e Linux
-- Gestão de dependências nativas
-- Detecção e configuração de hardware
-
-## XIII. Performance e Otimização
-
-### Otimizações Críticas
-
-1. **Processamento de Imagens**: Algoritmos otimizados para CPU/GPU
-2. **Inferência de Modelos**: Uso de TensorRT ou ONNX Runtime
-3. **I/O de Arquivo**: Acesso eficiente para grandes conjuntos de dados
-4. **API Responses**: Caching e paginação
-
-### Profile e Benchmarking
-
-- Ferramentas para identificação de gargalos
-- Benchmarks para operações críticas
-- Monitoramento contínuo de performance
-
-## XIV. Segurança
-
-### Práticas de Segurança
-
-1. **Validação de Entrada**: Validação rigorosa de todos os inputs
-2. **Sanitização de Paths**: Prevenção de path traversal
-3. **Configuração Segura**: Práticas seguras para configuração
-4. **Limitação de Recursos**: Prevenção de ataques DoS
-
-## XV. Integração com Frontend
-
-### Comunicação com Flutter
-
-1. **REST API**: Para operações síncronas principais
-2. **WebSockets**: Para streaming e notificações
-3. **Arquivos**: Para transferência de dados volumosos
-4. **Sistema de Eventos**: Para notificações assíncronas
-
-### Interface de Comunicação
-
-- Contratos claros via schemas Pydantic
-- Versionamento explícito da API
-- Documentação de endpoints
-
-## XVI. Considerações Éticas e Legais
-
-### Proteção de Dados
-
-- Anonimização de dados sensíveis
-- Opções para exclusão de dados
-- Conformidade com regulamentações de privacidade
-
-### Propriedade Intelectual
-
-- Licenciamento adequado de bibliotecas
-- Atribuição apropriada para modelos pré-treinados
-- Documentação de limitações e restrições
-
-## XVII. Referências e Recursos
-
-- Documentação oficial do Ultralytics YOLOv8
-- Documentação do FastAPI
-- Guias de melhores práticas para Python (PEP 8, PEP 257)
-- Literatura sobre visão computacional e processamento de imagens microscópicas
+- **Documentação**: README.md contém informações detalhadas de uso
+- **Testes**: Exemplos de uso na pasta tests/
+- **API Docs**: Disponível em `/docs` quando o servidor está rodando
