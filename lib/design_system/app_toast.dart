@@ -95,70 +95,98 @@ class AppToast {
     BuildContext? context,
     AlignmentGeometry alignment = Alignment.topRight,
   }) {
-    // Cria instância do toastification
-    final toastification = Toastification();
-    
-    // Obter o contexto preferencialmente do parâmetro, ou usar o GetX como fallback
-    if (context == null && overlayState == null) {
-      if (Get.context != null) {
-        context = Get.context;
-      } else if (Get.overlayContext != null) {
-        context = Get.overlayContext;
-      } else if (Get.key.currentContext != null) {
-        context = Get.key.currentContext;
-      }
-    }
+    // Avoid showing toasts during initialization or build phase
+    // Schedule it for the next frame to ensure build is complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        // Cria instância do toastification
+        final toastification = Toastification();
 
-    final Widget titleWidget = Text(
-      title,
-      style: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 14,
-      ),
-    );
+        // Obter o contexto preferencialmente do parâmetro, ou usar o GetX como fallback
+        if (context == null && overlayState == null) {
+          if (Get.context != null) {
+            context = Get.context;
+          } else if (Get.overlayContext != null) {
+            context = Get.overlayContext;
+          } else if (Get.key.currentContext != null) {
+            context = Get.key.currentContext;
+          }
+        }
 
-    final Widget? descriptionWidget = description != null
-        ? Text(
+        // Only show toast if we have a valid context
+        if (context != null && context!.mounted) {
+          final Widget titleWidget = Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          );
+
+          final Widget? descriptionWidget = description != null
+              ? Text(
             description,
             style: const TextStyle(
               fontSize: 12,
             ),
           )
-        : null;
+              : null;
 
-    if (context != null) {
-      toastification.show(
-        context: context,
-        title: titleWidget,
-        description: descriptionWidget,
-        type: type,
-        style: ToastificationStyle.fillColored,
-        autoCloseDuration: duration,
-        alignment: alignment,
-        animationDuration: const Duration(milliseconds: 300),
-        showProgressBar: true,
-        dragToClose: true,
-        closeOnClick: true,
-        pauseOnHover: true,
-        borderRadius: BorderRadius.circular(8),
-      );
-    } else if (overlayState != null) {
-      toastification.show(
-        overlayState: overlayState,
-        title: titleWidget,
-        description: descriptionWidget,
-        type: type,
-        style: ToastificationStyle.fillColored,
-        autoCloseDuration: duration,
-        alignment: alignment,
-        animationDuration: const Duration(milliseconds: 300),
-        showProgressBar: true,
-        dragToClose: true,
-        closeOnClick: true,
-        pauseOnHover: true,
-        borderRadius: BorderRadius.circular(8),
-      );
-    }
+          toastification.show(
+            context: context,
+            title: titleWidget,
+            description: descriptionWidget,
+            type: type,
+            style: ToastificationStyle.fillColored,
+            autoCloseDuration: duration,
+            alignment: alignment,
+            animationDuration: const Duration(milliseconds: 300),
+            showProgressBar: true,
+            dragToClose: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            borderRadius: BorderRadius.circular(8),
+          );
+        } else if (overlayState != null) {
+          // Use overlayState directly if provided
+          final Widget titleWidget = Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          );
+
+          final Widget? descriptionWidget = description != null
+              ? Text(
+            description,
+            style: const TextStyle(
+              fontSize: 12,
+            ),
+          )
+              : null;
+
+          toastification.show(
+            overlayState: overlayState,
+            title: titleWidget,
+            description: descriptionWidget,
+            type: type,
+            style: ToastificationStyle.fillColored,
+            autoCloseDuration: duration,
+            alignment: alignment,
+            animationDuration: const Duration(milliseconds: 300),
+            showProgressBar: true,
+            dragToClose: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            borderRadius: BorderRadius.circular(8),
+          );
+        }
+      } catch (e) {
+        // Just log the error but don't crash the app
+        debugPrint('Error showing toast: $e');
+      }
+    });
   }
   
   /// Limpa todos os toasts atualmente visíveis

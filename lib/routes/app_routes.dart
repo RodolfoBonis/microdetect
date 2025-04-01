@@ -11,6 +11,10 @@ abstract class AppRoutes {
   static final camera = root + _Paths.camera.path;
   static final annotations = root + _Paths.annotations.path;
   static final training = root + _Paths.training.path;
+  static final trainingCreate = training + _Paths.trainingCreate.path;
+  static final trainingDetails = training + _Paths.trainingDetails.path;
+  static final hyperparameters = training + _Paths.hyperparameters.path;
+  static final hyperparameterDetails = hyperparameters + _Paths.hyperparameterDetails.path;
   static final inference = root + _Paths.inference.path;
   static final analysis = root + _Paths.analysis.path;
   static final notFound = root + _Paths.notFound.path;
@@ -39,6 +43,10 @@ abstract class _Paths {
   static const camera = AppPathsModel(path: '/camera', title: 'Câmera');
   static const annotations = AppPathsModel(path: '/annotations', title: 'Anotações');
   static const training = AppPathsModel(path: '/training', title: 'Treinamento');
+  static const trainingCreate = AppPathsModel(path: '/create', title: 'Novo Treinamento');
+  static const trainingDetails = AppPathsModel(path: '/details', title: 'Detalhes do Treinamento');
+  static const hyperparameters = AppPathsModel(path: '/hyperparameters', title: 'Hiperparâmetros');
+  static const hyperparameterDetails = AppPathsModel(path: '/details', title: 'Detalhes do Hiperparâmetro');
   static const inference = AppPathsModel(path: '/inference', title: 'Inferência');
   static const analysis = AppPathsModel(path: '/analysis', title: 'Análise');
   static const notFound = AppPathsModel(path: '/not-found', title: 'Não Encontrado');

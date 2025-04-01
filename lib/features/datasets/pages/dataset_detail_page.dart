@@ -173,7 +173,7 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
                       const SizedBox(height: AppSpacing.xxSmall),
                       Text(
                         controller.dataset?.createdAt != null
-                            ? _formatDate(controller.dataset!.createdAt!)
+                            ? _formatDate(controller.dataset!.createdAt)
                             : 'N/A',
                         style: AppTypography.bodyMedium(context),
                       ),
@@ -193,7 +193,7 @@ class DatasetDetailPage extends GetView<DatasetDetailController> {
                       const SizedBox(height: AppSpacing.xxSmall),
                       Text(
                         controller.dataset?.updatedAt != null
-                            ? _formatDate(controller.dataset!.updatedAt!)
+                            ? _formatDate(controller.dataset!.updatedAt)
                             : 'N/A',
                         style: AppTypography.bodyMedium(context),
                       ),

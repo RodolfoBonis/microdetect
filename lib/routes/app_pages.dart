@@ -19,12 +19,18 @@ import 'package:microdetect/features/datasets/pages/datasets_page.dart';
 import 'package:microdetect/features/annotation/bindings/annotation_binding.dart';
 import 'package:microdetect/features/datasets/controllers/dataset_controller.dart';
 import 'package:microdetect/features/datasets/services/dataset_service.dart';
+import 'package:microdetect/features/training/bindings/hyperparameter_binding.dart';
+import 'package:microdetect/features/training/bindings/training_binding.dart';
+import 'package:microdetect/features/training/pages/hyperparameter_details_page.dart';
+import 'package:microdetect/features/training/pages/hyperparameter_search_page.dart';
+import 'package:microdetect/features/training/pages/training_create_page.dart';
+import 'package:microdetect/features/training/pages/training_details_page.dart';
+import 'package:microdetect/features/training/pages/training_home_page.dart';
 
 part 'app_routes.dart';
 
 /// Middleware para garantir que os controllers essenciais estejam disponíveis
 class DependencyMiddleware extends GetMiddleware {
-
   @override
   GetPage? onPageCalled(GetPage? page) {
     if (page != null) {
@@ -39,20 +45,14 @@ class DependencyMiddleware extends GetMiddleware {
   void _ensureEssentialControllersExist() {
     // Verificar e registrar DatasetService
     if (!Get.isRegistered<DatasetService>(tag: 'datasetService')) {
-      Get.put<DatasetService>(
-        DatasetService(),
-        tag: 'datasetService',
-        permanent: true
-      );
+      Get.put<DatasetService>(DatasetService(),
+          tag: 'datasetService', permanent: true);
     }
 
     // Verificar e registrar DatasetController
     if (!Get.isRegistered<DatasetController>(tag: 'datasetController')) {
-      Get.put<DatasetController>(
-        DatasetController(),
-        tag: 'datasetController',
-        permanent: true
-      );
+      Get.put<DatasetController>(DatasetController(),
+          tag: 'datasetController', permanent: true);
     }
   }
 }
@@ -125,6 +125,37 @@ abstract class AppPages {
           bindings: [
             DatasetBinding(),
             AnnotationBinding(),
+          ],
+        ),
+        GetPage(
+          name: _Paths.training.path,
+          page: () => TrainingHomePage(),
+          bindings: [TrainingBinding()],
+          preventDuplicates: true,
+          transition: Transition.fade,
+          children: [
+            GetPage(
+              name: _Paths.trainingCreate.path,
+              page: () => TrainingCreatePage(),
+              preventDuplicates: true,
+            ),
+            GetPage(
+              name: '${_Paths.trainingDetails.path}/:id',
+              page: () => const TrainingDetailsPage(),
+              preventDuplicates: true,
+            ),
+            GetPage(
+                name: _Paths.hyperparameters.path,
+                page: () => HyperparameterSearchPage(),
+                binding: HyperparameterBinding(),
+                preventDuplicates: true,
+                children: [
+                  GetPage(
+                    name: '${_Paths.hyperparameterDetails.path}/:id',
+                    page: () => const HyperparameterDetailsPage(),
+                    preventDuplicates: true,
+                  ),
+                ]),
           ],
         ),
         // GetPage(

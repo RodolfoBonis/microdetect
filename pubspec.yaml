@@ -71,6 +71,7 @@ dependencies:
   # Pacotes para manipulação de imagens
   flutter_image_compress: ^2.4.0
   dartx: ^1.2.0
+  percent_indicator: ^4.2.4
 
 dev_dependencies:
   flutter_test:
